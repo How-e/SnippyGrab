@@ -8,7 +8,7 @@ if (-not $bundlePath.StartsWith([IO.Path]::GetFullPath($artifactRoot) + [IO.Path
 & (Join-Path $PSScriptRoot 'provision-ocr.ps1')
 # A fresh staging directory prevents stale files entering a release.
 $stagingPath = Join-Path $artifactRoot ('staging-' + [Guid]::NewGuid().ToString('N'))
-dotnet publish (Join-Path $repoRoot 'src/SnippyGrab.App') -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishReadyToRun=true -p:Version=$Version -o $stagingPath
+dotnet publish (Join-Path $repoRoot 'src/SnippyGrab.App') -c Release -r win-x64 --self-contained true -p:ReleasePackaging=true -p:RestoreLockedMode=true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishReadyToRun=true -p:Version=$Version -o $stagingPath
 if ($LASTEXITCODE -ne 0) { throw 'Publish failed.' }
 # Keep the release x64-only, including only the sidecar dependencies actually used.
 $unusedPath = [IO.Path]::GetFullPath((Join-Path $stagingPath 'x86'))

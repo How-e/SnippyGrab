@@ -16,7 +16,7 @@ internal sealed class WelcomeWindow : Window
         panel.Children.Add(Ui.Text(HotkeyRegistration.Guidance(controller.Settings), 12, true));
         var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 10, 0, 0) };
         actions.Children.Add(Ui.Button("Settings", "Configure hotkeys and shelf", () => controller.ShowSettings()));
-        actions.Children.Add(Ui.Button("Start snipping", "Finish setup and stay in tray", () => controller.Try(() => { controller.Settings.FirstRunComplete = true; controller.Settings.LaunchOnStartup = startup.IsChecked == true; controller.ApplySettings(controller.Settings); Close(); })));
+        actions.Children.Add(Ui.Button("Start snipping", "Finish setup and stay in tray", () => controller.Try(() => { var draft = System.Text.Json.JsonSerializer.Deserialize<Settings>(System.Text.Json.JsonSerializer.Serialize(controller.Settings))!; draft.FirstRunComplete = true; draft.LaunchOnStartup = startup.IsChecked == true; controller.ApplySettings(draft); Close(); })));
         panel.Children.Add(actions);
     }
 }

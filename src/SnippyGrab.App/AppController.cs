@@ -34,6 +34,7 @@ internal sealed class AppController : IDisposable
     private bool dockWasVisible;
     private bool disposed;
     private bool exitRequested;
+    private string? cacheWarning;
     public AppController(bool background, string? isolatedDataDirectory = null, bool diagnostic = false)
     {
         dataDirectory = isolatedDataDirectory ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SnippyGrab");
@@ -43,10 +44,12 @@ internal sealed class AppController : IDisposable
         Settings.LaunchOnStartup = StartupService.Enabled;
         try { Repository = new(Settings.CachePath.Length == 0 ? Path.Combine(dataDirectory, "cache") : Settings.CachePath); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or ArgumentException)
-        { Repository = new(Path.Combine(dataDirectory, "cache")); Settings.CachePath = ""; }
+        { Repository = new(Path.Combine(dataDirectory, "cache")); Settings.CachePath = ""; cacheWarning = "Custom cache is unavailable. Using the default local cache; review Settings and retry the custom path."; }
         Repository.HistoryEnabled = Settings.HistoryEnabled; Repository.Load();
         DragDrop = new(Repository); Dock = new(this);
         tray = new Forms.NotifyIcon { Icon = System.Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath!) ?? System.Drawing.SystemIcons.Application, Text = "SnippyGrab · Print Screen to capture", Visible = !diagnostic };
+        Repository.PersistenceFailed += () => Notify("Capture pixels are safe in the cache and shelf, but history could not be saved. Cleanup is paused; retry via tray → Retry history save.");
+        if (cacheWarning is not null) Notify(cacheWarning);
         tray.DoubleClick += (_, _) => Run(() => Capture(CaptureMode.Region));
         Hotkeys.Capture += mode => Run(() => Capture(mode));
         Hotkeys.Configure(Settings, diagnostic); BuildTray();
@@ -71,8 +74,13 @@ internal sealed class AppController : IDisposable
         if (result is null || exitRequested || Exiting) return;
         var ready = Stopwatch.StartNew();
         var png = ImageService.Png(result.Image);
-        var record = Repository.Add(png, result.Image.PixelWidth, result.Image.PixelHeight, $"{result.Bounds.X},{result.Bounds.Y}");
-        Dock.Refresh(newCapture: true);
+        try { Repository.Add(png, result.Image.PixelWidth, result.Image.PixelHeight, $"{result.Bounds.X},{result.Bounds.Y}"); Dock.Refresh(newCapture: true); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
+        {
+            if (Settings.AutoCopy && await Clipboard.ImageAsync(result.Image, Settings.ClipboardPng, png)) Notify("Capture copied, but cache storage failed. Paste it now; check cache permissions/free space before retrying capture.");
+            else Notify("Capture storage and clipboard could not preserve this image. Check cache permissions/free space and retry capture.");
+            return;
+        }
         if (Settings.AutoCopy) await CopyImageCore(result.Image, png);
         Log($"capture_ready_ms={ready.ElapsedMilliseconds}; capture_total_ms={result.ElapsedMilliseconds + ready.ElapsedMilliseconds}");
     }
@@ -173,8 +181,8 @@ internal sealed class AppController : IDisposable
     }
     public void ApplySettings(Settings settings)
     {
-        StartupService.Set(settings.LaunchOnStartup); settingsService.Save(settings); Settings = settings;
-        Repository.HistoryEnabled = settings.HistoryEnabled; Repository.Persist();
+        SettingsTransaction.Apply(settings, StartupService.Enabled, StartupService.Set, settingsService.Save); Settings = settings;
+        Repository.HistoryEnabled = settings.HistoryEnabled; Try(Repository.Persist);
         Ui.Theme(settings.Theme); Hotkeys.Configure(settings, Hotkeys.Paused); cleanup.Interval = TimeSpan.FromMinutes(settings.CleanupMinutes); Dock.Refresh(); BuildTray();
         if (Hotkeys.Warnings.Count > 0) Notify(string.Join("\n", Hotkeys.Warnings));
     }
@@ -190,8 +198,8 @@ internal sealed class AppController : IDisposable
         Item("Show screenshot shelf", Dock.Reveal); Item("Focus screenshot shelf (keyboard)", Dock.FocusShelf); Item("Open recent captures", ShowHistory); Item("Hotkey help / conflicts", () => MessageBox.Show(HotkeyRegistration.Guidance(Settings) + "\n\n" + string.Join("\n", Hotkeys.Warnings), "SnippyGrab · Hotkey help")); Item("Open settings", ShowSettings);
         Item("Restore pins", () => { foreach (var pin in pins.Values) pin.RestoreInteraction(); });
         Item("Pause hotkeys", () => { Hotkeys.Configure(Settings, !Hotkeys.Paused); BuildTray(); }, Hotkeys.Paused);
-        Item("Clear temporary screenshots", ClearTemporary);
-        Item("Launch at Windows login", () => { Settings.LaunchOnStartup = !StartupService.Enabled; ApplySettings(Settings); }, StartupService.Enabled);
+        Item("Clear temporary screenshots", ClearTemporary); Item("Retry history save", () => { Repository.Persist(); Notify("History saved. Cleanup can resume."); });
+        Item("Launch at Windows login", () => { var draft = System.Text.Json.JsonSerializer.Deserialize<Settings>(System.Text.Json.JsonSerializer.Serialize(Settings))!; draft.LaunchOnStartup = !StartupService.Enabled; ApplySettings(draft); }, StartupService.Enabled);
         Item("About", () => MessageBox.Show("SnippyGrab 0.1.0 alpha\nNative, local screenshot shelf. MIT licensed.\nNo uploads, accounts, analytics or update polling.\n\nPrint Screen: region · Ctrl+Shift+S: fallback\nCtrl-click: select several · Drag: attach files\nClick: edit · Alt-drag: reorder\n\nUnsigned development build. See README for verification and limitations.", "SnippyGrab"));
         menu.Items.Add(new Forms.ToolStripSeparator()); Item("Exit", Exit);
         var old = tray.ContextMenuStrip; tray.ContextMenuStrip = menu; old?.Dispose();

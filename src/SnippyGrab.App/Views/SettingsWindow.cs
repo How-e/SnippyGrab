@@ -101,9 +101,10 @@ internal sealed class SettingsWindow : Window
                 if (!Path.IsPathFullyQualified(draft.CachePath) || draft.CachePath.StartsWith(@"\\", StringComparison.Ordinal)) throw new InvalidDataException("Cache path must be absolute and local.");
                 if (Path.GetFullPath(draft.CachePath) == Path.GetPathRoot(draft.CachePath)) throw new InvalidDataException("Choose a dedicated cache directory.");
             }
+            if (draft.CachePath.Length > 0) _ = new CaptureRepository(draft.CachePath);
             controller.ApplySettings(draft); Close();
         }
-        catch (Exception ex) when (ex is FormatException or InvalidDataException or ArgumentException or IOException or System.Security.SecurityException or TargetInvocationException)
+        catch (Exception ex) when (ex is FormatException or InvalidDataException or ArgumentException or IOException or System.Security.SecurityException or TargetInvocationException or UnauthorizedAccessException or AggregateException)
         { status.Text = "Settings could not be applied: " + ex.Message; }
     }
 }

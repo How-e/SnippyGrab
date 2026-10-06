@@ -27,6 +27,9 @@ public sealed class RepositoryState
 public sealed partial class CaptureRepository
 {
     private readonly string root;
+    private readonly Action<string, byte[]> write;
+    public bool PersistencePending { get; private set; }
+    public event Action? PersistenceFailed;
     private readonly Dictionary<string, int> leases = new(StringComparer.OrdinalIgnoreCase);
     private RepositoryState state = new();
     private bool recoveryNeedsBackup;
@@ -35,8 +38,9 @@ public sealed partial class CaptureRepository
     public bool HistoryEnabled { get; set; } = true;
     public bool Recovered { get; private set; }
     public bool CleanupBlocked { get; private set; }
-    public CaptureRepository(string directory)
+    public CaptureRepository(string directory, Action<string, byte[]>? writer = null)
     {
+        write = writer ?? AtomicFile.Write;
         root = Path.GetFullPath(directory);
         if (root.StartsWith(@"\\", StringComparison.Ordinal) || root == Path.GetPathRoot(root))
             throw new InvalidDataException("Cache must be a dedicated local directory.");
@@ -101,16 +105,17 @@ public sealed partial class CaptureRepository
     public CaptureRecord Add(byte[] png, int width, int height, string monitor = "")
     {
         var record = new CaptureRecord { FileName = "capture-" + Guid.NewGuid().ToString("N") + ".png", Width = width, Height = height, Monitor = monitor };
-        AtomicFile.Write(PathFor(record), png);
+        write(PathFor(record), png);
         state.Captures.Insert(0, record);
-        Persist();
+        try { Persist(); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException) { PersistenceFailed?.Invoke(); }
         return record;
     }
     public void Replace(CaptureRecord record, byte[] png, int width, int height)
     {
         // Immutable file identity keeps existing receiver/clipboard payloads intact after editing.
         var name = "capture-" + Guid.NewGuid().ToString("N") + ".png";
-        AtomicFile.Write(PathForName(name), png);
+        write(PathForName(name), png);
         var previous = (record.FileName, record.Width, record.Height, record.Edited);
         record.FileName = name; record.Width = width; record.Height = height; record.Edited = true;
         try { Persist(); }
@@ -129,7 +134,8 @@ public sealed partial class CaptureRepository
             File.Copy(metadata, Path.Combine(root, "history-recovered.invalid-" + Guid.NewGuid().ToString("N") + ".json"));
             recoveryNeedsBackup = false;
         }
-        AtomicFile.Write(metadata, SerializeState());
+        try { write(metadata, SerializeState()); PersistencePending = false; }
+        catch { PersistencePending = true; throw; }
     }
     private byte[] SerializeState()
     {
@@ -153,7 +159,7 @@ public sealed partial class CaptureRepository
             if (!SafeFile(metadata)) throw new InvalidDataException("Invalid metadata location.");
             File.Copy(metadata, Path.Combine(root, "history.invalid-" + Guid.NewGuid().ToString("N") + ".json"));
         }
-        AtomicFile.Write(metadata, SerializeState());
+        write(metadata, SerializeState());
         CleanupBlocked = false;
     }
     public IDisposable Lease(IEnumerable<CaptureRecord> records, bool transfer = false)
@@ -178,7 +184,7 @@ public sealed partial class CaptureRepository
     }
     public int Cleanup(DateTimeOffset now, int retentionHours, bool clear = false)
     {
-        if (CleanupBlocked) return 0; // Corrupt pin metadata must never turn into permission to delete images.
+        if (CleanupBlocked || PersistencePending) return 0; // Corrupt pin metadata must never turn into permission to delete images.
         var pinned = state.Captures.Where(c => c.Pinned).Select(c => c.FileName).ToHashSet();
         var removed = 0;
         foreach (var path in Directory.EnumerateFiles(root, "capture-*.png"))

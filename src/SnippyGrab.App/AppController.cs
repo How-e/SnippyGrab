@@ -88,8 +88,9 @@ internal sealed class AppController : IDisposable
     }
     public async Task CopyFiles(IReadOnlyList<CaptureRecord> records)
     {
-        using var lease = Repository.Lease(records, transfer: true);
-        if (!await Clipboard.FilesAsync(TransferPayload.Files(Repository, records))) Notify("Clipboard is busy. Try Copy again.");
+        var ordered = TransferPayload.Ordered(Repository, records);
+        using var lease = Repository.Lease(ordered, transfer: true);
+        if (!await Clipboard.FilesAsync(TransferPayload.Files(Repository, ordered))) Notify("Clipboard is busy. Try Copy again.");
     }
     public async Task Ocr(CaptureRecord record)
     {

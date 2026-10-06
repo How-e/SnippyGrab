@@ -104,6 +104,31 @@ public sealed class ImageIntegrationTests
         Sta(() => { var image = Synthetic(); var data = new DataObject(); data.SetImage(image); data.SetData("PNG", new MemoryStream(ImageService.Png(image))); Assert.True(data.GetDataPresent(DataFormats.Bitmap)); Assert.True(data.GetDataPresent("PNG")); return true; });
     }
     [Fact]
+    public void DragDataAndFileClipboardUseTheSameReorderedNonadjacentPayload()
+    {
+        Sta(() =>
+        {
+            var root = Path.Combine(Path.GetTempPath(), "SnippyGrab-drag-order-" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                var repository = new CaptureRepository(root);
+                for (var i = 0; i < 4; i++) repository.Add(ImageService.Png(Synthetic()), 160, 100);
+                var captures = (List<CaptureRecord>)repository.Captures; var a = captures[0]; var c = captures[2];
+                ShelfOrder.Move(captures, a.Id, c.Id);
+                var request = new[] { a, c, a };
+                var expected = TransferPayload.Files(repository, request);
+                var drag = new DragDropService(repository).BuildData(request);
+                Assert.Equal(expected, Assert.IsType<string[]>(drag.GetData(DataFormats.FileDrop)));
+                Assert.False(drag.GetDataPresent(DataFormats.Bitmap));
+                var single = new DragDropService(repository).BuildData([a, a]);
+                Assert.True(single.GetDataPresent(DataFormats.Bitmap)); Assert.True(single.GetDataPresent("PNG"));
+                Assert.Single(Assert.IsType<string[]>(single.GetData(DataFormats.FileDrop)));
+            }
+            finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+            return true;
+        });
+    }
+    [Fact]
     public async Task OcrRecognizesSyntheticErrorWithoutDesktop()
     {
         var bytes = Sta(() =>

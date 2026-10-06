@@ -196,7 +196,7 @@ internal sealed class DockWindow : Window
         { available = false; grid.Children.Add(Ui.Text("Image unavailable", 12)); }
         var border = new Border { Child = grid, CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(2), BorderBrush = selected.Contains(capture.Id) ? (Brush)FindResource("Accent") : new SolidColorBrush(Color.FromArgb(90, 120, 136, 156)), Background = (Brush)FindResource("Surface"), Margin = new Thickness(3), Focusable = true, Tag = capture.Id };
         AutomationProperties.SetName(border, $"Screenshot {capture.Width} by {capture.Height}{(capture.Pinned ? ", pinned" : "")}. Click to edit; drag to attach.");
-        var badge = Ui.Button($"{visible.IndexOf(capture) + 1}/{visible.Count}{(capture.Pinned ? " · pin" : "")}", "Focus this screenshot for keyboard actions without opening the editor", () => FocusCapture(capture.Id));
+        var badge = Ui.Button($"{visible.IndexOf(capture) + 1}/{visible.Count}{(capture.Pinned ? " · pin" : "")}", $"Focus screenshot {visible.IndexOf(capture) + 1} of {visible.Count} without opening the editor. Selected file transfers use ascending shelf numbers.", () => FocusCapture(capture.Id));
         badge.FontSize = 10; badge.Padding = new Thickness(6, 2, 6, 2); badge.HorizontalAlignment = HorizontalAlignment.Right; badge.VerticalAlignment = VerticalAlignment.Top; badge.Opacity = 0.9; grid.Children.Add(badge);
         var state = Ui.Text("", 10); state.HorizontalAlignment = HorizontalAlignment.Left; state.VerticalAlignment = VerticalAlignment.Top;
         state.Background = (Brush)FindResource("Surface"); state.IsHitTestVisible = false; grid.Children.Add(state);

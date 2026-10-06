@@ -210,9 +210,18 @@ public sealed partial class CaptureRepository
 
 public static class TransferPayload
 {
+    public static IReadOnlyList<CaptureRecord> Ordered(CaptureRepository repository, IEnumerable<CaptureRecord> records)
+    {
+        var requested = records.ToArray(); var ids = requested.Select(c => c.Id).ToHashSet();
+        var ordered = repository.Captures.Where(c => ids.Contains(c.Id)).ToArray();
+        var current = ordered.ToDictionary(c => c.Id, c => c.FileName);
+        if (ordered.Length == 0 || ordered.Length != ids.Count || requested.Any(c => current[c.Id] != c.FileName))
+            throw new IOException("Selected capture is no longer available in the shelf. Select it again.");
+        return ordered;
+    }
     public static string[] Files(CaptureRepository repository, IEnumerable<CaptureRecord> records)
     {
-        var paths = records.Select(repository.PathFor).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        var paths = Ordered(repository, records).Select(repository.PathFor).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         if (paths.Length == 0 || paths.Any(p => !File.Exists(p))) throw new IOException("Capture file is no longer available.");
         return paths;
     }

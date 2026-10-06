@@ -30,14 +30,20 @@ internal sealed class DragDropService(CaptureRepository repository)
 {
     public void Drag(DependencyObject source, IReadOnlyList<CaptureRecord> records)
     {
-        using var lease = repository.Lease(records, transfer: true);
-        var paths = TransferPayload.Files(repository, records);
+        var ordered = TransferPayload.Ordered(repository, records);
+        using var lease = repository.Lease(ordered, transfer: true);
+        DragDrop.DoDragDrop(source, BuildData(ordered), DragDropEffects.Copy);
+    }
+    internal DataObject BuildData(IReadOnlyList<CaptureRecord> records)
+    {
+        var ordered = TransferPayload.Ordered(repository, records);
+        var paths = TransferPayload.Files(repository, ordered);
         var data = new DataObject(); data.SetData(DataFormats.FileDrop, paths);
-        if (records.Count == 1)
+        if (ordered.Count == 1)
         {
             var image = ImageService.Load(paths[0]); data.SetImage(image);
             data.SetData("PNG", new MemoryStream(ImageService.Png(image)));
         }
-        DragDrop.DoDragDrop(source, data, DragDropEffects.Copy);
+        return data;
     }
 }

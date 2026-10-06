@@ -48,6 +48,8 @@ Report incorrect/stale images, duplicate captures, visible delay, focus loss or 
 
 If a browser/editor rejects the drop, report what happened and its version; receiver support must be established per application. Supports //.
 
+ order retest: select captures in reverse-click order and a nonadjacent pair; both file-copy and drag should deliver exactly those captures in ascending current shelf-number order. Alt-reorder and repeat, including selections spanning scrolling. The numbered order runs away from the anchored primary card; it may run right-to-left or bottom-to-top. Record receiver presentation separately from this payload contract, with build/receiver versions. History file transfers use underlying shelf order, which can differ from the history list's time order.
+
 ### Compact shelf, scrolling and selection
 
 1. With 10–20 disposable captures, move away from the dock. It should occupy a small footprint rather than cover the desktop.

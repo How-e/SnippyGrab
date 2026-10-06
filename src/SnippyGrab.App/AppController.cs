@@ -79,7 +79,7 @@ internal sealed class AppController : IDisposable
         if (result is null || exitRequested || Exiting) return;
         var ready = Stopwatch.StartNew();
         var png = ImageService.Png(result.Image);
-        try { Repository.Add(png, result.Image.PixelWidth, result.Image.PixelHeight, $"{result.Bounds.X},{result.Bounds.Y}"); Dock.Refresh(newCapture: true); }
+        try { Repository.Add(png, result.Image.PixelWidth, result.Image.PixelHeight, string.Join(",", Forms.Screen.AllScreens.Where(screen => !result.Bounds.Intersect(new PixelRect(screen.Bounds.X, screen.Bounds.Y, screen.Bounds.Width, screen.Bounds.Height)).IsEmpty).Select(screen => screen.DeviceName))); Dock.Refresh(newCapture: true); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
         {
             if (Settings.AutoCopy && await Clipboard.ImageAsync(result.Image, Settings.ClipboardPng, png)) Notify("Capture copied, but cache storage failed. Paste it now; check cache permissions/free space before retrying capture.");
@@ -160,14 +160,14 @@ internal sealed class AppController : IDisposable
         if (!Directory.Exists(directory)) throw new IOException("The export folder is no longer available.");
         Process.Start(new ProcessStartInfo { FileName = directory!, UseShellExecute = true });
     });
-    public void Pin(CaptureRecord record) => Try(() => { record.Pinned = !record.Pinned; Repository.Persist(); Dock.Refresh(); });
+    public void Pin(CaptureRecord record) => Try(() => { Repository.SetPinned(record, !record.Pinned); Dock.Refresh(); });
     public void Detach(CaptureRecord record) => Try(() =>
     {
-        record.Pinned = true; Repository.Persist();
+        Repository.SetPinned(record, true);
         if (pins.TryGetValue(record.Id, out var existing)) { existing.RestoreInteraction(); return; }
         var pin = new PinWindow(this, record); pins[record.Id] = pin; pin.Closed += (_, _) => pins.Remove(record.Id); pin.Show();
     });
-    public void Dismiss(IEnumerable<CaptureRecord> records) => Try(() => { foreach (var c in records) c.Dismissed = true; Repository.Persist(); Dock.Refresh(); });
+    public void Dismiss(IEnumerable<CaptureRecord> records) => Try(() => { Repository.Dismiss(records); Dock.Refresh(); });
     public void Reorder(Guid from, Guid target) => Try(() =>
     {
         // Shelf order is persisted directly in the repository list; history sorts by timestamp independently.

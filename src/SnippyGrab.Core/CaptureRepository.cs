@@ -37,6 +37,7 @@ public sealed partial class CaptureRepository
     private readonly HashSet<string> sessionFiles = new(StringComparer.OrdinalIgnoreCase);
     public bool PersistencePending { get; private set; }
     public event Action? PersistenceFailed;
+    public event Action? Changed;
     public event Action<CaptureRecord>? RevisionChanged;
     private readonly Dictionary<string, int> leases = new(StringComparer.OrdinalIgnoreCase);
     private RepositoryState state = new();
@@ -140,6 +141,17 @@ public sealed partial class CaptureRepository
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException) { PersistenceFailed?.Invoke(); }
         return record;
     }
+    public void SetPinned(CaptureRecord record, bool pinned)
+    {
+        var previous = record.Pinned; record.Pinned = pinned;
+        try { Persist(); } catch { record.Pinned = previous; throw; }
+    }
+    public void Dismiss(IEnumerable<CaptureRecord> records)
+    {
+        var previous = records.DistinctBy(c => c.Id).Select(c => (c, c.Dismissed)).ToArray();
+        foreach (var (record, _) in previous) record.Dismissed = true;
+        try { Persist(); } catch { foreach (var (record, dismissed) in previous) record.Dismissed = dismissed; throw; }
+    }
     public void Restore(IEnumerable<CaptureRecord> records, DateTimeOffset now)
     {
         var items = records.DistinctBy(c => c.Id).ToArray();
@@ -177,6 +189,7 @@ public sealed partial class CaptureRepository
         }
         try { write(metadata, SerializeState()); PersistencePending = false; }
         catch { PersistencePending = true; throw; }
+        Changed?.Invoke();
     }
     private byte[] SerializeState()
     {

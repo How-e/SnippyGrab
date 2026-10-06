@@ -4,7 +4,7 @@ using SnippyGrab.App.Services;
 namespace SnippyGrab.App.Views;
 
 internal enum EditTool { Arrow, Rectangle, Ellipse, Pen, Line, Text, Highlight, Number, Blur, Pixelate, Redact, Crop, Spotlight, OcrArea }
-internal sealed record Annotation(EditTool Tool, Point Start, Point End, Color Color, double Stroke, double TextSize, string Text, Point[] Points, BitmapSource? Patch = null);
+internal sealed record Annotation(EditTool Tool, Point Start, Point End, Color Color, double Stroke, double TextSize, string Text, IReadOnlyList<Point> Points, BitmapSource? Patch = null);
 internal sealed record EditorState(BitmapSource Base, Annotation[] Marks);
 internal sealed class EditorWindow : Window
 {
@@ -32,6 +32,7 @@ internal sealed class EditorWindow : Window
     private bool discard;
     private bool closeApproved;
     private bool copyRetryNeeded;
+    private Task? documentWork;
     private readonly EditorCommitCoordinator commits = new();
     private readonly EditorCommitCoordinator closes = new();
     public EditorWindow(AppController controller, CaptureRecord record)
@@ -39,7 +40,7 @@ internal sealed class EditorWindow : Window
         Ui.StyleWindow(this);
         this.controller = controller; this.record = record;
         expectedRevision = record.FileName;
-        journal = new(new EditorState(ImageService.Load(controller.Repository.PathFor(record)), []), 20);
+        journal = new(new EditorState(ImageService.Load(controller.Repository.PathFor(record)), []), 20, RetainedBytes, 256L * 1024 * 1024);
         Title = $"SnippyGrab · {record.Width} × {record.Height}"; Width = 1000; Height = 700; MinWidth = 660; MinHeight = 440; WindowStartupLocation = WindowStartupLocation.CenterScreen;
         var root = new DockPanel { Margin = new Thickness(12) }; Content = root;
         var actions = new WrapPanel();
@@ -51,11 +52,11 @@ internal sealed class EditorWindow : Window
         actions.Children.Add(Ui.Button("Undo", "Undo (Ctrl+Z)", Undo)); actions.Children.Add(Ui.Button("Redo", "Redo (Ctrl+Y)", Redo));
         actions.Children.Add(Ui.Button("−", "Zoom out", () => Zoom(scale.ScaleX / 1.2))); actions.Children.Add(Ui.Button("+", "Zoom in", () => Zoom(scale.ScaleX * 1.2)));
         actions.Children.Add(Ui.Button("Fit", "Fit image", Fit));
-        actions.Children.Add(Ui.Button("OCR", "Copy text from the edited screenshot", () => controller.Run(async () => await CopyOcr(Render(journal.Current)))));
+        actions.Children.Add(Ui.Button("OCR", "Copy text from the edited screenshot", () => controller.Run(() => CopyDocumentOcr())));
         actions.Children.Add(Ui.Button("Discard", "Close without applying unsaved changes", () => { discard = true; Close(); }));
         DockPanel.SetDock(actions, Dock.Top); root.Children.Add(actions);
         var toolbar = new WrapPanel { Margin = new Thickness(0, 4, 0, 8) };
-        tools = new ComboBox { Width = 118, ItemsSource = Enum.GetValues<EditTool>(), SelectedItem = EditTool.Arrow, ToolTip = "Annotation tool" };
+        tools = new ComboBox { MinWidth = 138, ItemsSource = Enum.GetValues<EditTool>().Select(t => new ToolChoice(t, ToolLabel(t))), DisplayMemberPath = nameof(ToolChoice.Label), SelectedValuePath = nameof(ToolChoice.Tool), SelectedValue = EditTool.Arrow, ToolTip = "Annotation tool" };
         toolbar.Children.Add(tools);
         color = new TextBox { Text = controller.Settings.AnnotationColor, Width = 100, ToolTip = "Color (#RRGGBB or #AARRGGBB)" }; toolbar.Children.Add(color);
         stroke = new TextBox { Text = controller.Settings.StrokeSize.ToString(CultureInfo.InvariantCulture), Width = 44, ToolTip = "Stroke thickness" }; toolbar.Children.Add(stroke);
@@ -69,25 +70,25 @@ internal sealed class EditorWindow : Window
         surface = new EditorSurface(journal.Current) { LayoutTransform = scale, Cursor = Cursors.Cross, Focusable = true };
         viewport = new ScrollViewer { Content = surface, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Background = new SolidColorBrush(Color.FromRgb(12, 15, 19)) };
         root.Children.Add(viewport);
-        surface.MouseLeftButtonDown += (_, e) => { if (journal.Current.Marks.Length >= 500) { status.Text = "500 annotations reached. Apply and reopen to continue."; return; } start = Clamp(e.GetPosition(surface)); points.Clear(); points.Add(start); drawing = true; surface.CaptureMouse(); e.Handled = true; };
+        surface.MouseLeftButtonDown += (_, e) => { if (commits.Busy || documentWork is not null) return; if (journal.Current.Marks.Length >= 500) { status.Text = "500 annotations reached. Apply and reopen to continue."; return; } start = Clamp(e.GetPosition(surface)); points.Clear(); points.Add(start); drawing = true; surface.CaptureMouse(); e.Handled = true; };
         surface.MouseMove += (_, e) =>
         {
             if (!drawing) return;
-            var point = Clamp(e.GetPosition(surface)); if (Tool == EditTool.Pen && points.Count < 20000) points.Add(point);
-            surface.Preview = Make(point); surface.InvalidateVisual();
+            var point = Clamp(e.GetPosition(surface)); if (Tool == EditTool.Pen && points.Count < 20000 && (point - points[^1]).Length >= 0.75) points.Add(point);
+            surface.Preview = Make(point, preview: true); surface.InvalidateVisual();
         };
         surface.MouseLeftButtonUp += (_, e) =>
         {
             if (!drawing) return;
             drawing = false; surface.ReleaseMouseCapture(); surface.Preview = null;
             var end = Clamp(e.GetPosition(surface)); var annotation = Make(end);
-            controller.Try(() => Commit(annotation)); e.Handled = true;
+            controller.Run(() => StartDocumentEdit(annotation)); e.Handled = true;
         };
         PreviewMouseWheel += (_, e) => { if ((Keyboard.Modifiers & ModifierKeys.Control) == 0) return; Zoom(scale.ScaleX * (e.Delta > 0 ? 1.15 : 1 / 1.15)); e.Handled = true; };
         PreviewKeyDown += (_, e) =>
         {
             if (e.Key == Key.Escape) { if (drawing) { drawing = false; surface.ReleaseMouseCapture(); surface.Preview = null; surface.InvalidateVisual(); } else Close(); e.Handled = true; }
-            if (commits.Busy) { e.Handled = true; return; }
+            if (commits.Busy || documentWork is not null) { e.Handled = true; return; }
             if (Keyboard.Modifiers != ModifierKeys.Control || Keyboard.FocusedElement is TextBox) return;
             if (e.Key == Key.Z) Undo(); else if (e.Key == Key.Y) Redo(); else if (e.Key == Key.C) controller.Run(ApplyCopy); else if (e.Key == Key.S) controller.Run(ExportPng); else return;
             e.Handled = true;
@@ -100,49 +101,71 @@ internal sealed class EditorWindow : Window
             controller.Run(async () => { await RequestCloseAsync(); });
         };
         lease = new(controller.Repository, record);
-        Closed += (_, _) => { ocrLifetime.Cancel(); ocrLifetime.Dispose(); lease.Dispose(); };
+        Closed += (_, _) => { ocrLifetime.Cancel(); ocrLifetime.Dispose(); lease.Dispose(); surface.Preview = null; surface.State = null; viewport.Content = null; points.Clear(); journal.Clear(); };
     }
-    private EditTool Tool => (EditTool)(tools.SelectedItem ?? EditTool.Arrow);
+    private sealed record ToolChoice(EditTool Tool, string Label) { public override string ToString() => Label; }
+    internal static string ToolLabel(EditTool tool) => tool switch { EditTool.Pen => "Freehand", EditTool.Highlight => "Highlighter", EditTool.Number => "Numbered marker", EditTool.Redact => "Solid redaction", EditTool.OcrArea => "OCR selected area", _ => tool.ToString() };
+    private EditTool Tool => (EditTool)(tools.SelectedValue ?? EditTool.Arrow);
     private Point Clamp(Point p) => new(Math.Clamp(p.X, 0, journal.Current.Base.PixelWidth), Math.Clamp(p.Y, 0, journal.Current.Base.PixelHeight));
-    private Annotation Make(Point end)
+    private Annotation Make(Point end, bool preview = false)
     {
         Color c; try { c = (Color)ColorConverter.ConvertFromString(color.Text); } catch (FormatException) { c = Colors.OrangeRed; }
         c.A = 255; // Redaction and annotations never inherit accidental transparent alpha.
         var width = double.TryParse(stroke.Text, CultureInfo.InvariantCulture, out var w) && double.IsFinite(w) ? Math.Clamp(w, 1, 30) : 3;
         var size = double.TryParse(textSize.Text, CultureInfo.InvariantCulture, out var t) && double.IsFinite(t) ? Math.Clamp(t, 8, 120) : 24;
-        return new(Tool, start, end, c, width, size, Tool == EditTool.Number ? number.ToString(CultureInfo.InvariantCulture) : caption.Text, points.ToArray());
+        return new(Tool, start, end, c, width, size, Tool == EditTool.Number ? number.ToString(CultureInfo.InvariantCulture) : caption.Text, Tool == EditTool.Pen ? preview ? points : points.ToArray() : []);
     }
-    private void Commit(Annotation mark)
+    internal async Task StartDocumentEdit(Annotation mark)
+    {
+        var content = (UIElement)Content; content.IsEnabled = false;
+        try { documentWork = CommitAsync(mark); await documentWork; }
+        finally { documentWork = null; content.IsEnabled = true; }
+    }
+    private async Task CommitAsync(Annotation mark)
     {
         var area = PixelRect.Between((int)mark.Start.X, (int)mark.Start.Y, (int)mark.End.X, (int)mark.End.Y).Intersect(new(0, 0, journal.Current.Base.PixelWidth, journal.Current.Base.PixelHeight));
         if (mark.Tool == EditTool.OcrArea)
         {
-            if (!area.IsEmpty) controller.Run(async () => await CopyOcr(ImageService.Crop(Render(journal.Current), area)));
+            if (!area.IsEmpty) controller.Run(() => CopyDocumentOcr(area));
             surface.InvalidateVisual(); return;
         }
         if (mark.Tool == EditTool.Crop)
         {
             if (area.Width < 2 || area.Height < 2) return;
-            journal.Push(new(ImageService.Crop(Render(journal.Current), area), [])); Refresh(); Fit(); dirty = true; return;
+            journal.Push(await BuildStateAsync(journal.Current, mark)); Refresh(); Fit(); dirty = true; return;
         }
         if (mark.Tool is EditTool.Blur or EditTool.Pixelate)
         {
             if (area.Width < 2 || area.Height < 2) return;
-            var patch = Effects.Apply(ImageService.Crop(Render(journal.Current), area), mark.Tool == EditTool.Pixelate);
-            mark = mark with { Start = new(area.X, area.Y), End = new(area.Right, area.Bottom), Patch = patch };
         }
         if (mark.Tool == EditTool.Number) number++;
-        journal.Push(journal.Current with { Marks = [.. journal.Current.Marks, mark] }); dirty = true; Refresh();
+        journal.Push(await BuildStateAsync(journal.Current, mark)); dirty = true; Refresh();
     }
-    private void Undo() { journal.Undo(); dirty = true; Refresh(); }
-    private void Redo() { journal.Redo(); dirty = true; Refresh(); }
+    internal static Task<EditorState> BuildStateAsync(EditorState state, Annotation mark)
+    {
+        if (mark.Tool is not (EditTool.Crop or EditTool.Blur or EditTool.Pixelate)) return Task.FromResult(state with { Marks = [.. state.Marks, mark] });
+        var area = PixelRect.Between((int)mark.Start.X, (int)mark.Start.Y, (int)mark.End.X, (int)mark.End.Y).Intersect(new(0, 0, state.Base.PixelWidth, state.Base.PixelHeight));
+        if (area.Width < 2 || area.Height < 2) return Task.FromResult(state);
+        return Task.Run(() =>
+        {
+            // Create the drawing on this worker; all input bitmaps are frozen and cross-thread safe.
+            var rendered = Render(state);
+            var crop = ImageService.Crop(rendered, area);
+            if (mark.Tool == EditTool.Crop) return new EditorState(crop, []);
+            var patch = Effects.Apply(crop, mark.Tool == EditTool.Pixelate);
+            return state with { Marks = [.. state.Marks, mark with { Start = new(area.X, area.Y), End = new(area.Right, area.Bottom), Patch = patch }] };
+        });
+    }
+    private void Undo() { if (!journal.CanUndo) return; journal.Undo(); dirty = true; Refresh(); }
+    private void Redo() { if (!journal.CanRedo) return; journal.Redo(); dirty = true; Refresh(); }
     private void Refresh() { surface.State = journal.Current; surface.Width = journal.Current.Base.PixelWidth; surface.Height = journal.Current.Base.PixelHeight; surface.InvalidateVisual(); }
     private void Fit() => Zoom(Math.Min(1, Math.Min(Math.Max(200, viewport.ActualWidth - 24) / journal.Current.Base.PixelWidth, Math.Max(200, viewport.ActualHeight - 24) / journal.Current.Base.PixelHeight)));
     private void Zoom(double value) { scale.ScaleX = scale.ScaleY = Math.Clamp(value, 0.03, 8); status.Text = $"{scale.ScaleX:P0} · {journal.Current.Base.PixelWidth} × {journal.Current.Base.PixelHeight} · Esc closes and applies" + (string.IsNullOrWhiteSpace(record.ExportPath) ? "" : " · Last PNG export: " + record.ExportPath); }
-    private BitmapSource Apply()
+    private async Task<BitmapSource> ApplyAsync()
     {
-        var image = Render(journal.Current);
-        controller.Repository.Replace(record, ImageService.Png(image), image.PixelWidth, image.PixelHeight, expectedRevision);
+        var image = await RenderAsync(journal.Current);
+        var png = await Task.Run(() => ImageService.Png(image));
+        controller.Repository.Replace(record, png, image.PixelWidth, image.PixelHeight, expectedRevision);
         expectedRevision = record.FileName;
         dirty = false; controller.Dock.Refresh(); return image;
     }
@@ -152,7 +175,7 @@ internal sealed class EditorWindow : Window
         content.IsEnabled = false;
         try
         {
-            var image = dirty ? Apply() : ImageService.Load(controller.Repository.PathFor(record));
+            var image = dirty ? await ApplyAsync() : await Task.Run(() => ImageService.Load(controller.Repository.PathFor(record)));
             copyRetryNeeded = !await controller.CopyImage(image);
             status.Text = copyRetryNeeded ? "Edits are saved to the shelf. Clipboard is busy; retry Apply + copy or close again, or Discard to close." : "Applied to the managed shelf image and copied to clipboard. Use Export PNG for a separate file.";
             return !copyRetryNeeded;
@@ -170,7 +193,7 @@ internal sealed class EditorWindow : Window
         var content = (UIElement)Content; content.IsEnabled = false;
         try
         {
-            if (dirty) Apply();
+            if (dirty) await ApplyAsync();
             var outcome = controller.Save(record, this);
             status.Text = outcome.Status switch
             {
@@ -197,6 +220,7 @@ internal sealed class EditorWindow : Window
         if (closeApproved) return true;
         try
         {
+            if (documentWork is { } pending) await pending;
             if (!discard && (dirty || commits.Busy || copyRetryNeeded) && !await ApplyCopy()) return false;
             closeApproved = true;
             Close();
@@ -208,12 +232,29 @@ internal sealed class EditorWindow : Window
             return false;
         }
     }
+    private async Task CopyDocumentOcr(PixelRect? area = null)
+    {
+        var token = ocrLifetime.Token; var state = journal.Current;
+        var image = await Task.Run(() => area is { } crop ? ImageService.Crop(Render(state), crop) : Render(state));
+        if (!token.IsCancellationRequested) await CopyOcr(image);
+    }
     private async Task CopyOcr(BitmapSource image)
     {
         status.Text = "Reading text locally…";
         var token = ocrLifetime.Token;
         var outcome = await controller.OcrText(image, token);
         if (!token.IsCancellationRequested) status.Text = outcome;
+    }
+    internal static long RetainedBytes(IReadOnlyList<EditorState> states)
+    {
+        var images = new HashSet<BitmapSource>(ReferenceEqualityComparer.Instance);
+        var marks = new HashSet<Annotation>(ReferenceEqualityComparer.Instance);
+        foreach (var state in states)
+        {
+            images.Add(state.Base);
+            foreach (var mark in state.Marks) { marks.Add(mark); if (mark.Patch is not null) images.Add(mark.Patch); }
+        }
+        return images.Sum(image => (long)image.PixelWidth * image.PixelHeight * 4) + marks.Sum(mark => (long)mark.Points.Count * 16 + mark.Text.Length * 2L + 128);
     }
     internal static BitmapSource Render(EditorState state)
     {
@@ -225,6 +266,7 @@ internal sealed class EditorWindow : Window
         }
         var bitmap = new RenderTargetBitmap(state.Base.PixelWidth, state.Base.PixelHeight, 96, 96, PixelFormats.Pbgra32); bitmap.Render(drawing); bitmap.Freeze(); return bitmap;
     }
+    internal static Task<BitmapSource> RenderAsync(EditorState state) => Task.Run(() => Render(state));
     internal static void Draw(DrawingContext dc, Annotation m, int width, int height)
     {
         var brush = new SolidColorBrush(m.Color); var pen = new Pen(brush, m.Stroke) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round, LineJoin = PenLineJoin.Round };
@@ -243,8 +285,18 @@ internal sealed class EditorWindow : Window
                 dc.DrawLine(pen, m.End, new Point(m.End.X - head * Math.Cos(angle - 0.45), m.End.Y - head * Math.Sin(angle - 0.45)));
                 dc.DrawLine(pen, m.End, new Point(m.End.X - head * Math.Cos(angle + 0.45), m.End.Y - head * Math.Sin(angle + 0.45))); break;
             case EditTool.Pen:
-                if (m.Points.Length == 1) dc.DrawEllipse(brush, null, m.Start, m.Stroke / 2, m.Stroke / 2);
-                for (var i = 1; i < m.Points.Length; i++) dc.DrawLine(pen, m.Points[i - 1], m.Points[i]); break;
+                if (m.Points.Count == 1) dc.DrawEllipse(brush, null, m.Start, m.Stroke / 2, m.Stroke / 2);
+                else if (m.Points.Count > 1)
+                {
+                    var path = new StreamGeometry();
+                    using (var context = path.Open())
+                    {
+                        context.BeginFigure(m.Points[0], false, false);
+                        for (var i = 1; i < m.Points.Count; i++) context.LineTo(m.Points[i], true, false);
+                    }
+                    path.Freeze(); dc.DrawGeometry(null, pen, path);
+                }
+                break;
             case EditTool.Text:
                 dc.DrawText(new FormattedText(m.Text, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface("Segoe UI"), m.TextSize, brush, 1), m.Start); break;
             case EditTool.Number:
@@ -259,11 +311,12 @@ internal sealed class EditorWindow : Window
     }
     private sealed class EditorSurface : FrameworkElement
     {
-        public EditorState State { get; set; }
+        public EditorState? State { get; set; }
         public Annotation? Preview { get; set; }
         public EditorSurface(EditorState state) { State = state; Width = state.Base.PixelWidth; Height = state.Base.PixelHeight; }
         protected override void OnRender(DrawingContext dc)
         {
+            if (State is null) return;
             dc.DrawImage(State.Base, new Rect(0, 0, Width, Height));
             foreach (var mark in State.Marks) Draw(dc, mark, State.Base.PixelWidth, State.Base.PixelHeight);
             if (Preview is not null) Draw(dc, Preview, State.Base.PixelWidth, State.Base.PixelHeight);

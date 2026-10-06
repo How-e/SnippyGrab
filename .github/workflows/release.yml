@@ -10,8 +10,8 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
           dotnet-version: '10.0.400'
       - run: ./scripts/provision-ocr.ps1
@@ -19,6 +19,8 @@ jobs:
       - run: dotnet restore --locked-mode
       - run: dotnet build --no-restore -c Release -warnaserror
       - run: dotnet test --no-build -c Release
+      - run: ./scripts/audit-dependencies.ps1
+        shell: pwsh
       - name: Package unsigned portable and per-user installer
         shell: pwsh
         run: |

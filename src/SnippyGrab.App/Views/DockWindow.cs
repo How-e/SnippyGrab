@@ -20,6 +20,8 @@ internal sealed class DockWindow : Window
     private readonly DispatcherTimer collapseTimer = new() { Interval = TimeSpan.FromMilliseconds(180) };
     private MonitorInfo? anchor;
     private int configuredMonitor = int.MinValue;
+    private string configuredIdentity = "";
+    private DockOrientation LayoutOrientation => DockLayout.Orientation(controller.Settings.Orientation, controller.Settings.Corner);
     private bool positionQueued;
     private bool keyboardMode;
     private bool expanded;
@@ -73,8 +75,8 @@ internal sealed class DockWindow : Window
     public void Refresh(bool newCapture = false)
     {
         if (newCapture) { index = 0; selection.Reset(); keyboardMode = false; expanded = !controller.Settings.AutoCollapse; anchor = null; }
-        if (configuredMonitor != controller.Settings.DockMonitor) { configuredMonitor = controller.Settings.DockMonitor; anchor = null; }
-        anchor ??= MonitorService.ForPointer(controller.Settings.DockMonitor);
+        if (configuredMonitor != controller.Settings.DockMonitor || configuredIdentity != controller.Settings.DockMonitorIdentity) { configuredMonitor = controller.Settings.DockMonitor; configuredIdentity = controller.Settings.DockMonitorIdentity; anchor = null; }
+        anchor ??= MonitorService.ForPointer(controller.Settings.DockMonitor, controller.Settings.DockMonitorIdentity);
         visible = controller.Repository.Captures.Where(c => CaptureLifetime.Visible(c, controller.Settings.DockLifetimeMinutes, DateTimeOffset.UtcNow)).ToList();
         selection.Update(visible, visible.ElementAtOrDefault(index)?.Id);
         var files = visible.Select(c => c.FileName).ToHashSet();
@@ -91,6 +93,7 @@ internal sealed class DockWindow : Window
         }
     }
     public void Reveal() { if (!IsVisible) anchor = null; Refresh(); if (visible.Count > 0) { Show(); UpdateLayout(); Position(); ScheduleHide(); } }
+    internal void TopologyChanged() { anchor = null; Refresh(); if (IsVisible) Position(); }
     public void FocusShelf() { Reveal(); if (selection.Current is { } current) FocusCapture(current.Id); }
     private void FocusCapture(Guid id)
     {
@@ -139,10 +142,10 @@ internal sealed class DockWindow : Window
         Topmost = controller.Settings.AlwaysOnTop;
         var children = new List<UIElement>();
         BeginAnimation(OpacityProperty, null); Opacity = controller.Settings.DockOpacity;
-        shelf.Orientation = controller.Settings.Orientation == DockOrientation.Horizontal ? Orientation.Horizontal : Orientation.Vertical;
+        shelf.Orientation = LayoutOrientation == DockOrientation.Horizontal ? Orientation.Horizontal : Orientation.Vertical;
         if (visible.Count == 0) { shelf.Children.Clear(); return; }
         var count = expanded ? controller.Settings.ExpandedItems : 1;
-        var monitor = anchor ??= MonitorService.ForPointer(controller.Settings.DockMonitor);
+        var monitor = anchor ??= MonitorService.ForPointer(controller.Settings.DockMonitor, controller.Settings.DockMonitorIdentity);
         var horizontal = shelf.Orientation == Orientation.Horizontal;
         var budget = DpiGeometry.ToDip(horizontal ? monitor.Work.Width : monitor.Work.Height, monitor.Dpi) * (horizontal ? 0.55 : 0.48);
         double used = 0;
@@ -158,7 +161,7 @@ internal sealed class DockWindow : Window
             for (var i = 0; i < Math.Min(2, visible.Count - 1); i++)
                 children.Add(new Border { Width = horizontal ? 4 : controller.Settings.ThumbnailSize - (i + 1) * 12, Height = horizontal ? 64 : 4, CornerRadius = new CornerRadius(2), Background = new SolidColorBrush(Color.FromArgb((byte)(150 - i * 40), 81, 99, 124)), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center });
         }
-        if (DockLayout.Reverse(controller.Settings.Orientation, controller.Settings.Corner)) children.Reverse();
+        if (DockLayout.Reverse(LayoutOrientation, controller.Settings.Corner)) children.Reverse();
         if (!shelf.Children.Cast<UIElement>().SequenceEqual(children))
         {
             shelf.Children.Clear(); foreach (var child in children) shelf.Children.Add(child);
@@ -171,8 +174,8 @@ internal sealed class DockWindow : Window
         if (cards.TryGetValue(stamp, out var old) && !old.Available) cards.Remove(stamp);
         var card = cards.GetOrAdd(stamp, () => CreateCard(capture));
         card.Frame.BorderBrush = (Brush)FindResource(selected.Contains(capture.Id) ? "Accent" : "Muted");
-        card.Frame.HorizontalAlignment = controller.Settings.Corner is DockCorner.TopRight or DockCorner.BottomRight ? HorizontalAlignment.Right : HorizontalAlignment.Left;
-        card.Frame.VerticalAlignment = controller.Settings.Corner is DockCorner.BottomLeft or DockCorner.BottomRight ? VerticalAlignment.Bottom : VerticalAlignment.Top;
+        card.Frame.HorizontalAlignment = controller.Settings.Corner is DockCorner.Top or DockCorner.Bottom ? HorizontalAlignment.Center : DockLayout.Right(controller.Settings.Corner) ? HorizontalAlignment.Right : HorizontalAlignment.Left;
+        card.Frame.VerticalAlignment = controller.Settings.Corner is DockCorner.Left or DockCorner.Right ? VerticalAlignment.Center : DockLayout.Bottom(controller.Settings.Corner) ? VerticalAlignment.Bottom : VerticalAlignment.Top;
         var focused = keyboardMode && selection.Focused == capture.Id;
         card.State.Text = focused ? selected.Contains(capture.Id) ? "Focus · selected" : "Focus" : selected.Contains(capture.Id) ? "Selected" : "";
         card.State.Visibility = card.State.Text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
@@ -317,7 +320,7 @@ internal sealed class DockWindow : Window
         if (key is Key.Up or Key.Left or Key.Down or Key.Right or Key.Home or Key.End && modifiers is ModifierKeys.None or ModifierKeys.Control)
         {
             keyboardMode = true; hideTimer.Stop(); collapseTimer.Stop();
-            var reverse = DockLayout.Reverse(controller.Settings.Orientation, controller.Settings.Corner);
+            var reverse = DockLayout.Reverse(LayoutOrientation, controller.Settings.Corner);
             if (key == Key.Home) selection.Focus(visible[0].Id);
             else if (key == Key.End) selection.Focus(visible[^1].Id);
             else selection.Move((key is Key.Up or Key.Left ? -1 : 1) * (reverse ? -1 : 1));
@@ -348,7 +351,7 @@ internal sealed class DockWindow : Window
     private void Position()
     {
         if (!IsVisible) return;
-        var monitor = anchor ??= MonitorService.ForPointer(controller.Settings.DockMonitor);
+        var monitor = anchor ??= MonitorService.ForPointer(controller.Settings.DockMonitor, controller.Settings.DockMonitorIdentity);
         // SetWindowPos uses physical origin; only size is converted with the destination monitor DPI.
         var width = DpiGeometry.ToPixel(ActualWidth, monitor.Dpi); var height = DpiGeometry.ToPixel(ActualHeight, monitor.Dpi);
         var placement = DockLayout.Place(monitor.Work, width, height, controller.Settings.Corner);

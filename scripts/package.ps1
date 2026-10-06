@@ -14,6 +14,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Publish failed.' }
 $unusedPath = [IO.Path]::GetFullPath((Join-Path $stagingPath 'x86'))
 if ($unusedPath.StartsWith([IO.Path]::GetFullPath($stagingPath) + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -and (Test-Path -LiteralPath $unusedPath)) { Remove-Item -LiteralPath $unusedPath -Recurse -Force }
 Get-ChildItem -LiteralPath $stagingPath -Filter '*.pdb' | Remove-Item -Force
+& (Join-Path $PSScriptRoot 'audit-dependencies.ps1') -ComponentDirectory $stagingPath
 foreach ($name in @('README.md', 'LICENSE', 'THIRD-PARTY-NOTICES.md')) { Copy-Item -LiteralPath (Join-Path $repoRoot $name) -Destination $stagingPath }
 Copy-Item -LiteralPath (Join-Path $repoRoot 'licenses') -Destination $stagingPath -Recurse
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'install.ps1') -Destination $stagingPath

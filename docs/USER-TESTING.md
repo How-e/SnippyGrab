@@ -160,3 +160,20 @@ Failure: steps → expected → observed; frequency; rough delay
 ```
 
 Provide only test IDs you ran. If you can do just two tests, prioritize ** and  in Codex**. A passed test closes its acceptance requirement only after results are recorded and any associated implementation gaps are resolved. Automated tests and code review remain complementary evidence.
+
+These are independent computer-use results in an isolated development fixture. Normal cache/settings/startup registration were not changed. Clipboard writes were intercepted; hotkeys were disabled. The fixture exposes dock/overlay taskbar entries so the computer-use inventory can target them. This means keyboard handlers and gestures were exercised, but ordinary nonactivating/taskbar behavior and external clipboard delivery are separate gates. Real native capture buttons called the production capture service. The actual monitor layout was 1920×1080 at 100%, another 1920×1080 at 100% with negative X, and 2560×1600 at 150% with negative Y. Native virtual desktop was 6400×1600.
+
+| Check | Agent result | What still needs manual/lab coverage |
+|---|---|---|
+| Explicit shelf badge focus, Up, Space, Ctrl+C, Delete, Enter | PASS: nonprimary copy reached the image sink; Delete dismissed only the selected nonprimary record; Enter opened its separate editor | Ordinary production focus/composer restoration, assistive technology and remaining selection/reorder gestures |
+| Three-capture first entry and top-card reachability | PASS for observed padding-entry/top-padding route; no jump/collapse observed | More cold/warm cycles, all placements, selection leave/re-entry and Alt-reorder; no broad jitter closure |
+| Editor redaction, keyboard undo/redo | PASS: reversed redaction, undo removed it and redo restored it | Other human gestures; all required flattened tools have render/document regressions |
+| Native Export PNG dialog | PASS: configured directory, exported file/full-path success, remembered filename, overwrite prompt, decline and cancel | Accepted overwrite/open-folder path, other destinations/permissions; failure cases are injected automatically |
+| Crop, zoom, freehand and dirty close | PASS: reversed crop produced 615×120, 120% zoomed freehand aligned, close committed 615×120 and reached image sink | Real clipboard delivery and injected-failure UX; offscreen close-during-worker regression covers final worker coordination |
+| Full-image OCR | PASS: actual editor displayed local progress and text-copy success in the intercepted sink | OS clipboard/receiver behavior and arbitrary text recognition; a 30px fixture confuses 0/@ |
+| Capture modes | PASS: active-window and picked fixture both 746×423; full desktop 6400×1600; reversed region exactly 320×80 with decoded synthetic text; Esc preserved 25 captures and returned to fixture | Global hotkeys, protected/maximized/offscreen content, cross-monitor gestures, remaining DPI/HDR/topology hardware matrix |
+| Hidden dock / display-change handler | PASS: dock stayed hidden after topology refresh | Physical disconnect/reconnect and driver/device identity changes |
+
+Computer-use initially scaled its 1920×1080 overlay screenshot across the 6400×1600 target. Correcting that tool mapping produced the exact 320×80 crop; this was an automation coordinate issue, not an app crop fix. Initial offscreen runs were disturbed by external pointer/focus changes; a later run without concurrent computer-use inputs passed all 64 dock layouts and four overlays.
+
+Manual retesting can focus on the rightmost column rather than repeating agent-proven file existence, editor document pixels, command routing, storage faults and ordinary dialog cancellation.  external Codex acceptance is still open: the Windows computer-use skill does not allow automating the Codex/ChatGPT desktop UI. No attachment was transmitted by this pass.

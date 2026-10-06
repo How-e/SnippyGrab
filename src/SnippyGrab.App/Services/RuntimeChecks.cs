@@ -46,6 +46,12 @@ internal static class RuntimeChecks
                 pending = new PendingOcr(); controller.OcrService = pending;
                 using var lifetime = new CancellationTokenSource(); oldOcr = controller.OcrText(image, lifetime.Token); lifetime.Cancel(); pending.Completion.SetResult("closed editor OCR");
                 Assert(await oldOcr == "OCR cancelled." && writes.Count == 1, "Closed editor lifetime prevents clipboard publication");
+                var editedRecord = controller.Repository.Add(png, 320, 160);
+                var editor = new EditorWindow(controller, editedRecord) { ShowActivated = false, WindowStartupLocation = WindowStartupLocation.Manual, Left = -30000, Top = -30000 };
+                editor.Show();
+                var work = editor.StartDocumentEdit(new(EditTool.Blur, new Point(20, 20), new Point(300, 140), Colors.Red, 3, 24, "", []));
+                var close = editor.RequestCloseAsync();
+                await work; Assert(await close && editedRecord.Edited && writes.Count == 2, "Close during worker effect waits and applies/copies final document");
                 Assert(Native.GetForegroundWindow() == foreground, "Reliability probe preserves foreground");
             }
             finally { pin.Close(); history.Close(); controller.Dock.Close(); }
@@ -72,26 +78,30 @@ internal static class RuntimeChecks
             try
             {
                 editor.Show(); await Task.Delay(50);
+                foreach (var textScale in new[] { 1.0, 1.5, 2.25 })
                 foreach (var width in new[] { 660, 1000 })
                 {
+                    Application.Current.Resources["BodyTextSize"] = 13 * textScale;
+                    Application.Current.Resources["TextSize.12"] = 12 * textScale;
+                    ((DockPanel)editor.Content).Children.OfType<WrapPanel>().Last().Children.OfType<ComboBox>().Single().SelectedValue = EditTool.OcrArea;
                     editor.Width = width; editor.UpdateLayout(); await Task.Delay(25);
                     var rootPanel = (DockPanel)editor.Content;
                     var toolbar = rootPanel.Children.OfType<WrapPanel>().First();
                     var buttons = toolbar.Children.OfType<Button>().ToArray();
                     Assert(buttons.Any(b => Equals(b.Content, "Apply + copy")) && buttons.Any(b => Equals(b.Content, "Export PNG…")) && !buttons.Any(b => Equals(b.Content, "Save")), "Explicit apply/export labels");
                     Assert(buttons.Single(b => Equals(b.Content, "Open export folder")).IsEnabled, "Successful export exposes folder action");
-                    foreach (var button in buttons)
+                    foreach (var control in rootPanel.Children.OfType<WrapPanel>().SelectMany(p => p.Children.OfType<FrameworkElement>()))
                     {
-                        var bounds = button.TransformToAncestor(rootPanel).TransformBounds(new Rect(button.RenderSize));
-                        Assert(bounds.Left >= -1 && bounds.Right <= rootPanel.ActualWidth + 1 && bounds.Bottom <= rootPanel.ActualHeight, "Every editor action stays reachable at minimum width");
+                        var bounds = control.TransformToAncestor(rootPanel).TransformBounds(new Rect(control.RenderSize));
+                        Assert(bounds.Left >= -1 && bounds.Right <= rootPanel.ActualWidth + 1 && bounds.Bottom <= rootPanel.ActualHeight, $"Every editor action/tool stays reachable at {width} DIP and {textScale:P0} text");
                     }
-                    Snapshot(editor, Path.Combine(Path.GetDirectoryName(Path.GetFullPath(destination))!, $"editor-export-{width}.png"));
+                    Snapshot(editor, Path.Combine(Path.GetDirectoryName(Path.GetFullPath(destination))!, $"editor-export-{width}-text{(int)(textScale * 100)}.png"));
                 }
                 Assert(Native.GetForegroundWindow() == foreground, "Editor layout probe preserves focus");
             }
             finally { await editor.RequestCloseAsync(); }
             controller.Dispose(); controller.Dock.Close();
-            AtomicFile.Write(destination, JsonSerializer.SerializeToUtf8Bytes(new { Result = "PASS", Widths = new[] { 660, 1000 }, Scope = "Offscreen synthetic editor labels/action bounds; no clipboard writes, file dialogs, folder launch or real annotation gestures." }, new JsonSerializerOptions { WriteIndented = true }));
+            AtomicFile.Write(destination, JsonSerializer.SerializeToUtf8Bytes(new { Result = "PASS", Widths = new[] { 660, 1000 }, TextScales = new[] { 1.0, 1.5, 2.25 }, Scope = "Offscreen synthetic editor labels/action/tool bounds; no clipboard writes, file dialogs, folder launch or real annotation gestures." }, new JsonSerializerOptions { WriteIndented = true }));
         }
         finally
         {

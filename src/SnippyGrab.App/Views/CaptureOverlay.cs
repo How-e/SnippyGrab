@@ -19,7 +19,8 @@ internal sealed class CaptureOverlay : Window
     {
         desktop = bounds; pickWindow = windowMode; this.activate = activate;
         ShowActivated = activate;
-        WindowStyle = WindowStyle.None; ResizeMode = ResizeMode.NoResize; ShowInTaskbar = false;
+        Title = "SnippyGrab capture selection";
+        WindowStyle = WindowStyle.None; ResizeMode = ResizeMode.NoResize; ShowInTaskbar = InteractiveChecks.TargetableWindows;
         Topmost = true; Background = Brushes.Black; Cursor = Cursors.Cross;
         surface = new(frozen, bounds.Width, bounds.Height, windowMode);
         Content = new System.Windows.Controls.Viewbox { Stretch = Stretch.Fill, Child = surface };
@@ -48,8 +49,7 @@ internal sealed class CaptureOverlay : Window
         {
             if (!selecting) return;
             Native.GetCursorPos(out var point);
-            var region = PixelRect.Between(origin.X, origin.Y, point.X, point.Y).Intersect(desktop);
-            if (region.Width >= 2 && region.Height >= 2) Selection = region;
+            Selection = CaptureSelection.Region(origin.X, origin.Y, point.X, point.Y, desktop);
             ReleaseMouseCapture(); Close();
         };
     }

@@ -3,7 +3,7 @@ using System.Text.Json;
 namespace SnippyGrab.Core;
 
 public enum CaptureMode { Region, Desktop, Window, ActiveWindow }
-public enum DockCorner { BottomRight, BottomLeft, TopRight, TopLeft }
+public enum DockCorner { BottomRight, BottomLeft, TopRight, TopLeft, Top, Bottom, Left, Right }
 public enum DockOrientation { Vertical, Horizontal }
 public enum AppTheme { System, Dark, Light }
 public sealed record Hotkey(uint Key, uint Modifiers)
@@ -25,6 +25,7 @@ public sealed class Settings
     public bool IncludeCursor { get; set; }
     public bool Animate { get; set; } = true;
     public int DockMonitor { get; set; } = -1;
+    public string DockMonitorIdentity { get; set; } = "";
     public DockCorner Corner { get; set; } = DockCorner.BottomRight;
     public DockOrientation Orientation { get; set; }
     public int ThumbnailSize { get; set; } = 224;
@@ -54,6 +55,7 @@ public sealed class Settings
         if (SchemaVersion > 1 || SchemaVersion < 0) throw new InvalidDataException("Unsupported settings version.");
         SchemaVersion = 1;
         CachePath ??= "";
+        DockMonitorIdentity ??= "";
         SaveDirectory ??= Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
         AnnotationColor ??= "#FFEF675E";
         ThumbnailSize = Math.Clamp(ThumbnailSize, 120, 400);
@@ -79,6 +81,7 @@ public sealed class SettingsService(string file)
     public bool Recovered { get; private set; }
     public Settings Load()
     {
+        ManagedPath.RejectRedirects(file);
         if (!File.Exists(file)) return new();
         try
         {
@@ -105,12 +108,14 @@ public static class AtomicFile
 {
     public static void Write(string path, byte[] data)
     {
+        ManagedPath.RejectRedirects(path);
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
         var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {
             using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
             { stream.Write(data); stream.Flush(true); }
+            ManagedPath.RejectRedirects(path);
             File.Move(temporary, path, true);
         }
         finally { if (File.Exists(temporary)) File.Delete(temporary); }

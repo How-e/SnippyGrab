@@ -27,7 +27,8 @@ internal static class ImageService
                 if (Native.GetCursorInfo(ref info) && info.Flags == 1 && Native.GetIconInfo(info.Cursor, out var icon))
                 {
                     var dc = graphics.GetHdc();
-                    try { Native.DrawIconEx(dc, info.Position.X - rect.X - icon.HotX, info.Position.Y - rect.Y - icon.HotY, info.Cursor, 0, 0, 0, 0, 3); }
+                    var origin = CaptureSelection.CursorOrigin(info.Position.X, info.Position.Y, icon.HotX, icon.HotY, rect);
+                    try { Native.DrawIconEx(dc, origin.X, origin.Y, info.Cursor, 0, 0, 0, 0, 3); }
                     finally { graphics.ReleaseHdc(dc); Native.DeleteObject(icon.Mask); if (icon.Color != 0) Native.DeleteObject(icon.Color); }
                 }
             }
@@ -42,9 +43,10 @@ internal static class ImageService
     }
     public static BitmapSource Load(string path, int thumbnail = 0, int thumbnailHeight = 0)
     {
-        if (new FileInfo(path).Length > 100 * 1024 * 1024) throw new InvalidDataException("Image file exceeds 100 MB.");
         using var stream = File.OpenRead(path);
+        ValidateEncoded(stream);
         var decoder = BitmapDecoder.Create(stream, BitmapCreateOptions.DelayCreation, BitmapCacheOption.None);
+        if (decoder is not (PngBitmapDecoder or JpegBitmapDecoder or BmpBitmapDecoder)) throw new InvalidDataException("Only PNG, JPEG and BMP image content is accepted.");
         var frame = decoder.Frames[0];
         if ((long)frame.PixelWidth * frame.PixelHeight > MaxPixels) throw new InvalidDataException("Image exceeds 80 megapixels.");
         stream.Position = 0;
@@ -57,6 +59,30 @@ internal static class ImageService
             else image.DecodePixelWidth = width;
         }
         image.StreamSource = stream; image.EndInit(); image.Freeze(); return image;
+    }
+    internal static void ValidateEncoded(Stream stream)
+    {
+        if (stream.Length > 100 * 1024 * 1024) throw new InvalidDataException("Image file exceeds 100 MB.");
+        Span<byte> header = stackalloc byte[24];
+        if (stream.Length < 24) throw new InvalidDataException("Image is truncated.");
+        stream.ReadExactly(header);
+        if (header[..8].SequenceEqual(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 }))
+        {
+            if (!header.Slice(12, 4).SequenceEqual("IHDR"u8)) throw new InvalidDataException("PNG header is invalid.");
+            var width = System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(header.Slice(16, 4));
+            var height = System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(header.Slice(20, 4));
+            if (width == 0 || height == 0 || (ulong)width * height > MaxPixels) throw new InvalidDataException("Image exceeds 80 megapixels or has invalid dimensions.");
+            stream.Position = stream.Length - 12;
+            Span<byte> end = stackalloc byte[12]; stream.ReadExactly(end);
+            if (!end.SequenceEqual(new byte[] { 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130 })) throw new InvalidDataException("PNG is truncated or has an invalid end marker.");
+        }
+        else if (header[0] == 255 && header[1] == 216 && header[2] == 255)
+        {
+            stream.Position = stream.Length - 2;
+            if (stream.ReadByte() != 255 || stream.ReadByte() != 217) throw new InvalidDataException("JPEG is truncated.");
+        }
+        else if (header[0] != 66 || header[1] != 77) throw new InvalidDataException("Only PNG, JPEG and BMP image content is accepted.");
+        stream.Position = 0;
     }
     public static byte[] Png(BitmapSource image)
     {

@@ -16,7 +16,18 @@ internal static class Native
     }
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     internal struct MONITORINFO
-    { public int Size; public RECT Monitor, Work; public uint Flags; }
+    { public int Size; public RECT Monitor, Work; public uint Flags; [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string Device; }
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    internal struct DISPLAY_DEVICE
+    {
+        public int Size;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string Name;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string Description;
+        public uint Flags;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string Identity;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string Key;
+    }
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] internal static extern bool EnumDisplayDevices(string device, uint index, ref DISPLAY_DEVICE display, uint flags);
     [StructLayout(LayoutKind.Sequential)] internal struct CURSORINFO { public int Size; public int Flags; public nint Cursor; public POINT Position; }
     [StructLayout(LayoutKind.Sequential)] internal struct ICONINFO { [MarshalAs(UnmanagedType.Bool)] public bool Icon; public int HotX, HotY; public nint Mask, Color; }
     internal delegate bool MonitorCallback(nint monitor, nint dc, ref RECT rect, nint data);
@@ -56,7 +67,7 @@ internal static class Native
     }
 }
 
-internal sealed record MonitorInfo(nint Handle, PixelRect Bounds, PixelRect Work, uint Dpi, int Index);
+internal sealed record MonitorInfo(nint Handle, PixelRect Bounds, PixelRect Work, uint Dpi, int Index, string Identity = "", bool Primary = false);
 internal static class MonitorService
 {
     public static IReadOnlyList<MonitorInfo> All()
@@ -67,15 +78,19 @@ internal static class MonitorService
             var info = new Native.MONITORINFO { Size = Marshal.SizeOf<Native.MONITORINFO>() };
             Native.GetMonitorInfo(monitor, ref info);
             Native.GetDpiForMonitor(monitor, 0, out var dpi, out _);
-            monitors.Add(new(monitor, info.Monitor.Pixels, info.Work.Pixels, dpi == 0 ? 96 : dpi, monitors.Count));
+            var device = new Native.DISPLAY_DEVICE { Size = Marshal.SizeOf<Native.DISPLAY_DEVICE>() };
+            var identity = Native.EnumDisplayDevices(info.Device, 0, ref device, 1) && !string.IsNullOrEmpty(device.Identity) ? device.Identity : info.Device;
+            monitors.Add(new(monitor, info.Monitor.Pixels, info.Work.Pixels, dpi == 0 ? 96 : dpi, monitors.Count, identity, (info.Flags & 1) != 0));
             return true;
         }, 0);
         return monitors;
     }
-    public static MonitorInfo ForPointer(int configured = -1)
+    public static MonitorInfo ForPointer(int configured = -1, string identity = "")
     {
         var monitors = All();
-        if (configured >= 0 && configured < monitors.Count) return monitors[configured];
+        var primary = monitors.FirstOrDefault(m => m.Primary)?.Index ?? 0;
+        var index = MonitorIdentity.ConfiguredIndex(monitors.Select(m => m.Identity).ToArray(), configured, identity, primary);
+        if (index >= 0) return monitors[index];
         Native.GetCursorPos(out var p);
         return monitors.FirstOrDefault(m => p.X >= m.Bounds.X && p.X < m.Bounds.Right && p.Y >= m.Bounds.Y && p.Y < m.Bounds.Bottom) ?? monitors[0];
     }

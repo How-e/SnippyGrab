@@ -42,8 +42,15 @@ internal sealed class AppController : IDisposable
     public AppController(bool background, string? isolatedDataDirectory = null, bool diagnostic = false)
     {
         dataDirectory = isolatedDataDirectory ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SnippyGrab");
+        ManagedPath.RejectRedirects(dataDirectory);
         Directory.CreateDirectory(dataDirectory);
         settingsService = new(Path.Combine(dataDirectory, "settings.json")); Settings = settingsService.Load();
+        if (Settings.DockMonitor >= 0 && Settings.DockMonitorIdentity.Length == 0)
+        {
+            Settings.DockMonitorIdentity = MonitorService.All().ElementAtOrDefault(Settings.DockMonitor)?.Identity ?? "";
+            try { settingsService.Save(Settings); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException) { cacheWarning = "Monitor identity could not be saved. Review and retry Settings before changing the display layout."; }
+        }
         Ui.FailureHandler = Failure;
         Ui.Theme(Settings.Theme);
         Settings.LaunchOnStartup = StartupService.Enabled;
@@ -131,7 +138,7 @@ internal sealed class AppController : IDisposable
             return await CopyText(text, token) ? "OCR text copied." : "OCR text was not copied. Retry OCR when the clipboard is available.";
         }
         catch (OperationCanceledException) { return "OCR cancelled."; }
-        catch (Exception ex) { Log("failure_category=Ocr; exception_type=" + ex.GetType().Name); return "OCR failed. Check the local English model and complete package/runtime, then retry OCR. Capture remains available."; }
+        catch (Exception ex) { Log("failure_category=Ocr; exception_type=" + ex.GetType().Name); return ex is InvalidDataException ? "OCR input is invalid or too large. Use a smaller valid image; capture remains available." : "OCR failed. Check the local English model and complete x64 package/Visual C++ runtime, then retry OCR. Capture remains available."; }
     }
     public async Task Ocr(CaptureRecord record)
     {
@@ -212,6 +219,9 @@ internal sealed class AppController : IDisposable
     }
     public void ApplySettings(Settings settings)
     {
+        if (settings.DockMonitor < 0) settings.DockMonitorIdentity = "";
+        else if (settings.DockMonitorIdentity.Length == 0 || (settings.DockMonitor != Settings.DockMonitor && settings.DockMonitorIdentity == Settings.DockMonitorIdentity))
+            settings.DockMonitorIdentity = MonitorService.All().ElementAtOrDefault(settings.DockMonitor)?.Identity ?? "";
         SettingsTransaction.Apply(settings, StartupService.Enabled, StartupService.Set, settingsService.Save); Settings = settings;
         Repository.HistoryEnabled = settings.HistoryEnabled; Try(Repository.Persist);
         Ui.Theme(settings.Theme); Hotkeys.Configure(settings, Hotkeys.Paused); cleanup.Interval = TimeSpan.FromMinutes(settings.CleanupMinutes); Dock.Refresh(); BuildTray();
@@ -236,7 +246,7 @@ internal sealed class AppController : IDisposable
         menu.Items.Add(new Forms.ToolStripSeparator()); Item("Exit", Exit);
         var old = tray.ContextMenuStrip; tray.ContextMenuStrip = menu; old?.Dispose();
     }
-    private void DisplayChanged(object? sender, EventArgs e) => Application.Current.Dispatcher.BeginInvoke(() => { Dock.Refresh(); Dock.Reveal(); });
+    private void DisplayChanged(object? sender, EventArgs e) => Application.Current.Dispatcher.BeginInvoke(() => Dock.TopologyChanged());
     private void PowerChanged(object sender, PowerModeChangedEventArgs e) { if (e.Mode == PowerModes.Resume) Application.Current.Dispatcher.BeginInvoke(() => Try(() => { Hotkeys.Configure(Settings, Hotkeys.Paused); Repository.Cleanup(DateTimeOffset.UtcNow, Settings.RetentionHours); Dock.Refresh(); })); }
     private void PreferencesChanged(object sender, UserPreferenceChangedEventArgs e) => Application.Current.Dispatcher.BeginInvoke(() => Ui.Theme(Settings.Theme));
     public async void Run(Func<Task> action) { try { await action(); } catch (Exception ex) { Failure(ex); } }

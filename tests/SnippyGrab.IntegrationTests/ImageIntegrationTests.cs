@@ -30,7 +30,7 @@ public sealed class ImageIntegrationTests
             return true;
         });
     }
-    private static T Sta<T>(Func<T> action)
+    internal static T Sta<T>(Func<T> action)
     {
         T result = default!; Exception? error = null;
         var thread = new Thread(() => { try { result = action(); } catch (Exception ex) { error = ex; } });

@@ -54,6 +54,7 @@ public sealed partial class CaptureRepository
         root = Path.GetFullPath(directory);
         if (root.StartsWith(@"\\", StringComparison.Ordinal) || root == Path.GetPathRoot(root))
             throw new InvalidDataException("Cache must be a dedicated local directory.");
+        ManagedPath.RejectRedirects(root);
         Directory.CreateDirectory(root);
         // Reject symlinks/junctions in every parent, preventing cleanup from crossing a redirected root.
         for (var current = new DirectoryInfo(root); current is not null; current = current.Parent)
@@ -68,7 +69,9 @@ public sealed partial class CaptureRepository
     public string PathForName(string name)
     {
         if (!IsSafeName(name)) throw new InvalidDataException("Invalid capture filename.");
-        return Path.Combine(root, name);
+        var path = Path.Combine(root, name);
+        ManagedPath.RejectRedirects(path);
+        return path;
     }
     private bool SafeFile(string path) => File.Exists(path) && (File.GetAttributes(path) & FileAttributes.ReparsePoint) == 0;
     private RepositoryState ReadState(string metadata)
@@ -96,6 +99,7 @@ public sealed partial class CaptureRepository
     }
     public void Load()
     {
+        ManagedPath.RejectRedirects(root);
         state = new(); Recovered = false; CleanupBlocked = false; recoveryNeedsBackup = false;
         var metadata = Path.Combine(root, "history.json");
         var recovery = Path.Combine(root, "history-recovered.json");
@@ -186,6 +190,7 @@ public sealed partial class CaptureRepository
     }
     public void Persist()
     {
+        ManagedPath.RejectRedirects(root);
         try
         {
             var metadata = Path.Combine(root, CleanupBlocked ? "history-recovered.json" : "history.json");
@@ -281,6 +286,7 @@ public sealed partial class CaptureRepository
     public int CleanupSession(DateTimeOffset now) => Cleanup(now, -1, clear: true, sessionOnly: true);
     public int Cleanup(DateTimeOffset now, int retentionHours, bool clear = false, bool sessionOnly = false)
     {
+        ManagedPath.RejectRedirects(root);
         if (CleanupBlocked || PersistencePending) return 0; // Corrupt pin metadata must never turn into permission to delete images.
         var pinned = state.Captures.Where(c => c.Pinned).Select(c => c.FileName).ToHashSet();
         var records = state.Captures.ToDictionary(c => c.FileName);

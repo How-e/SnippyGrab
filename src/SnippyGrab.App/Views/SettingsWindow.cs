@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Text.Json;
 using System.Windows.Automation;
 using System.Windows.Interop;
+using SnippyGrab.App.Services;
 
 namespace SnippyGrab.App.Views;
 
@@ -42,7 +43,7 @@ internal sealed class SettingsWindow : Window
         body.Children.Add(Ui.Text("Click a hotkey field, then press the desired combination. Escape disables it. Windows may intercept Print Screen: Settings → Accessibility → Keyboard → ‘Use the Print Screen key to open screen capture’. Disable it and restart if necessary.", 12, true));
         Add(nameof(Settings.IncludeCursor), "Include cursor"); Add(nameof(Settings.Animate), "Animate capture arrival");
         Section("Screenshot shelf");
-        Add(nameof(Settings.DockMonitor), "Monitor (-1 follows pointer, 0 = first)"); Add(nameof(Settings.Corner), "Corner"); Add(nameof(Settings.Orientation), "Orientation");
+        AddMonitor(); Add(nameof(Settings.Corner), "Screen position"); Add(nameof(Settings.Orientation), "Corner orientation (edges expand inward)");
         Add(nameof(Settings.ThumbnailSize), "Thumbnail width (120–400 DIP)"); Add(nameof(Settings.ExpandedItems), "Maximum expanded items (1–5)"); Add(nameof(Settings.DockOpacity), "Opacity (0.25–1)");
         Add(nameof(Settings.AlwaysOnTop), "Always on top"); Add(nameof(Settings.AutoCollapse), "Collapse when pointer leaves"); Add(nameof(Settings.AutoHideSeconds), "Auto-hide seconds (0 = off)"); Add(nameof(Settings.DockLifetimeMinutes), "Shelf lifetime minutes (0 = indefinitely)");
         Section("Clipboard"); Add(nameof(Settings.AutoCopy), "Copy automatically on capture"); Add(nameof(Settings.ClipboardPng), "Include PNG representation with image");
@@ -57,6 +58,23 @@ internal sealed class SettingsWindow : Window
         foreach (var text in body.Children.OfType<TextBlock>()) text.TextWrapping = TextWrapping.Wrap;
     }
     private void Section(string title) => body.Children.Add(new TextBlock { Text = title, FontSize = 16, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 20, 0, 8) });
+    private sealed record MonitorChoice(int Index, string Identity, string Label) { public override string ToString() => Label; }
+    private void AddMonitor()
+    {
+        body.Children.Add(Ui.Text("Monitor (saved by device identity)"));
+        var choices = new List<MonitorChoice> { new(-1, "", "Follow pointer") };
+        choices.AddRange(MonitorService.All().Select(m => new MonitorChoice(m.Index, m.Identity, $"Display {m.Index + 1} · {m.Bounds.Width} × {m.Bounds.Height}" + (m.Primary ? " · primary" : ""))));
+        var selected = draft.DockMonitor < 0 ? choices[0] : choices.FirstOrDefault(c => draft.DockMonitorIdentity.Length > 0 ? c.Identity == draft.DockMonitorIdentity : c.Index == draft.DockMonitor);
+        if (selected is null)
+        {
+            selected = new(draft.DockMonitor, draft.DockMonitorIdentity, "Saved display disconnected · use primary until it returns");
+            choices.Add(selected);
+        }
+        var combo = new ComboBox { ItemsSource = choices, SelectedItem = selected };
+        AutomationProperties.SetName(combo, "Screenshot shelf monitor"); body.Children.Add(combo);
+        values[nameof(Settings.DockMonitor)] = () => ((MonitorChoice)combo.SelectedItem).Index;
+        values[nameof(Settings.DockMonitorIdentity)] = () => ((MonitorChoice)combo.SelectedItem).Identity;
+    }
     private void Add(string name, string label)
     {
         var property = typeof(Settings).GetProperty(name)!; var value = property.GetValue(draft);

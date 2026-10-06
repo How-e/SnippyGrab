@@ -18,8 +18,17 @@ public static class DpiGeometry
     public static double ToDip(double pixels, double dpi) => pixels * 96 / dpi;
     public static int ToPixel(double dips, double dpi) => (int)Math.Round(dips * dpi / 96);
 }
+public static class CaptureSelection
+{
+    public static PixelRect? Region(int startX, int startY, int endX, int endY, PixelRect desktop)
+    {
+        var area = PixelRect.Between(startX, startY, endX, endY).Intersect(desktop);
+        return area.Width >= 2 && area.Height >= 2 ? area : null;
+    }
+    public static (int X, int Y) CursorOrigin(int x, int y, int hotspotX, int hotspotY, PixelRect capture) => (x - capture.X - hotspotX, y - capture.Y - hotspotY);
+}
 
-public sealed class UndoJournal<T>(T initial, int capacity = 60)
+public sealed class UndoJournal<T>(T initial, int capacity = 60, Func<IReadOnlyList<T>, long>? retainedBytes = null, long byteBudget = long.MaxValue)
 {
     private readonly List<T> states = [initial];
     private int index;
@@ -30,9 +39,10 @@ public sealed class UndoJournal<T>(T initial, int capacity = 60)
     {
         states.RemoveRange(index + 1, states.Count - index - 1);
         states.Add(state);
-        if (states.Count > capacity) states.RemoveAt(0);
+        while (states.Count > 1 && (states.Count > capacity || (retainedBytes?.Invoke(states) ?? 0) > byteBudget)) states.RemoveAt(0);
         index = states.Count - 1;
     }
     public T Undo() { if (CanUndo) index--; return Current; }
     public T Redo() { if (CanRedo) index++; return Current; }
+    public void Clear() { states.Clear(); index = 0; }
 }

@@ -91,11 +91,28 @@ internal static class RuntimeChecks
             var beforeEditDecode = dock.ThumbnailDecodeCount;
             controller.Repository.Replace(controller.Repository.Captures[0], png, 720, 360); dock.Refresh();
             Assert(dock.ThumbnailDecodeCount == beforeEditDecode + 1, "New revision invalidates the cached image");
+            var actions = new List<(ShelfAction Action, Guid[] Ids)>();
+            dock.CommandSinkOverride = (action, captures) => actions.Add((action, captures.Select(c => c.Id).ToArray()));
+            var captures = controller.Repository.Captures;
+            dock.ToggleSelection(captures[7].Id);
+            dock.HandleKey(Key.C, ModifierKeys.Control); dock.HandleKey(Key.Delete, ModifierKeys.None);
+            Assert(actions.All(a => a.Ids.SequenceEqual(new[] { captures[7].Id })), "Single nonprimary keyboard targets");
+            dock.ToggleSelection(captures[2].Id); dock.HandleKey(Key.Home, ModifierKeys.None);
+            actions.Clear(); dock.HandleKey(Key.C, ModifierKeys.Control); dock.HandleKey(Key.Delete, ModifierKeys.None);
+            Assert(actions.All(a => a.Ids.SequenceEqual(new[] { captures[2].Id, captures[7].Id })), "Selected set wins even when focused primary is excluded");
+            dock.HandleKey(Key.End, ModifierKeys.None);
+            Assert(dock.FocusedCapture == captures[^1].Id, "Keyboard navigation reaches scrolling capture");
+            actions.Clear(); dock.HandleKey(Key.Enter, ModifierKeys.None); dock.HandleKey(Key.S, ModifierKeys.Control); dock.HandleKey(Key.P, ModifierKeys.Control);
+            Assert(actions.All(a => a.Ids.SequenceEqual(new[] { captures[^1].Id })), "Single-item edit/export/pin use focused capture");
+            dock.HandleKey(Key.Space, ModifierKeys.None); Assert(dock.SelectionCount == 3, "Keyboard multiple selection survives scrolling");
+            dock.HandleKey(Key.Escape, ModifierKeys.None); Assert(dock.SelectionCount == 0 && !dock.Expanded, "Escape clears selection and collapses");
+            dock.HandleKey(Key.Home, ModifierKeys.None);
+            dock.CommandSinkOverride = null;
             Snapshot(dock, Path.Combine(Path.GetDirectoryName(Path.GetFullPath(destination))!, "dock-layout-synthetic.png"));
             Assert(Native.GetForegroundWindow() == foreground, "Dock probe preserves foreground");
             Native.GetCursorPos(out var afterPointer); Assert(afterPointer.X == pointer.X && afterPointer.Y == pointer.Y, "Dock probe never moves pointer");
             controller.Dispose(); dock.Close();
-            AtomicFile.Write(destination, JsonSerializer.SerializeToUtf8Bytes(new { Result = "PASS", Layouts = hoverBuilds, ScrolledItems = 20, RevisionInvalidation = true, CachedCards = dock.CachedCardCount, CachedThumbnails = dock.CachedThumbnailCount, Scope = "Offscreen synthetic WPF/native layout and raised hover events; no actual pointer gestures, OS clipboard writes or external receivers." }, new JsonSerializerOptions { WriteIndented = true }));
+            AtomicFile.Write(destination, JsonSerializer.SerializeToUtf8Bytes(new { Result = "PASS", Layouts = hoverBuilds, ScrolledItems = 20, RevisionInvalidation = true, KeyboardCommandRouting = true, CachedCards = dock.CachedCardCount, CachedThumbnails = dock.CachedThumbnailCount, Scope = "Offscreen synthetic WPF/native layout, raised hover events and keyboard command routing with intercepted side effects; no actual pointer gestures, OS clipboard writes or external receivers." }, new JsonSerializerOptions { WriteIndented = true }));
         }
         finally
         {

@@ -166,7 +166,7 @@ internal sealed class AppController : IDisposable
         Item("Capture active window", () => Run(() => Capture(CaptureMode.ActiveWindow)));
         Item("Capture entire desktop", () => Run(() => Capture(CaptureMode.Desktop)));
         menu.Items.Add(new Forms.ToolStripSeparator());
-        Item("Show screenshot shelf", Dock.Reveal); Item("Open recent captures", ShowHistory); Item("Open settings", ShowSettings);
+        Item("Show screenshot shelf", Dock.Reveal); Item("Focus screenshot shelf (keyboard)", Dock.FocusShelf); Item("Open recent captures", ShowHistory); Item("Open settings", ShowSettings);
         Item("Restore pins", () => { foreach (var pin in pins.Values) pin.RestoreInteraction(); });
         Item("Pause hotkeys", () => { Hotkeys.Configure(Settings, !Hotkeys.Paused); BuildTray(); }, Hotkeys.Paused);
         Item("Clear temporary screenshots", ClearTemporary);

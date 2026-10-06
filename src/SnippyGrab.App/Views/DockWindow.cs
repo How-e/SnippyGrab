@@ -10,11 +10,12 @@ internal sealed class DockWindow : Window
 {
     private readonly AppController controller;
     private readonly StackPanel shelf = new() { Background = Brushes.Transparent };
-    private readonly HashSet<Guid> selected = [];
+    private readonly ShelfSelection selection = new();
+    private HashSet<Guid> selected => selection.Selected;
     private readonly BoundedCache<(string File, int Pixels), BitmapSource> thumbnails = new(12);
     private readonly BoundedCache<CardStamp, CardVisual> cards = new(5);
     private sealed record CardStamp(Guid Id, string File, int Width, int Height, int Size, int Number, int Total, bool Pinned, Brush Surface, Brush Accent);
-    private sealed record CardVisual(Border Frame, StackPanel Controls, bool Available);
+    private sealed record CardVisual(Border Frame, StackPanel Controls, TextBlock State, bool Available);
     private readonly DispatcherTimer hideTimer = new();
     private readonly DispatcherTimer collapseTimer = new() { Interval = TimeSpan.FromMilliseconds(180) };
     private MonitorInfo? anchor;
@@ -34,9 +35,11 @@ internal sealed class DockWindow : Window
     internal int SelectionCount => selected.Count;
     internal int CachedThumbnailCount => thumbnails.Count;
     internal int CachedCardCount => cards.Count;
+    internal Guid? FocusedCapture => selection.Focused;
+    internal Action<ShelfAction, IReadOnlyList<CaptureRecord>>? CommandSinkOverride { get; set; }
     internal void ToggleSelection(Guid id)
     {
-        if (!selected.Add(id)) selected.Remove(id);
+        selection.Toggle(id);
     }
     public DockWindow(AppController controller)
     {
@@ -48,7 +51,8 @@ internal sealed class DockWindow : Window
         // Layered-window pixels with alpha zero are click-through, even when WPF hit testing succeeds.
         // Keep padding/gaps almost invisible but nonzero even at the minimum configured opacity.
         Content = new Border { Background = new SolidColorBrush(Color.FromArgb(8, 0, 0, 0)), Padding = new Thickness(4), Child = shelf };
-        AutomationProperties.SetName(this, "Screenshot shelf. Ctrl-click to select multiple captures; drag to attach.");
+        AutomationProperties.SetName(this, "Screenshot shelf. Use the tray Focus shelf action or click a numbered badge for keyboard focus. Arrows navigate; Space selects; Enter edits; Delete dismisses.");
+        KeyboardNavigation.SetTabNavigation(shelf, KeyboardNavigationMode.Cycle);
         MouseEnter += (_, _) => { hideTimer.Stop(); collapseTimer.Stop(); SetExpanded(true); };
         MouseLeave += (_, _) => { collapseTimer.Stop(); collapseTimer.Start(); };
         collapseTimer.Tick += (_, _) =>
@@ -68,11 +72,11 @@ internal sealed class DockWindow : Window
     }
     public void Refresh(bool newCapture = false)
     {
-        if (newCapture) { index = 0; selected.Clear(); keyboardMode = false; expanded = !controller.Settings.AutoCollapse; anchor = null; }
+        if (newCapture) { index = 0; selection.Reset(); keyboardMode = false; expanded = !controller.Settings.AutoCollapse; anchor = null; }
         if (configuredMonitor != controller.Settings.DockMonitor) { configuredMonitor = controller.Settings.DockMonitor; anchor = null; }
         anchor ??= MonitorService.ForPointer(controller.Settings.DockMonitor);
         visible = controller.Repository.Captures.Where(c => CaptureLifetime.Visible(c, controller.Settings.DockLifetimeMinutes, DateTimeOffset.UtcNow)).ToList();
-        selected.RemoveWhere(id => visible.All(c => c.Id != id));
+        selection.Update(visible, visible.ElementAtOrDefault(index)?.Id);
         var files = visible.Select(c => c.FileName).ToHashSet();
         thumbnails.RemoveWhere(k => !files.Contains(k.File));
         cards.RemoveWhere(k => !files.Contains(k.File));
@@ -87,6 +91,24 @@ internal sealed class DockWindow : Window
         }
     }
     public void Reveal() { if (!IsVisible) anchor = null; Refresh(); if (visible.Count > 0) { Show(); UpdateLayout(); Position(); ScheduleHide(); } }
+    public void FocusShelf() { Reveal(); if (selection.Current is { } current) FocusCapture(current.Id); }
+    private void FocusCapture(Guid id)
+    {
+        selection.Focus(id); keyboardMode = true; hideTimer.Stop(); collapseTimer.Stop();
+        EnsureFocusedVisible(); Activate(); FocusCurrentCard();
+    }
+    private void EnsureFocusedVisible()
+    {
+        var ordinal = visible.FindIndex(c => c.Id == selection.Focused);
+        if (ordinal < 0) return;
+        if (!shelf.Children.OfType<Border>().Any(b => b.Tag is Guid id && id == selection.Focused)) index = ordinal;
+        expanded = true; Rebuild();
+    }
+    private void FocusCurrentCard()
+    {
+        var card = shelf.Children.OfType<Border>().FirstOrDefault(b => b.Tag is Guid id && id == selection.Focused);
+        card?.Focus();
+    }
     internal void SetExpanded(bool value)
     {
         if (expanded == value) return;
@@ -141,7 +163,7 @@ internal sealed class DockWindow : Window
         {
             shelf.Children.Clear(); foreach (var child in children) shelf.Children.Add(child);
         }
-        if (restoreFocus) Keyboard.Focus(this);
+        if (restoreFocus) FocusCurrentCard();
     }
     private UIElement Card(CaptureRecord capture)
     {
@@ -151,6 +173,10 @@ internal sealed class DockWindow : Window
         card.Frame.BorderBrush = (Brush)FindResource(selected.Contains(capture.Id) ? "Accent" : "Muted");
         card.Frame.HorizontalAlignment = controller.Settings.Corner is DockCorner.TopRight or DockCorner.BottomRight ? HorizontalAlignment.Right : HorizontalAlignment.Left;
         card.Frame.VerticalAlignment = controller.Settings.Corner is DockCorner.BottomLeft or DockCorner.BottomRight ? VerticalAlignment.Bottom : VerticalAlignment.Top;
+        var focused = keyboardMode && selection.Focused == capture.Id;
+        card.State.Text = focused ? selected.Contains(capture.Id) ? "Focus · selected" : "Focus" : selected.Contains(capture.Id) ? "Selected" : "";
+        card.State.Visibility = card.State.Text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+        AutomationProperties.SetName(card.Frame, $"Screenshot {stamp.Number} of {stamp.Total}, {capture.Width} by {capture.Height}{(capture.Pinned ? ", pinned" : "")}{(selected.Contains(capture.Id) ? ", selected" : "")}. Space selects, Enter edits, Delete dismisses.");
         card.Controls.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
         return card.Frame;
     }
@@ -170,8 +196,11 @@ internal sealed class DockWindow : Window
         { available = false; grid.Children.Add(Ui.Text("Image unavailable", 12)); }
         var border = new Border { Child = grid, CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(2), BorderBrush = selected.Contains(capture.Id) ? (Brush)FindResource("Accent") : new SolidColorBrush(Color.FromArgb(90, 120, 136, 156)), Background = (Brush)FindResource("Surface"), Margin = new Thickness(3), Focusable = true, Tag = capture.Id };
         AutomationProperties.SetName(border, $"Screenshot {capture.Width} by {capture.Height}{(capture.Pinned ? ", pinned" : "")}. Click to edit; drag to attach.");
-        var badge = Ui.Button($"{visible.IndexOf(capture) + 1}/{visible.Count}{(capture.Pinned ? " · pin" : "")}", "Open recent captures", controller.ShowHistory);
+        var badge = Ui.Button($"{visible.IndexOf(capture) + 1}/{visible.Count}{(capture.Pinned ? " · pin" : "")}", "Focus this screenshot for keyboard actions without opening the editor", () => FocusCapture(capture.Id));
         badge.FontSize = 10; badge.Padding = new Thickness(6, 2, 6, 2); badge.HorizontalAlignment = HorizontalAlignment.Right; badge.VerticalAlignment = VerticalAlignment.Top; badge.Opacity = 0.9; grid.Children.Add(badge);
+        var state = Ui.Text("", 10); state.HorizontalAlignment = HorizontalAlignment.Left; state.VerticalAlignment = VerticalAlignment.Top;
+        state.Background = (Brush)FindResource("Surface"); state.IsHitTestVisible = false; grid.Children.Add(state);
+        state.MaxWidth = size * 0.55;
         var controls = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom, Background = (Brush)FindResource("Surface") };
         foreach (var (label, hint, action) in new (string, string, Action)[]
         {
@@ -189,6 +218,7 @@ internal sealed class DockWindow : Window
         {
             if (FindButton(e.OriginalSource as DependencyObject)) return;
             keyboardMode = false; down = e.GetPosition(this); pressed = capture; dragging = false;
+            selection.Focus(capture.Id);
             if ((Keyboard.Modifiers & ModifierKeys.Control) != 0)
             {
                 ToggleSelection(capture.Id);
@@ -196,6 +226,7 @@ internal sealed class DockWindow : Window
             }
             border.Focus(); border.CaptureMouse(); e.Handled = true;
         };
+        border.GotKeyboardFocus += (_, _) => { selection.Focus(capture.Id); PaintStates(); };
         border.MouseMove += (_, e) =>
         {
             if (pressed != capture || e.LeftButton != MouseButtonState.Pressed || dragging) return;
@@ -235,7 +266,7 @@ internal sealed class DockWindow : Window
             if (e.Data.GetData("SnippyGrab.Reorder") is string id && Guid.TryParse(id, out var guid)) controller.Reorder(guid, capture.Id);
             e.Handled = true;
         };
-        return new(border, controls, available);
+        return new(border, controls, state, available);
     }
     private static bool FindButton(DependencyObject? source)
     {
@@ -247,6 +278,7 @@ internal sealed class DockWindow : Window
         var menu = new ContextMenu();
         foreach (var (name, action) in new (string, Action)[]
         {
+            ("Focus this screenshot (keyboard)", () => FocusCapture(record.Id)),
             ("Edit", () => controller.Edit(record)), ("Copy image", () => controller.Run(() => controller.Copy(record))),
             ("Copy file(s)", () => controller.Run(() => controller.CopyFiles(SelectedOr(record)))),
             ("Copy file path", () => controller.Run(() => controller.Clipboard.TextAsync(controller.Repository.PathFor(record)))),
@@ -260,16 +292,57 @@ internal sealed class DockWindow : Window
     private List<CaptureRecord> SelectedOr(CaptureRecord record) => selected.Contains(record.Id) ? visible.Where(c => selected.Contains(c.Id)).ToList() : [record];
     private void OnKey(object sender, KeyEventArgs e)
     {
-        keyboardMode = true; hideTimer.Stop(); collapseTimer.Stop();
-        var current = visible.ElementAtOrDefault(index); if (current is null) return;
-        if (e.Key == Key.Delete) controller.Dismiss(SelectedOr(current));
-        else if (e.Key == Key.Enter) controller.Edit(current);
-        else if (e.Key == Key.C && Keyboard.Modifiers == ModifierKeys.Control) controller.Run(() => selected.Count > 1 ? controller.CopyFiles(SelectedOr(current)) : controller.Copy(current));
-        else if (e.Key == Key.S && Keyboard.Modifiers == ModifierKeys.Control) controller.Save(current);
-        else if (e.Key == Key.Escape) { selected.Clear(); expanded = false; Rebuild(); }
-        else if (e.Key is Key.Up or Key.Left or Key.Down or Key.Right) { index = Math.Clamp(index + (e.Key is Key.Up or Key.Left ? -1 : 1), 0, visible.Count - 1); Rebuild(); }
-        else return;
-        e.Handled = true;
+        // Leave ordinary Enter/Space behavior on toolbar buttons intact.
+        if (FindButton(e.OriginalSource as DependencyObject) && e.Key is Key.Enter or Key.Space) return;
+        if (HandleKey(e.Key, Keyboard.Modifiers)) e.Handled = true;
+    }
+    internal bool HandleKey(Key key, ModifierKeys modifiers)
+    {
+        if (selection.Current is null) return false;
+        ShelfAction? action = key switch
+        {
+            Key.Delete when modifiers == ModifierKeys.None => ShelfAction.Dismiss,
+            Key.Enter when modifiers == ModifierKeys.None => ShelfAction.Edit,
+            Key.C when modifiers == ModifierKeys.Control => ShelfAction.Copy,
+            Key.S when modifiers == ModifierKeys.Control => ShelfAction.Export,
+            Key.P when modifiers == ModifierKeys.Control => ShelfAction.Pin,
+            Key.H when modifiers == ModifierKeys.Control => ShelfAction.History,
+            Key.OemComma when modifiers == ModifierKeys.Control => ShelfAction.Settings,
+            _ => null
+        };
+        if (action is { } command) { keyboardMode = true; hideTimer.Stop(); collapseTimer.Stop(); Execute(command); PaintStates(); return true; }
+        if (key == Key.Space && modifiers is ModifierKeys.None or ModifierKeys.Control) { keyboardMode = true; selection.Toggle(selection.Focused!.Value); PaintStates(); return true; }
+        if (key == Key.Escape && modifiers == ModifierKeys.None) { selected.Clear(); keyboardMode = false; expanded = false; Keyboard.ClearFocus(); Rebuild(); ScheduleHide(); return true; }
+        if (key is Key.Up or Key.Left or Key.Down or Key.Right or Key.Home or Key.End && modifiers is ModifierKeys.None or ModifierKeys.Control)
+        {
+            keyboardMode = true; hideTimer.Stop(); collapseTimer.Stop();
+            var reverse = DockLayout.Reverse(controller.Settings.Orientation, controller.Settings.Corner);
+            if (key == Key.Home) selection.Focus(visible[0].Id);
+            else if (key == Key.End) selection.Focus(visible[^1].Id);
+            else selection.Move((key is Key.Up or Key.Left ? -1 : 1) * (reverse ? -1 : 1));
+            EnsureFocusedVisible(); if (IsKeyboardFocusWithin) FocusCurrentCard(); return true;
+        }
+        return false;
+    }
+    private void Execute(ShelfAction action)
+    {
+        var targets = selection.Targets(action);
+        if (CommandSinkOverride is { } sink) { sink(action, targets); return; }
+        if (targets.Count == 0) return;
+        switch (action)
+        {
+            case ShelfAction.Copy: controller.Run(() => targets.Count == 1 ? controller.Copy(targets[0]) : controller.CopyFiles(targets)); break;
+            case ShelfAction.Dismiss: controller.Dismiss(targets); break;
+            case ShelfAction.Edit: controller.Edit(targets[0]); break;
+            case ShelfAction.Export: controller.Save(targets[0]); break;
+            case ShelfAction.Pin: controller.Pin(targets[0]); break;
+            case ShelfAction.History: controller.ShowHistory(); break;
+            case ShelfAction.Settings: controller.ShowSettings(); break;
+        }
+    }
+    private void PaintStates()
+    {
+        foreach (var capture in visible.Where(c => shelf.Children.OfType<Border>().Any(b => b.Tag is Guid id && id == c.Id))) Card(capture);
     }
     private void Position()
     {

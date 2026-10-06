@@ -14,7 +14,8 @@ $shortcutPath = Join-Path ([Environment]::GetFolderPath('Programs')) 'SnippyGrab
 $uninstallKey = 'HKCU:/Software/Microsoft/Windows/CurrentVersion/Uninstall/SnippyGrab'
 $startupKey = 'HKCU:/Software/Microsoft/Windows/CurrentVersion/Run'
 if ($Uninstall) {
-    $existing = Get-ItemPropertyValue -LiteralPath $startupKey -Name SnippyGrab -ErrorAction SilentlyContinue
+    $startupEntry = Get-ItemProperty -LiteralPath $startupKey -ErrorAction SilentlyContinue
+    $existing = $startupEntry.SnippyGrab
     if ($existing -and $existing.Contains($exePath)) { Remove-ItemProperty -LiteralPath $startupKey -Name SnippyGrab -ErrorAction SilentlyContinue }
     if (Test-Path -LiteralPath $shortcutPath) { Remove-Item -LiteralPath $shortcutPath }
     if (Test-Path -LiteralPath $uninstallKey) { Remove-Item -LiteralPath $uninstallKey }

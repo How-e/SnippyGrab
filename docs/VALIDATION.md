@@ -5,9 +5,11 @@ Status: runnable **0.1.0 alpha**, not stable acceptance.
 ## Evidence
 
 - Release build: zero warnings/errors with warnings as errors.
-- 44 Core checks and 10 Windows non-interactive integration checks passed.
+- 48 Core checks and 10 Windows non-interactive integration checks passed.
 - Formatting and NuGet vulnerability audit passed; no known vulnerable dependencies reported by the current feed.
 - Development and self-contained runtime checks passed: English OCR, exported opaque redaction, crop/blur/pixelation, physical capture pixels and PNG/file-drop construction.
+- Native Print Screen key injection drove region selection to a valid PNG and visible shelf, with the original foreground window restored. Clipboard writes were disabled only in the harness to preserve user data.
+- Per-user installation, installed runtime checks, and removal of files/shortcut/uninstall registration passed on the current Windows user. Clean-machine/login acceptance remains pending.
 - Native OLE delivered two PNG paths to a synthetic WPF receiver; files remained valid after drop. **Not Codex acceptance.**
 - Overlay drags matched exact 160×120 physical selections on connected monitors: (0,0), 1920×1080 / 96 DPI; (-1920,9), 1920×1080 / 96 DPI; (1920,-221), 2560×1600 / 144 DPI.
 - Twenty captures produced a collapsed 226×128 DIP shelf. Dark editor/settings/history/first-run views rendered and were visually inspected; previews contain only synthetic content.

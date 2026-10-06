@@ -66,7 +66,7 @@ public sealed partial class CaptureRepository
                 if (new FileInfo(metadata).Length > 4 * 1024 * 1024) throw new InvalidDataException("History too large.");
                 state = JsonSerializer.Deserialize<RepositoryState>(File.ReadAllText(metadata)) ?? new();
                 if (state.SchemaVersion != 1) throw new InvalidDataException("Unsupported history version.");
-                if (state.Captures is null || state.ProtectedUntil is null) throw new InvalidDataException("Invalid history state.");
+                if (state.Captures is null || state.ProtectedUntil is null || state.Captures.Any(c => c is null)) throw new InvalidDataException("Invalid history state.");
                 state.Captures = state.Captures.Where(c => IsSafeName(c.FileName) && c.Width > 0 && c.Height > 0 && SafeFile(PathFor(c)))
                     .DistinctBy(c => c.Id).ToList();
                 state.ProtectedUntil = state.ProtectedUntil.Where(p => IsSafeName(p.Key) && p.Value > DateTimeOffset.UtcNow).ToDictionary();
@@ -177,4 +177,10 @@ public static class StartupCommand
             throw new ArgumentException("Startup executable must be an absolute executable path.");
         return $"\"{executable}\" --background";
     }
+}
+
+public static class CaptureLifetime
+{
+    public static bool Visible(CaptureRecord capture, int minutes, DateTimeOffset now) =>
+        !capture.Dismissed && (capture.Pinned || minutes == 0 || capture.CreatedUtc.AddMinutes(minutes) > now);
 }

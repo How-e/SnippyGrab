@@ -168,17 +168,47 @@ internal static class RuntimeChecks
         controller.Dock.Refresh(true); await Task.Delay(100);
         var output = Path.GetDirectoryName(Path.GetFullPath(destination))!;
         Snapshot(controller.Dock, Path.Combine(output, "dock.png"));
+        var initialWidth = controller.Dock.ActualWidth; var initialHeight = controller.Dock.ActualHeight;
         Assert(controller.Dock.ActualWidth < 280 && controller.Dock.ActualHeight < 210, "Compact 20-capture shelf");
         var settings = new SettingsWindow(controller, true); settings.Show(); await Task.Delay(100); Snapshot(settings, Path.Combine(output, "settings.png")); settings.Close();
         var welcome = new WelcomeWindow(controller); welcome.Show(); await Task.Delay(100); Snapshot(welcome, Path.Combine(output, "welcome.png")); welcome.Close();
         var editor = new EditorWindow(controller, controller.Repository.Captures[0]); editor.Show(); await Task.Delay(100); Snapshot(editor, Path.Combine(output, "editor.png")); editor.Close();
         var history = new HistoryWindow(controller); history.Show(); await Task.Delay(100); Snapshot(history, Path.Combine(output, "history.png")); history.Close();
+        var primary = await CheckPrimaryWorkflow(controller);
         await Task.Delay(2000);
         GC.Collect(); GC.WaitForPendingFinalizers(); await Task.Delay(2000);
         var process = Process.GetCurrentProcess(); var cpu = process.TotalProcessorTime; var before = process.WorkingSet64;
         await Task.Delay(5000); process.Refresh();
-        var result = new { Captures = 20, ShelfWidthDip = controller.Dock.ActualWidth, ShelfHeightDip = controller.Dock.ActualHeight, WorkingSetMb = Math.Round(process.WorkingSet64 / 1048576.0, 1), IdleCpuMsOver5Seconds = (process.TotalProcessorTime - cpu).TotalMilliseconds, WorkingSetDeltaMb = Math.Round((process.WorkingSet64 - before) / 1048576.0, 1), Screenshots = "synthetic dock, editor, settings and history" };
+        var result = new { FixtureCaptures = 20, TotalCaptures = controller.Repository.Captures.Count, InitialShelfWidthDip = initialWidth, InitialShelfHeightDip = initialHeight, WorkingSetMb = Math.Round(process.WorkingSet64 / 1048576.0, 1), IdleCpuMsOver5Seconds = (process.TotalProcessorTime - cpu).TotalMilliseconds, WorkingSetDeltaMb = Math.Round((process.WorkingSet64 - before) / 1048576.0, 1), PrimaryWorkflow = primary, Screenshots = "synthetic dock, editor, settings and history" };
         controller.Dispose(); controller.Dock.Close(); return result;
+    }
+
+
+    private static async Task<object> CheckPrimaryWorkflow(AppController controller)
+    {
+        Native.GetCursorPos(out var pointer); var original = Native.GetForegroundWindow();
+        var previousCount = controller.Repository.Captures.Count;
+        controller.Settings.AutoCopy = false; // The harness must preserve the user's clipboard.
+        controller.Hotkeys.Configure(controller.Settings);
+        if (controller.Hotkeys.Warnings.Count > 0) return new { Status = "SKIPPED: hotkey conflict", Warnings = controller.Hotkeys.Warnings.ToArray() };
+        var window = new Window { Title = "Synthetic Print Screen workflow", Width = 420, Height = 250, Background = Brushes.RoyalBlue, Content = new TextBlock { Text = "SYNTHETIC CAPTURE", Foreground = Brushes.White, Margin = new Thickness(20) }, WindowStartupLocation = WindowStartupLocation.CenterScreen, ShowInTaskbar = false };
+        try
+        {
+            window.Show(); await Task.Delay(100); var hwnd = new WindowInteropHelper(window).Handle;
+            Native.SetForegroundWindow(hwnd); Native.GetWindowRect(hwnd, out var bounds);
+            Native.keybd_event(44, 0, 0, 0); Native.keybd_event(44, 0, 2, 0);
+            await Task.Delay(250);
+            Native.SetCursorPos(bounds.Left + 40, bounds.Top + 70); Native.mouse_event(0x0002, 0, 0, 0, 0); await Task.Delay(40);
+            Native.SetCursorPos(bounds.Left + 200, bounds.Top + 170); await Task.Delay(40);
+            Native.mouse_event(0x0004, 0, 0, 0, 0); await Task.Delay(250);
+            Assert(controller.Repository.Captures.Count == previousCount + 1, "Print Screen through capture to cache/shelf");
+            var record = controller.Repository.Captures[0];
+            Assert(record.Width == 160 && record.Height == 100, "Primary workflow crop size");
+            Assert(Native.GetForegroundWindow() == hwnd, "Focus restored after capture");
+            Assert(controller.Dock.IsVisible && File.Exists(controller.Repository.PathFor(record)), "Capture availability");
+            return new { Status = "PASS", PrintScreen = "native key event -> registered hotkey -> region overlay", ExactRegion = "160x100", ForegroundRestored = true, FileAndShelfAvailable = true, Clipboard = "disabled only in harness to preserve user data" };
+        }
+        finally { controller.Hotkeys.Configure(controller.Settings, true); window.Close(); Native.SetCursorPos(pointer.X, pointer.Y); if (original != 0) Native.SetForegroundWindow(original); }
     }
 
     private static async Task<object> CheckOle(CaptureRepository repository, CaptureRecord[] records)

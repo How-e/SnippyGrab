@@ -9,7 +9,7 @@ public enum AppTheme { System, Dark, Light }
 public sealed record Hotkey(uint Key, uint Modifiers)
 {
     private string KeyName => Key == 44 ? "PrintScreen" : Key is >= 112 and <= 135 ? "F" + (Key - 111) : Key is >= 65 and <= 90 or >= 48 and <= 57 ? ((char)Key).ToString() : "VK " + Key;
-    public override string ToString() => $"{((Modifiers & 2) != 0 ? "Ctrl+" : "")}{((Modifiers & 1) != 0 ? "Alt+" : "")}{((Modifiers & 4) != 0 ? "Shift+" : "")}{((Modifiers & 8) != 0 ? "Win+" : "")}{KeyName}";
+    public override string ToString() => Key == 0 ? "Disabled" : $"{((Modifiers & 2) != 0 ? "Ctrl+" : "")}{((Modifiers & 1) != 0 ? "Alt+" : "")}{((Modifiers & 4) != 0 ? "Shift+" : "")}{((Modifiers & 8) != 0 ? "Win+" : "")}{KeyName}";
 }
 
 public sealed class Settings
@@ -53,6 +53,9 @@ public sealed class Settings
     {
         if (SchemaVersion > 1 || SchemaVersion < 0) throw new InvalidDataException("Unsupported settings version.");
         SchemaVersion = 1;
+        CachePath ??= "";
+        SaveDirectory ??= Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
+        AnnotationColor ??= "#FFEF675E";
         ThumbnailSize = Math.Clamp(ThumbnailSize, 120, 400);
         ExpandedItems = Math.Clamp(ExpandedItems, 1, 5);
         DockOpacity = double.IsFinite(DockOpacity) ? Math.Clamp(DockOpacity, 0.25, 1) : 0.96;
@@ -67,7 +70,7 @@ public sealed class Settings
         if (!Enum.IsDefined(Theme)) Theme = AppTheme.System;
         if (!Enum.IsDefined(DefaultCaptureMode)) DefaultCaptureMode = CaptureMode.Region;
         foreach (var key in new[] { PrimaryHotkey, DesktopHotkey, WindowHotkey, ActiveWindowHotkey, FallbackHotkey })
-            if (key is null || key.Key is < 1 or > 254 || key.Modifiers > 15) throw new InvalidDataException("Invalid hotkey.");
+            if (key is null || key.Key > 254 || key.Modifiers > 15 || (key.Key == 0 && key.Modifiers != 0)) throw new InvalidDataException("Invalid hotkey.");
     }
 }
 
@@ -79,6 +82,7 @@ public sealed class SettingsService(string file)
         if (!File.Exists(file)) return new();
         try
         {
+            if (new FileInfo(file).Length > 128 * 1024) throw new InvalidDataException("Settings file is too large.");
             var settings = JsonSerializer.Deserialize<Settings>(File.ReadAllText(file)) ?? new();
             settings.Validate();
             return settings;

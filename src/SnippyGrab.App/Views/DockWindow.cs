@@ -39,7 +39,7 @@ internal sealed class DockWindow : Window
     public void Refresh(bool newCapture = false)
     {
         if (newCapture) { index = 0; selected.Clear(); }
-        visible = controller.Repository.Captures.Where(c => !c.Dismissed && (c.Pinned || controller.Settings.DockLifetimeMinutes == 0 || c.CreatedUtc.AddMinutes(controller.Settings.DockLifetimeMinutes) > DateTimeOffset.UtcNow)).ToList();
+        visible = controller.Repository.Captures.Where(c => CaptureLifetime.Visible(c, controller.Settings.DockLifetimeMinutes, DateTimeOffset.UtcNow)).ToList();
         selected.RemoveWhere(id => visible.All(c => c.Id != id));
         var files = visible.Select(c => c.FileName).ToHashSet();
         foreach (var stale in thumbnails.Keys.Where(k => !files.Contains(k)).ToArray()) thumbnails.Remove(stale);
@@ -62,11 +62,20 @@ internal sealed class DockWindow : Window
     private void Rebuild()
     {
         shelf.Children.Clear(); Topmost = controller.Settings.AlwaysOnTop;
-        if (!HasAnimatedProperties) Opacity = controller.Settings.DockOpacity;
+        BeginAnimation(OpacityProperty, null); Opacity = controller.Settings.DockOpacity;
         shelf.Orientation = controller.Settings.Orientation == DockOrientation.Horizontal ? Orientation.Horizontal : Orientation.Vertical;
         if (visible.Count == 0) return;
         var count = expanded ? controller.Settings.ExpandedItems : 1;
-        foreach (var capture in visible.Skip(index).Take(count)) shelf.Children.Add(Card(capture));
+        var monitor = MonitorService.ForPointer(controller.Settings.DockMonitor);
+        var horizontal = shelf.Orientation == Orientation.Horizontal;
+        var budget = DpiGeometry.ToDip(horizontal ? monitor.Work.Width : monitor.Work.Height, monitor.Dpi) * (horizontal ? 0.55 : 0.48);
+        double used = 0;
+        foreach (var capture in visible.Skip(index).Take(count))
+        {
+            var extent = horizontal ? controller.Settings.ThumbnailSize : Math.Clamp(controller.Settings.ThumbnailSize * (double)capture.Height / Math.Max(1, capture.Width), 72, controller.Settings.ThumbnailSize * 0.65) + 8;
+            if (used > 0 && used + extent > budget) break;
+            shelf.Children.Add(Card(capture)); used += extent;
+        }
         if (!expanded && visible.Count > 1)
         {
             // Two understated offset edges communicate a stack without creating a gallery.
@@ -87,7 +96,7 @@ internal sealed class DockWindow : Window
         { grid.Children.Add(Ui.Text("Image unavailable", 12)); }
         var border = new Border { Child = grid, CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(selected.Contains(capture.Id) ? 2 : 1), BorderBrush = selected.Contains(capture.Id) ? (Brush)FindResource("Accent") : new SolidColorBrush(Color.FromArgb(90, 120, 136, 156)), Background = (Brush)FindResource("Surface"), Margin = new Thickness(0, 3, 0, 3), Focusable = true };
         AutomationProperties.SetName(border, $"Screenshot {capture.Width} by {capture.Height}{(capture.Pinned ? ", pinned" : "")}. Click to edit; drag to attach.");
-        var badge = Ui.Button($"{index + 1}/{visible.Count}{(capture.Pinned ? " · pin" : "")}", "Open recent captures", controller.ShowHistory);
+        var badge = Ui.Button($"{visible.IndexOf(capture) + 1}/{visible.Count}{(capture.Pinned ? " · pin" : "")}", "Open recent captures", controller.ShowHistory);
         badge.FontSize = 10; badge.Padding = new Thickness(6, 2, 6, 2); badge.HorizontalAlignment = HorizontalAlignment.Right; badge.VerticalAlignment = VerticalAlignment.Top; badge.Opacity = 0.9; grid.Children.Add(badge);
         if (expanded)
         {
@@ -101,7 +110,7 @@ internal sealed class DockWindow : Window
                 ("T", "OCR and copy text", () => controller.Run(() => controller.Ocr(capture))),
                 ("×", "Dismiss (Delete)", () => controller.Dismiss([capture]))
             })
-            { var b = Ui.Button(label, hint, action); b.Padding = new Thickness(6, 3, 6, 3); b.Margin = new Thickness(1); b.FontSize = 13; controls.Children.Add(b); }
+            { var b = Ui.Button(label, hint, action); b.Padding = new Thickness(size < 180 ? 2 : 6, 3, size < 180 ? 2 : 6, 3); b.Margin = new Thickness(1); b.FontSize = 13; controls.Children.Add(b); }
             grid.Children.Add(controls);
         }
         border.ContextMenu = Menu(capture);

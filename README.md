@@ -58,7 +58,7 @@ The app lives in the tray. Closing a window keeps it running; **Exit** stops it.
 | Ctrl+Z / Ctrl+Y in editor | Undo / Redo |
 | Esc in editor | Close and apply |
 
-Configure global shortcuts in Settings. If Windows intercepts Print Screen, disable **Settings → Accessibility → Keyboard → Use the Print Screen key to open screen capture**, then restart. Conflicts are reported; Windows settings are never changed automatically. Hotkeys pause while configuring settings.
+Configure global shortcuts in Settings; Escape in a hotkey field disables that shortcut. If Windows intercepts Print Screen, disable **Settings → Accessibility → Keyboard → Use the Print Screen key to open screen capture**, then restart. Conflicts are reported; Windows settings are never changed automatically. Hotkeys pause while configuring settings.
 
 ## Settings and cache
 

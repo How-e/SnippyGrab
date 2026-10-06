@@ -121,6 +121,33 @@ public sealed class LifecycleTests : IDisposable
     [InlineData("C:\\file.txt")]
     public void RejectsUnsafeStartupCommand(string path) => Assert.Throws<ArgumentException>(() => StartupCommand.Build(path));
     [Fact] public void HotkeyNamesAreReadable() { Assert.Equal("Ctrl+Shift+F8", new Hotkey(119, 6).ToString()); Assert.Equal("Alt+PrintScreen", new Hotkey(44, 1).ToString()); }
+    [Fact]
+    public void ShelfExpirationRespectsPinsAndDismissal()
+    {
+        var capture = Add(); var now = capture.CreatedUtc.AddMinutes(31);
+        Assert.False(CaptureLifetime.Visible(capture, 30, now));
+        Assert.True(CaptureLifetime.Visible(capture, 0, now));
+        capture.Pinned = true; Assert.True(CaptureLifetime.Visible(capture, 30, now));
+        capture.Dismissed = true; Assert.False(CaptureLifetime.Visible(capture, 0, now));
+    }
+    [Fact]
+    public void OptionalHotkeysCanBeDisabled()
+    {
+        var settings = new Settings { FallbackHotkey = new(0, 0) }; settings.Validate();
+        Assert.Equal("Disabled", settings.FallbackHotkey.ToString());
+    }
+    [Fact]
+    public void NullHistoryEntriesBlockDestructiveCleanup()
+    {
+        Add(); File.WriteAllText(Path.Combine(root, "history.json"), "{\"SchemaVersion\":1,\"Captures\":[null]}");
+        repository.Load(); Assert.True(repository.CleanupBlocked);
+    }
+    [Fact]
+    public void NullableSettingsStringsRecoverWithoutCrashing()
+    {
+        var file = Path.Combine(root, "settings.json"); File.WriteAllText(file, "{\"CachePath\":null,\"SaveDirectory\":null,\"AnnotationColor\":null}");
+        var settings = new SettingsService(file).Load(); Assert.Equal("", settings.CachePath); Assert.NotNull(settings.SaveDirectory); Assert.NotNull(settings.AnnotationColor);
+    }
     public void Dispose()
     {
         foreach (var file in Directory.EnumerateFiles(root)) File.Delete(file);

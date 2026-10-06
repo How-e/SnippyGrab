@@ -19,4 +19,4 @@ Use synthetic information. Record Windows/app build, GPU/HDR, monitor geometry/s
 | Performance | Fresh tray working set, 60-second idle CPU, 20 captures, 4K/8K capture-to-availability, editor memory recovery, 200 capture cycles. |
 | Accessibility | Keyboard/focus, accessible names/tooltips, high contrast, text scaling, dark/light/system theme. |
 
-`SnippyGrab.exe --self-test C:/absolute/path/checks.json` temporarily shows synthetic windows and moves the pointer on each monitor. Run when the desktop is idle. It uses an isolated cache and does not overwrite the user's clipboard. Not suitable for headless CI. Automated intra-app OLE delivery does not prove Codex acceptance.
+`SnippyGrab.exe --self-test C:/absolute/path/checks.json` temporarily shows synthetic windows and moves the pointer on each monitor and sends a synthetic Print Screen key event. Run when the desktop is idle. It uses an isolated cache and does not overwrite the user's clipboard. Not suitable for headless CI. Automated intra-app OLE delivery does not prove Codex acceptance.

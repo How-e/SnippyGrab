@@ -22,6 +22,7 @@ internal sealed class HotkeyService : IDisposable
         foreach (var (key, mode) in requested)
         {
             var id = idNext++;
+            if (key.Key == 0) continue;
             if (Native.RegisterHotKey(source.Handle, id, key.Modifiers | 0x4000, key.Key)) active[id] = mode;
             else Warnings.Add($"{key} is unavailable. Choose another hotkey in Settings.");
         }

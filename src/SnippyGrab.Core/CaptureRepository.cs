@@ -149,8 +149,9 @@ public sealed partial class CaptureRepository
         try { Persist(); }
         catch { foreach (var (c, dismissed, restored) in previous) { c.Dismissed = dismissed; c.RestoredUtc = restored; } throw; }
     }
-    public void Replace(CaptureRecord record, byte[] png, int width, int height)
+    public void Replace(CaptureRecord record, byte[] png, int width, int height, string? expectedRevision = null)
     {
+        if (!state.Captures.Contains(record) || (expectedRevision is not null && record.FileName != expectedRevision)) throw new InvalidOperationException("Capture changed in another view. Reopen the editor before applying changes.");
         // Immutable file identity keeps existing receiver/clipboard payloads intact after editing.
         var name = "capture-" + Guid.NewGuid().ToString("N") + ".png";
         write(PathForName(name), png);

@@ -42,8 +42,16 @@ internal sealed class HistoryWindow : Window
         list.MouseDoubleClick += (_, _) => { if (Selected().FirstOrDefault() is { } c) controller.Edit(c); };
         list.PreviewMouseMove += (_, e) => { if (e.LeftButton == MouseButtonState.Pressed && Selected().Count > 0 && (Keyboard.Modifiers & ModifierKeys.Alt) != 0) controller.Try(() => controller.DragDrop.Drag(list, Selected())); };
         KeyDown += (_, e) => { if (e.Key == Key.Escape) Close(); if (e.Key == Key.Delete) { controller.Dismiss(Selected()); Refresh(); } };
+        controller.Repository.RevisionChanged += RevisionChanged;
+        Closed += (_, _) => controller.Repository.RevisionChanged -= RevisionChanged;
         Refresh();
     }
     private List<CaptureRecord> Selected() => list.SelectedItems.Cast<Row>().Select(r => r.Capture).ToList();
-    private void Refresh() => list.ItemsSource = controller.Repository.Captures.OrderByDescending(c => c.CreatedUtc).Select(c => new Row(c)).ToList();
+    private void RevisionChanged(CaptureRecord record) => controller.Try(Refresh);
+    private void Refresh()
+    {
+        var selected = Selected().Select(c => c.Id).ToHashSet();
+        list.ItemsSource = controller.Repository.Captures.OrderByDescending(c => c.CreatedUtc).Select(c => new Row(c)).ToList();
+        foreach (var row in list.Items.Cast<Row>().Where(r => selected.Contains(r.Capture.Id))) list.SelectedItems.Add(row);
+    }
 }

@@ -176,6 +176,14 @@ public sealed class LifecycleTests : IDisposable
         Assert.Equal(0, repository.Cleanup(restored.AddMinutes(29), 1));
         var reopened = new CaptureRepository(root); reopened.Load(); Assert.Equal(restored, Assert.Single(reopened.Captures).RestoredUtc);
     }
+    [Fact] public void StaleEditorCannotOverwriteCommittedRevisionOrEmitRefresh()
+    {
+        var record = Add(); var expected = record.FileName; var events = 0;
+        repository.RevisionChanged += _ => events++;
+        repository.Replace(record, [2], 40, 50, expected); var latest = record.FileName;
+        Assert.Throws<InvalidOperationException>(() => repository.Replace(record, [3], 60, 70, expected));
+        Assert.Equal(latest, record.FileName); Assert.Equal(new byte[] { 2 }, File.ReadAllBytes(repository.PathFor(record))); Assert.Equal(1, events);
+    }
     public void Dispose()
     {
         foreach (var file in Directory.EnumerateFiles(root)) File.Delete(file);

@@ -10,7 +10,8 @@ internal sealed class EditorWindow : Window
 {
     private readonly AppController controller;
     private readonly CaptureRecord record;
-    private readonly List<IDisposable> leases = [];
+    private readonly CaptureViewLease lease;
+    private string expectedRevision;
     private readonly UndoJournal<EditorState> journal;
     private readonly EditorSurface surface;
     private readonly ScrollViewer viewport;
@@ -37,7 +38,7 @@ internal sealed class EditorWindow : Window
     {
         Ui.StyleWindow(this);
         this.controller = controller; this.record = record;
-        leases.Add(controller.Repository.Lease([record]));
+        expectedRevision = record.FileName;
         journal = new(new EditorState(ImageService.Load(controller.Repository.PathFor(record)), []), 20);
         Title = $"SnippyGrab · {record.Width} × {record.Height}"; Width = 1000; Height = 700; MinWidth = 660; MinHeight = 440; WindowStartupLocation = WindowStartupLocation.CenterScreen;
         var root = new DockPanel { Margin = new Thickness(12) }; Content = root;
@@ -98,7 +99,8 @@ internal sealed class EditorWindow : Window
             e.Cancel = true;
             controller.Run(async () => { await RequestCloseAsync(); });
         };
-        Closed += (_, _) => { ocrLifetime.Cancel(); ocrLifetime.Dispose(); foreach (var lease in leases) lease.Dispose(); };
+        lease = new(controller.Repository, record);
+        Closed += (_, _) => { ocrLifetime.Cancel(); ocrLifetime.Dispose(); lease.Dispose(); };
     }
     private EditTool Tool => (EditTool)(tools.SelectedItem ?? EditTool.Arrow);
     private Point Clamp(Point p) => new(Math.Clamp(p.X, 0, journal.Current.Base.PixelWidth), Math.Clamp(p.Y, 0, journal.Current.Base.PixelHeight));
@@ -140,8 +142,8 @@ internal sealed class EditorWindow : Window
     private BitmapSource Apply()
     {
         var image = Render(journal.Current);
-        controller.Repository.Replace(record, ImageService.Png(image), image.PixelWidth, image.PixelHeight);
-        leases.Add(controller.Repository.Lease([record]));
+        controller.Repository.Replace(record, ImageService.Png(image), image.PixelWidth, image.PixelHeight, expectedRevision);
+        expectedRevision = record.FileName;
         dirty = false; controller.Dock.Refresh(); return image;
     }
     private Task<bool> ApplyCopy() => commits.RunAsync(async () =>

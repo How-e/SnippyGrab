@@ -24,7 +24,7 @@ internal sealed class PinWindow : Window
             ("Copy", () => controller.Run(() => controller.Copy(record))), ("Edit", () => controller.Edit(record)),
             ("Toggle always on top", () => Topmost = !Topmost), ("Opacity 50% / 100%", () => Opacity = Opacity < 1 ? 1 : 0.5),
             ("Click-through (restore via tray → Restore pins)", () => { var hwnd = new WindowInteropHelper(this).Handle; Native.SetWindowLongPtr(hwnd, -20, Native.GetWindowLongPtr(hwnd, -20) | 0x20 | 0x08000000); }),
-            ("Return to shelf", () => { record.Dismissed = false; controller.Repository.Persist(); controller.Dock.Reveal(); Close(); }), ("Close pin window", Close)
+            ("Return to shelf", () => { controller.Repository.Restore([record], DateTimeOffset.UtcNow); controller.Dock.Reveal(); Close(); }), ("Close pin window", Close)
         }) { var item = new MenuItem { Header = label }; item.Click += (_, _) => controller.Try(action); menu.Items.Add(item); }
         ContextMenu = menu;
         lease = new(controller.Repository, record);

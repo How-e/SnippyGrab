@@ -8,6 +8,7 @@ public sealed class CaptureRecord
     public Guid Id { get; set; } = Guid.NewGuid();
     public string FileName { get; set; } = "";
     public DateTimeOffset CreatedUtc { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset? RestoredUtc { get; set; }
     public int Width { get; set; }
     public int Height { get; set; }
     public string Monitor { get; set; } = "";
@@ -112,6 +113,15 @@ public sealed partial class CaptureRepository
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException) { PersistenceFailed?.Invoke(); }
         return record;
     }
+    public void Restore(IEnumerable<CaptureRecord> records, DateTimeOffset now)
+    {
+        var items = records.DistinctBy(c => c.Id).ToArray();
+        if (items.Any(c => !state.Captures.Contains(c) || !SafeFile(PathFor(c)))) throw new IOException("Capture is no longer available.");
+        var previous = items.Select(c => (c, c.Dismissed, c.RestoredUtc)).ToArray();
+        foreach (var c in items) { c.Dismissed = false; c.RestoredUtc = now; }
+        try { Persist(); }
+        catch { foreach (var (c, dismissed, restored) in previous) { c.Dismissed = dismissed; c.RestoredUtc = restored; } throw; }
+    }
     public void Replace(CaptureRecord record, byte[] png, int width, int height)
     {
         // Immutable file identity keeps existing receiver/clipboard payloads intact after editing.
@@ -194,7 +204,7 @@ public sealed partial class CaptureRepository
             var name = Path.GetFileName(path);
             if (!IsSafeName(name) || !SafeFile(path) || pinned.Contains(name) || leases.ContainsKey(name) || state.ProtectedUntil.GetValueOrDefault(name) > now) continue;
             var record = state.Captures.FirstOrDefault(c => c.FileName == name);
-            var created = record?.CreatedUtc ?? new DateTimeOffset(File.GetLastWriteTimeUtc(path));
+            var created = record is null ? new DateTimeOffset(File.GetLastWriteTimeUtc(path)) : record.RestoredUtc ?? record.CreatedUtc;
             if (!clear && (retentionHours < 0 || created.AddHours(retentionHours) > now)) continue;
             try { File.Delete(path); state.Captures.RemoveAll(c => c.FileName == name); removed++; }
             catch (IOException) { }
@@ -247,5 +257,5 @@ public static class StartupCommand
 public static class CaptureLifetime
 {
     public static bool Visible(CaptureRecord capture, int minutes, DateTimeOffset now) =>
-        !capture.Dismissed && (capture.Pinned || minutes == 0 || capture.CreatedUtc.AddMinutes(minutes) > now);
+        !capture.Dismissed && (capture.Pinned || minutes == 0 || (capture.RestoredUtc ?? capture.CreatedUtc).AddMinutes(minutes) > now);
 }

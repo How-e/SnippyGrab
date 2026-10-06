@@ -167,6 +167,15 @@ public sealed class LifecycleTests : IDisposable
         var file = Path.Combine(root, "settings.json"); File.WriteAllText(file, "{\"CachePath\":null,\"SaveDirectory\":null,\"AnnotationColor\":null}");
         var settings = new SettingsService(file).Load(); Assert.Equal("", settings.CachePath); Assert.NotNull(settings.SaveDirectory); Assert.NotNull(settings.AnnotationColor);
     }
+    [Fact] public void RestoringExpiredCaptureStartsNewLifetimeAndKeepsOriginalTimestamp()
+    {
+        var record = Add(); var original = record.CreatedUtc; record.Dismissed = true;
+        var restored = original.AddDays(3); repository.Restore([record], restored);
+        Assert.Equal(original, record.CreatedUtc); Assert.True(CaptureLifetime.Visible(record, 30, restored.AddMinutes(29)));
+        Assert.False(CaptureLifetime.Visible(record, 30, restored.AddMinutes(30)));
+        Assert.Equal(0, repository.Cleanup(restored.AddMinutes(29), 1));
+        var reopened = new CaptureRepository(root); reopened.Load(); Assert.Equal(restored, Assert.Single(reopened.Captures).RestoredUtc);
+    }
     public void Dispose()
     {
         foreach (var file in Directory.EnumerateFiles(root)) File.Delete(file);

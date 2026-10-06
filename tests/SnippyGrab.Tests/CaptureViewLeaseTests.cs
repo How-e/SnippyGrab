@@ -1,8 +1,10 @@
 using SnippyGrab.Core;
 namespace SnippyGrab.Tests;
+
 public sealed class CaptureViewLeaseTests
 {
-    [Fact] public void DetachedViewSurvivesUnpinClearAndFollowsRevisionUntilClose()
+    [Fact]
+    public void DetachedViewSurvivesUnpinClearAndFollowsRevisionUntilClose()
     {
         var root = Path.Combine(Path.GetTempPath(), "SnippyGrab-pin-" + Guid.NewGuid().ToString("N"));
         try

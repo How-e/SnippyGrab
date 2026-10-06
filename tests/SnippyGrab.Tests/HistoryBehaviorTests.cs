@@ -1,15 +1,18 @@
 using SnippyGrab.Core;
 namespace SnippyGrab.Tests;
+
 public sealed class HistoryBehaviorTests
 {
-    [Fact] public void HistoryPagesAreBoundedAndCaptureTimeOrdered()
+    [Fact]
+    public void HistoryPagesAreBoundedAndCaptureTimeOrdered()
     {
         var start = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
         var captures = Enumerable.Range(0, 450).Select(i => new CaptureRecord { CreatedUtc = start.AddMinutes(i) }).ToArray();
         Assert.Equal(200, HistoryPage.Read(captures, 0).Length); Assert.Equal(captures[449].Id, HistoryPage.Read(captures, 0)[0].Id);
         Assert.Equal(captures[249].Id, HistoryPage.Read(captures, 1)[0].Id); Assert.Equal(50, HistoryPage.Read(captures, 2).Length);
     }
-    [Fact] public void OptionalHistoryPinsPersistDismissDoesNotDeleteAndFailuresRollBack()
+    [Fact]
+    public void OptionalHistoryPinsPersistDismissDoesNotDeleteAndFailuresRollBack()
     {
         var root = Path.Combine(Path.GetTempPath(), "SnippyGrab-history-behavior-" + Guid.NewGuid().ToString("N"));
         try

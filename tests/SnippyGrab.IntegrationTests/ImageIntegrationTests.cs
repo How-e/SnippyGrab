@@ -12,7 +12,8 @@ namespace SnippyGrab.IntegrationTests;
 
 public sealed class ImageIntegrationTests
 {
-    [Fact] public void EveryClipboardRepresentationReportsItsOwnOutcomeWithoutWritingOsClipboard()
+    [Fact]
+    public void EveryClipboardRepresentationReportsItsOwnOutcomeWithoutWritingOsClipboard()
     {
         Sta(() =>
         {

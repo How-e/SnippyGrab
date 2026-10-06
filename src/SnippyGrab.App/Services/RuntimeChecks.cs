@@ -79,24 +79,24 @@ internal static class RuntimeChecks
             {
                 editor.Show(); await Task.Delay(50);
                 foreach (var textScale in new[] { 1.0, 1.5, 2.25 })
-                foreach (var width in new[] { 660, 1000 })
-                {
-                    Application.Current.Resources["BodyTextSize"] = 13 * textScale;
-                    Application.Current.Resources["TextSize.12"] = 12 * textScale;
-                    ((DockPanel)editor.Content).Children.OfType<WrapPanel>().Last().Children.OfType<ComboBox>().Single().SelectedValue = EditTool.OcrArea;
-                    editor.Width = width; editor.UpdateLayout(); await Task.Delay(25);
-                    var rootPanel = (DockPanel)editor.Content;
-                    var toolbar = rootPanel.Children.OfType<WrapPanel>().First();
-                    var buttons = toolbar.Children.OfType<Button>().ToArray();
-                    Assert(buttons.Any(b => Equals(b.Content, "Apply + copy")) && buttons.Any(b => Equals(b.Content, "Export PNG…")) && !buttons.Any(b => Equals(b.Content, "Save")), "Explicit apply/export labels");
-                    Assert(buttons.Single(b => Equals(b.Content, "Open export folder")).IsEnabled, "Successful export exposes folder action");
-                    foreach (var control in rootPanel.Children.OfType<WrapPanel>().SelectMany(p => p.Children.OfType<FrameworkElement>()))
+                    foreach (var width in new[] { 660, 1000 })
                     {
-                        var bounds = control.TransformToAncestor(rootPanel).TransformBounds(new Rect(control.RenderSize));
-                        Assert(bounds.Left >= -1 && bounds.Right <= rootPanel.ActualWidth + 1 && bounds.Bottom <= rootPanel.ActualHeight, $"Every editor action/tool stays reachable at {width} DIP and {textScale:P0} text");
+                        Application.Current.Resources["BodyTextSize"] = 13 * textScale;
+                        Application.Current.Resources["TextSize.12"] = 12 * textScale;
+                        ((DockPanel)editor.Content).Children.OfType<WrapPanel>().Last().Children.OfType<ComboBox>().Single().SelectedValue = EditTool.OcrArea;
+                        editor.Width = width; editor.UpdateLayout(); await Task.Delay(25);
+                        var rootPanel = (DockPanel)editor.Content;
+                        var toolbar = rootPanel.Children.OfType<WrapPanel>().First();
+                        var buttons = toolbar.Children.OfType<Button>().ToArray();
+                        Assert(buttons.Any(b => Equals(b.Content, "Apply + copy")) && buttons.Any(b => Equals(b.Content, "Export PNG…")) && !buttons.Any(b => Equals(b.Content, "Save")), "Explicit apply/export labels");
+                        Assert(buttons.Single(b => Equals(b.Content, "Open export folder")).IsEnabled, "Successful export exposes folder action");
+                        foreach (var control in rootPanel.Children.OfType<WrapPanel>().SelectMany(p => p.Children.OfType<FrameworkElement>()))
+                        {
+                            var bounds = control.TransformToAncestor(rootPanel).TransformBounds(new Rect(control.RenderSize));
+                            Assert(bounds.Left >= -1 && bounds.Right <= rootPanel.ActualWidth + 1 && bounds.Bottom <= rootPanel.ActualHeight, $"Every editor action/tool stays reachable at {width} DIP and {textScale:P0} text");
+                        }
+                        Snapshot(editor, Path.Combine(Path.GetDirectoryName(Path.GetFullPath(destination))!, $"editor-export-{width}-text{(int)(textScale * 100)}.png"));
                     }
-                    Snapshot(editor, Path.Combine(Path.GetDirectoryName(Path.GetFullPath(destination))!, $"editor-export-{width}-text{(int)(textScale * 100)}.png"));
-                }
                 Assert(Native.GetForegroundWindow() == foreground, "Editor layout probe preserves focus");
             }
             finally { await editor.RequestCloseAsync(); }

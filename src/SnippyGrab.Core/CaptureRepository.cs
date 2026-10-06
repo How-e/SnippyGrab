@@ -1,6 +1,6 @@
-using System.Text.Json;
 using System.Buffers.Binary;
 using System.Security.Cryptography;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace SnippyGrab.Core;

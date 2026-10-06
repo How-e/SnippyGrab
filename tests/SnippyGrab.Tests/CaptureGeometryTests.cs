@@ -32,7 +32,11 @@ public sealed class CaptureGeometryTests
         Assert.Equal(new PixelRect(-100, -100, 150, 150), CaptureSelection.Region(-200, -200, 50, 50, desktop));
     }
     [Theory]
-    [InlineData(96)] [InlineData(120)] [InlineData(144)] [InlineData(168)] [InlineData(192)]
+    [InlineData(96)]
+    [InlineData(120)]
+    [InlineData(144)]
+    [InlineData(168)]
+    [InlineData(192)]
     public void DpiPlacementAndCursorHotspotStayInPhysicalPixels(int dpi)
     {
         Assert.Equal(237, DpiGeometry.ToPixel(DpiGeometry.ToDip(237, dpi), dpi));

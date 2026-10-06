@@ -22,7 +22,18 @@ public sealed class EditorDocumentTests
     }
     private static Annotation Mark(EditTool tool) => new(tool, new Point(110, 70), new Point(30, 20), Colors.Red, 4, 20, "TEST", [new(20, 20), new(90, 40), new(110, 60)]);
     [Theory]
-    [InlineData(0)] [InlineData(1)] [InlineData(2)] [InlineData(3)] [InlineData(4)] [InlineData(5)] [InlineData(6)] [InlineData(7)] [InlineData(8)] [InlineData(9)] [InlineData(10)] [InlineData(12)]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    [InlineData(5)]
+    [InlineData(6)]
+    [InlineData(7)]
+    [InlineData(8)]
+    [InlineData(9)]
+    [InlineData(10)]
+    [InlineData(12)]
     public void RequiredToolsFlattenAndUndoRedoWithoutChangingSource(int toolNumber)
     {
         ImageIntegrationTests.Sta(() =>

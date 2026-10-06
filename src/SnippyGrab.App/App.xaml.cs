@@ -11,6 +11,14 @@ public partial class App : Application
     {
         base.OnStartup(e);
         Native.SetDefaultDllDirectories(0x1000); // Default safe locations; never the working directory.
+        if (e.Args.Contains("--check-overlay-layout"))
+        {
+            var destination = e.Args.SkipWhile(a => a != "--check-overlay-layout").Skip(1).FirstOrDefault();
+            if (destination is null) { Shutdown(1); return; }
+            try { await RuntimeChecks.CheckOverlayLayout(destination); Shutdown(0); }
+            catch (Exception ex) { File.WriteAllText(destination, "FAILED: " + ex); Shutdown(1); }
+            return;
+        }
         if (e.Args.Contains("--self-test") || e.Args.Contains("--benchmark"))
         {
             var destination = e.Args.SkipWhile(a => a is not ("--self-test" or "--benchmark")).Skip(1).FirstOrDefault() ?? Path.Combine(Path.GetTempPath(), "SnippyGrab-self-test.json");

@@ -8,6 +8,36 @@ namespace SnippyGrab.App.Services;
 
 internal static class RuntimeChecks
 {
+    // Safe during normal desktop use: only synthetic, offscreen windows; no pointer/clipboard/capture activity.
+    public static async Task CheckOverlayLayout(string destination)
+    {
+        var foreground = Native.GetForegroundWindow();
+        var image = SyntheticCode(320, 180);
+        var desktop = Native.Desktop;
+        var results = new List<object>();
+        foreach (var size in new[] { (desktop.Width, desktop.Height, -30000), (desktop.Width, desktop.Height, 30000), (6400, 1821, -30000), (3840, 4320, -30000) })
+        {
+            var bounds = new PixelRect(size.Item3, -30000, size.Item1, size.Item2);
+            var overlay = new CaptureOverlay(image, bounds, false, activate: false) { Topmost = false };
+            try
+            {
+                overlay.Show(); await Task.Delay(100); overlay.UpdateLayout();
+                Native.GetWindowRect(new WindowInteropHelper(overlay).Handle, out var actual);
+                var dpi = VisualTreeHelper.GetDpi(overlay);
+                var view = (System.Windows.Controls.Viewbox)overlay.Content;
+                var rendered = view.Child.TransformToAncestor(overlay).TransformBounds(new Rect(0, 0, bounds.Width, bounds.Height));
+                Assert(actual.Pixels == bounds, "Full physical overlay HWND bounds");
+                Assert(Math.Abs(rendered.X) < 0.01 && Math.Abs(rendered.Y) < 0.01 &&
+                    Math.Abs(rendered.Width * dpi.DpiScaleX - bounds.Width) < 1 &&
+                    Math.Abs(rendered.Height * dpi.DpiScaleY - bounds.Height) < 1, "Snapshot maps to every overlay pixel");
+                Assert(Native.GetForegroundWindow() == foreground, "Offscreen layout probe preserves focus");
+                results.Add(new { Requested = bounds, Actual = actual.Pixels, dpi.DpiScaleX, dpi.DpiScaleY, RenderedDipBounds = rendered });
+            }
+            finally { overlay.Close(); }
+        }
+        AtomicFile.Write(destination, JsonSerializer.SerializeToUtf8Bytes(new { Result = "PASS", Desktop = desktop, Layouts = results, Scope = "Offscreen synthetic layout only; no pointer movement, clipboard write or desktop capture." }, new JsonSerializerOptions { WriteIndented = true }));
+    }
+
     public static async Task Run(string destination)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(destination))!);

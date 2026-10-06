@@ -6,6 +6,8 @@ namespace SnippyGrab.App.Services;
 internal static class Native
 {
     [StructLayout(LayoutKind.Sequential)] internal struct POINT { public int X, Y; }
+    [StructLayout(LayoutKind.Sequential)] internal struct MINMAXINFO { public POINT Reserved, MaxSize, MaxPosition, MinTrackSize, MaxTrackSize; }
+    [StructLayout(LayoutKind.Sequential)] internal struct WINDOWPOS { public nint Window, After; public int X, Y, Width, Height; public uint Flags; }
     [StructLayout(LayoutKind.Sequential)]
     internal struct RECT
     {

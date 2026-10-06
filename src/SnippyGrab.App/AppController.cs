@@ -36,11 +36,14 @@ internal sealed class AppController : IDisposable
     private readonly LatestOperation ocr = new();
     private bool exitRequested;
     private string? cacheWarning;
+    private string lastNotice = "No recent notification.";
+    private DateTimeOffset lastNoticeUtc;
     public AppController(bool background, string? isolatedDataDirectory = null, bool diagnostic = false)
     {
         dataDirectory = isolatedDataDirectory ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SnippyGrab");
         Directory.CreateDirectory(dataDirectory);
         settingsService = new(Path.Combine(dataDirectory, "settings.json")); Settings = settingsService.Load();
+        Ui.FailureHandler = Failure;
         Ui.Theme(Settings.Theme);
         Settings.LaunchOnStartup = StartupService.Enabled;
         try { Repository = new(Settings.CachePath.Length == 0 ? Path.Combine(dataDirectory, "cache") : Settings.CachePath); }
@@ -217,6 +220,7 @@ internal sealed class AppController : IDisposable
         Item("Pause hotkeys", () => { Hotkeys.Configure(Settings, !Hotkeys.Paused); BuildTray(); }, Hotkeys.Paused);
         Item("Clear temporary screenshots", ClearTemporary); Item("Retry history save", () => { Repository.Persist(); Notify("History saved. Cleanup can resume."); });
         Item("Launch at Windows login", () => { var draft = System.Text.Json.JsonSerializer.Deserialize<Settings>(System.Text.Json.JsonSerializer.Serialize(Settings))!; draft.LaunchOnStartup = !StartupService.Enabled; ApplySettings(draft); }, StartupService.Enabled);
+        Item("Last operation details", () => MessageBox.Show(lastNotice, "SnippyGrab · Operation details"));
         Item("About", () => MessageBox.Show("SnippyGrab 0.1.0 alpha\nNative, local screenshot shelf. MIT licensed.\nNo uploads, accounts, analytics or update polling.\n\nPrint Screen: region · Ctrl+Shift+S: fallback\nCtrl-click: select several · Drag: attach files\nClick: edit · Alt-drag: reorder\n\nUnsigned development build. See README for verification and limitations.", "SnippyGrab"));
         menu.Items.Add(new Forms.ToolStripSeparator()); Item("Exit", Exit);
         var old = tray.ContextMenuStrip; tray.ContextMenuStrip = menu; old?.Dispose();
@@ -226,12 +230,25 @@ internal sealed class AppController : IDisposable
     private void PreferencesChanged(object sender, UserPreferenceChangedEventArgs e) => Application.Current.Dispatcher.BeginInvoke(() => Ui.Theme(Settings.Theme));
     public async void Run(Func<Task> action) { try { await action(); } catch (Exception ex) { Failure(ex); } }
     public void Try(Action action) { try { action(); } catch (Exception ex) { Failure(ex); } }
-    private void Failure(Exception ex) { Log("failure=" + ex.GetType().Name); Notify(ex is DllNotFoundException or TypeInitializationException ? "Local OCR could not load. Install the Microsoft Visual C++ 2015–2022 x64 runtime and use the complete release package." : ex.Message); }
+    public void Failure(Exception ex)
+    {
+        var failure = OperationFailure.From(ex);
+        if (failure.Kind == FailureKind.Cancelled) return;
+        Log("failure_category=" + failure.Kind + "; exception_type=" + ex.GetType().Name);
+        Notify(failure.Message);
+    }
     private void Log(string text)
     {
         try { var path = Path.Combine(dataDirectory, "diagnostics.log"); if (File.Exists(path) && new FileInfo(path).Length > 512 * 1024) File.Delete(path); File.AppendAllText(path, $"{DateTimeOffset.UtcNow:O} {text}\n"); } catch (IOException) { } catch (UnauthorizedAccessException) { }
     }
-    public void Notify(string message) { if (!Exiting) tray.ShowBalloonTip(3500, "SnippyGrab", message.Length > 250 ? message[..250] : message, Forms.ToolTipIcon.Info); }
+    public void Notify(string message)
+    {
+        if (Exiting) return;
+        var now = DateTimeOffset.UtcNow;
+        if (message == lastNotice && now - lastNoticeUtc < TimeSpan.FromSeconds(5)) return;
+        lastNotice = message; lastNoticeUtc = now;
+        tray.ShowBalloonTip(3500, "SnippyGrab", message.Length > 250 ? message[..210] + "… Tray → Last operation details." : message, Forms.ToolTipIcon.Info);
+    }
     public void Exit()
     {
         if (Exiting || exitRequested) return;
@@ -262,6 +279,6 @@ internal sealed class AppController : IDisposable
         if (disposed) return; disposed = true;
         Exiting = true; cleanup.Stop(); expiry.Stop();
         SystemEvents.DisplaySettingsChanged -= DisplayChanged; SystemEvents.PowerModeChanged -= PowerChanged; SystemEvents.UserPreferenceChanged -= PreferencesChanged;
-        ocr.Dispose(); Clipboard.Invalidate(); Hotkeys.Dispose(); tray.Visible = false; tray.ContextMenuStrip?.Dispose(); tray.Icon?.Dispose(); tray.Dispose();
+        Ui.FailureHandler = null; ocr.Dispose(); Clipboard.Invalidate(); Hotkeys.Dispose(); tray.Visible = false; tray.ContextMenuStrip?.Dispose(); tray.Icon?.Dispose(); tray.Dispose();
     }
 }

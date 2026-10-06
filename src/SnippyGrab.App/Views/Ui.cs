@@ -6,12 +6,13 @@ namespace SnippyGrab.App.Views;
 internal static class Ui
 {
     private static readonly HashSet<double> fontSizes = [];
+    public static Action<Exception>? FailureHandler { get; set; }
     private static double textScale = 1;
     public static Button Button(string label, string hint, Action action)
     {
         var button = new Button { Content = label, ToolTip = hint };
         AutomationProperties.SetName(button, hint);
-        button.Click += (_, e) => { e.Handled = true; action(); };
+        button.Click += (_, e) => { e.Handled = true; try { action(); } catch (Exception ex) { if (FailureHandler is null) throw; FailureHandler(ex); } };
         return button;
     }
     public static void StyleWindow(Window window) => window.Style = (Style)Application.Current.FindResource(typeof(Window));

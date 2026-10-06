@@ -40,7 +40,7 @@ public partial class App : Application
     }
     private void OnUnhandled(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
-        e.Handled = true; controller?.Notify("An operation failed. Captures remain in the local cache. Retry the action or restart SnippyGrab.");
+        e.Handled = true; controller?.Failure(e.Exception);
     }
     protected override void OnExit(ExitEventArgs e)
     {

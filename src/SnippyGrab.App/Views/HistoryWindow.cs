@@ -30,7 +30,7 @@ internal sealed class HistoryWindow : Window
             DockPanel.SetDock(recovery, Dock.Top); root.Children.Add(recovery);
         }
         var toolbar = new WrapPanel();
-        toolbar.Children.Add(Ui.Button("To shelf", "Restore selected captures to shelf", () => { foreach (var c in Selected()) c.Dismissed = false; controller.Repository.Persist(); controller.Dock.Reveal(); }));
+        toolbar.Children.Add(Ui.Button("To shelf", "Restore selected captures to shelf", () => controller.Try(() => { foreach (var c in Selected()) c.Dismissed = false; controller.Repository.Persist(); controller.Dock.Reveal(); })));
         toolbar.Children.Add(Ui.Button("Copy", "Copy image or selected files", () => controller.Run(async () => { var items = Selected(); if (items.Count == 1) await controller.Copy(items[0]); else if (items.Count > 1) await controller.CopyFiles(items); })));
         toolbar.Children.Add(Ui.Button("Edit", "Edit selected capture", () => { if (Selected().FirstOrDefault() is { } c) controller.Edit(c); }));
         toolbar.Children.Add(Ui.Button("Pin", "Toggle pin on selected captures", () => { foreach (var c in Selected()) controller.Pin(c); Refresh(); }));

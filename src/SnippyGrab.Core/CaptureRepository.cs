@@ -33,6 +33,8 @@ public sealed partial class CaptureRepository
 {
     private readonly string root;
     private readonly Action<string, byte[]> write;
+    private readonly Func<DateTimeOffset> clock;
+    private readonly HashSet<string> sessionFiles = new(StringComparer.OrdinalIgnoreCase);
     public bool PersistencePending { get; private set; }
     public event Action? PersistenceFailed;
     public event Action<CaptureRecord>? RevisionChanged;
@@ -44,9 +46,9 @@ public sealed partial class CaptureRepository
     public bool HistoryEnabled { get; set; } = true;
     public bool Recovered { get; private set; }
     public bool CleanupBlocked { get; private set; }
-    public CaptureRepository(string directory, Action<string, byte[]>? writer = null)
+    public CaptureRepository(string directory, Action<string, byte[]>? writer = null, Func<DateTimeOffset>? utcNow = null)
     {
-        write = writer ?? AtomicFile.Write;
+        write = writer ?? AtomicFile.Write; clock = utcNow ?? (() => DateTimeOffset.UtcNow);
         root = Path.GetFullPath(directory);
         if (root.StartsWith(@"\\", StringComparison.Ordinal) || root == Path.GetPathRoot(root))
             throw new InvalidDataException("Cache must be a dedicated local directory.");
@@ -84,7 +86,7 @@ public sealed partial class CaptureRepository
         if (loaded.Captures is null || loaded.ProtectedUntil is null || loaded.Captures.Any(c => c is null)) throw new InvalidDataException("Invalid history state.");
         loaded.Captures = loaded.Captures.Where(c => IsSafeName(c.FileName) && c.Width > 0 && c.Height > 0 && SafeFile(PathFor(c)))
             .DistinctBy(c => c.Id).DistinctBy(c => c.FileName).ToList();
-        loaded.ProtectedUntil = loaded.ProtectedUntil.Where(p => IsSafeName(p.Key) && p.Value > DateTimeOffset.UtcNow).ToDictionary();
+        loaded.ProtectedUntil = loaded.ProtectedUntil.Where(p => IsSafeName(p.Key) && p.Value > clock()).ToDictionary();
         return loaded;
     }
     public void Load()
@@ -130,8 +132,9 @@ public sealed partial class CaptureRepository
     }
     public CaptureRecord Add(byte[] png, int width, int height, string monitor = "")
     {
-        var record = new CaptureRecord { FileName = "capture-" + Guid.NewGuid().ToString("N") + ".png", Width = width, Height = height, Monitor = monitor };
+        var record = new CaptureRecord { CreatedUtc = clock(), FileName = "capture-" + Guid.NewGuid().ToString("N") + ".png", Width = width, Height = height, Monitor = monitor };
         write(PathFor(record), png);
+        sessionFiles.Add(record.FileName);
         state.Captures.Insert(0, record);
         try { Persist(); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException) { PersistenceFailed?.Invoke(); }
@@ -151,6 +154,7 @@ public sealed partial class CaptureRepository
         // Immutable file identity keeps existing receiver/clipboard payloads intact after editing.
         var name = "capture-" + Guid.NewGuid().ToString("N") + ".png";
         write(PathForName(name), png);
+        sessionFiles.Add(name);
         var previous = (record.FileName, record.Width, record.Height, record.Edited);
         record.FileName = name; record.Width = width; record.Height = height; record.Edited = true;
         try { Persist(); }
@@ -217,33 +221,43 @@ public sealed partial class CaptureRepository
     public IDisposable Lease(IEnumerable<CaptureRecord> records, bool transfer = false)
     {
         var names = records.Select(c => c.FileName).Distinct().ToArray();
+        foreach (var name in names) PathForName(name);
+        var previous = names.ToDictionary(name => name, name => state.ProtectedUntil.GetValueOrDefault(name));
         foreach (var name in names)
         {
-            PathForName(name);
             leases[name] = leases.GetValueOrDefault(name) + 1;
-            if (transfer) state.ProtectedUntil[name] = DateTimeOffset.UtcNow.AddHours(24);
+            if (transfer) state.ProtectedUntil[name] = clock().AddHours(24);
         }
-        if (transfer) Persist();
+        void Release() { foreach (var name in names) { var count = leases.GetValueOrDefault(name); if (count <= 1) leases.Remove(name); else leases[name] = count - 1; } }
+        if (transfer)
+            try { Persist(); }
+            catch
+            {
+                Release();
+                foreach (var name in names) { if (previous[name] == default) state.ProtectedUntil.Remove(name); else state.ProtectedUntil[name] = previous[name]; }
+                throw;
+            }
         return new ReleaseLease(() =>
         {
-            foreach (var name in names)
-            {
-                if (leases.TryGetValue(name, out var count)) { if (count <= 1) leases.Remove(name); else leases[name] = count - 1; }
-                if (transfer) state.ProtectedUntil[name] = DateTimeOffset.UtcNow.AddHours(24);
-            }
-            if (transfer) Persist();
+            Release();
+            if (!transfer) return;
+            foreach (var name in names) state.ProtectedUntil[name] = clock().AddHours(24);
+            try { Persist(); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException) { PersistenceFailed?.Invoke(); }
         });
     }
-    public int Cleanup(DateTimeOffset now, int retentionHours, bool clear = false)
+    public int CleanupSession(DateTimeOffset now) => Cleanup(now, -1, clear: true, sessionOnly: true);
+    public int Cleanup(DateTimeOffset now, int retentionHours, bool clear = false, bool sessionOnly = false)
     {
         if (CleanupBlocked || PersistencePending) return 0; // Corrupt pin metadata must never turn into permission to delete images.
         var pinned = state.Captures.Where(c => c.Pinned).Select(c => c.FileName).ToHashSet();
+        var records = state.Captures.ToDictionary(c => c.FileName);
         var removed = 0;
         foreach (var path in Directory.EnumerateFiles(root, "capture-*.png"))
         {
             var name = Path.GetFileName(path);
-            if (!IsSafeName(name) || !SafeFile(path) || pinned.Contains(name) || leases.ContainsKey(name) || state.ProtectedUntil.GetValueOrDefault(name) > now) continue;
-            var record = state.Captures.FirstOrDefault(c => c.FileName == name);
+            if ((sessionOnly && !sessionFiles.Contains(name)) || !IsSafeName(name) || !SafeFile(path) || pinned.Contains(name) || leases.ContainsKey(name) || state.ProtectedUntil.GetValueOrDefault(name) > now) continue;
+            var record = records.GetValueOrDefault(name);
             var created = record is null ? new DateTimeOffset(File.GetLastWriteTimeUtc(path)) : record.RestoredUtc ?? record.CreatedUtc;
             if (!clear && (retentionHours < 0 || created.AddHours(retentionHours) > now)) continue;
             try { File.Delete(path); state.Captures.RemoveAll(c => c.FileName == name); removed++; }
@@ -255,8 +269,14 @@ public sealed partial class CaptureRepository
         foreach (var path in Directory.EnumerateFiles(root, "*.tmp"))
             if (SafeFile(path) && File.GetLastWriteTimeUtc(path) < now.UtcDateTime.AddDays(-1) &&
                 TemporaryPattern().IsMatch(Path.GetFileName(path)))
-                try { File.Delete(path); } catch (IOException) { }
+                try { File.Delete(path); } catch (IOException) { } catch (UnauthorizedAccessException) { }
         Persist();
+        // Only owned pages unreferenced by the durable manifest and older than the crash grace are removable.
+        var manifest = Path.Combine(root, "history.json");
+        var pages = File.Exists(manifest) ? JsonSerializer.Deserialize<RepositoryState>(File.ReadAllText(manifest))?.Pages.ToHashSet() ?? [] : new HashSet<string>();
+        foreach (var path in Directory.EnumerateFiles(root, "history-page-*.json"))
+            if (PagePattern().IsMatch(Path.GetFileName(path)) && !pages.Contains(Path.GetFileName(path)) && SafeFile(path) && File.GetLastWriteTimeUtc(path) < now.UtcDateTime.AddDays(-1))
+                try { File.Delete(path); } catch (IOException) { } catch (UnauthorizedAccessException) { }
         return removed;
     }
     private sealed class ReleaseLease(Action release) : IDisposable

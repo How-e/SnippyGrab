@@ -263,7 +263,7 @@ internal sealed class AppController : IDisposable
         {
             foreach (var editor in editors.Values.ToArray())
                 if (!await editor.RequestCloseAsync()) return;
-            if (Settings.SessionOnly) Repository.Cleanup(DateTimeOffset.UtcNow, Settings.RetentionHours, true);
+            if (Settings.SessionOnly) { foreach (var pin in pins.Values.ToArray()) pin.Close(); Repository.CleanupSession(DateTimeOffset.UtcNow); }
             else Repository.Persist();
             Exiting = true;
             Application.Current.Shutdown();

@@ -43,6 +43,25 @@ public sealed class ImageIntegrationTests
         Sta(() => { var crop = ImageService.Crop(Synthetic(), new(-10, -10, 50, 50)); Assert.Equal(40, crop.PixelWidth); Assert.Equal(40, crop.PixelHeight); Assert.False(crop is CroppedBitmap); Assert.Throws<InvalidDataException>(() => ImageService.Crop(Synthetic(), new(300, 300, 10, 10))); return true; });
     }
     [Theory]
+    [InlineData(32, 3200)]
+    [InlineData(3200, 32)]
+    public void DockThumbnailBoundsBothDimensionsForExtremeAspectRatios(int width, int height)
+    {
+        Sta(() =>
+        {
+            var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".png");
+            try
+            {
+                var image = BitmapSource.Create(width, height, 96, 96, PixelFormats.Bgra32, null, new byte[width * height * 4], width * 4);
+                File.WriteAllBytes(path, ImageService.Png(image));
+                var thumbnail = ImageService.Load(path, 100, 80);
+                Assert.InRange(thumbnail.PixelWidth, 1, 100); Assert.InRange(thumbnail.PixelHeight, 1, 80);
+            }
+            finally { File.Delete(path); }
+            return true;
+        });
+    }
+    [Theory]
     [InlineData(10)]
     [InlineData(9)]
     [InlineData(8)]

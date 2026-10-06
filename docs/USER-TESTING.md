@@ -59,6 +59,8 @@ If a browser/editor rejects the drop, report what happened and its version; rece
 
 For the reported regressions, also check first hover with 3/5/20 captures, move from the collapsed dock to the top expanded card, leave/re-enter with selections, and Alt-move adjacent items both upward and downward. Confirm keyboard focus is visibly on the dock before testing Delete/Enter; hovering alone may leave keys with the previous application.
 
+Dock reliability build retest: the primary card should stay at the chosen corner while other cards grow inward. Move through padding/gaps and reach every displayed card/control; leaving should collapse after a short delay, with the same selection restored on re-entry. Try cold and repeated hover with 1/3/5/20 captures, scrolling, adjacent/nonadjacent Alt-moves in both directions, starting a drag then canceling, and releasing a simple press outside its card. Repeat your normal Codex capture/paste and selected-file drop checks.  keyboard focus/action fixes are still pending in this build; do not treat those known failures as closed.
+
 Report screen coverage, hidden selections, premature hiding, controls that cannot be reached and any action using the wrong capture. Supports ///////; transfer ordering is .
 
 ### Editor and updated screenshot

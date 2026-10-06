@@ -40,7 +40,7 @@ internal static class ImageService
         }
         finally { bitmap.UnlockBits(bits); }
     }
-    public static BitmapSource Load(string path, int thumbnail = 0)
+    public static BitmapSource Load(string path, int thumbnail = 0, int thumbnailHeight = 0)
     {
         if (new FileInfo(path).Length > 100 * 1024 * 1024) throw new InvalidDataException("Image file exceeds 100 MB.");
         using var stream = File.OpenRead(path);
@@ -49,7 +49,13 @@ internal static class ImageService
         if ((long)frame.PixelWidth * frame.PixelHeight > MaxPixels) throw new InvalidDataException("Image exceeds 80 megapixels.");
         stream.Position = 0;
         var image = new BitmapImage(); image.BeginInit(); image.CacheOption = BitmapCacheOption.OnLoad;
-        if (thumbnail > 0) image.DecodePixelWidth = Math.Min(thumbnail, frame.PixelWidth);
+        if (thumbnail > 0)
+        {
+            var width = Math.Min(thumbnail, frame.PixelWidth);
+            if (thumbnailHeight > 0 && width * (double)frame.PixelHeight / frame.PixelWidth > thumbnailHeight)
+                image.DecodePixelHeight = Math.Min(thumbnailHeight, frame.PixelHeight);
+            else image.DecodePixelWidth = width;
+        }
         image.StreamSource = stream; image.EndInit(); image.Freeze(); return image;
     }
     public static byte[] Png(BitmapSource image)

@@ -37,7 +37,7 @@ The app lives in the tray. Closing a window keeps it running; **Exit** stops it.
 - Capture and immediately **Ctrl+V** into an application accepting clipboard images.
 - Drag a thumbnail to attach its temporary PNG file.
 - **Ctrl-click** several captures, then drag one selected image to export all of them. Multi-image Ctrl+C copies file-drop data; no universal multi-image bitmap paste format exists.
-- Wheel to browse. Hover expands a bounded strip and reveals edit/copy/pin/save/OCR/dismiss. **Alt-drag** onto another shelf image to reorder.
+- Wheel to browse. Hover expands inward from the primary card at the chosen corner and reveals edit/copy/pin/save/OCR/dismiss. Leaving collapses after a brief delay while preserving selections; keyboard use and dragging keep it open. **Alt-drag** onto another shelf image to move to that image's numbered position, in either direction.
 - Click to edit: crop, arrow, rectangle, ellipse, pen, line, text, highlighter, numbered marker, blur, pixelate, solid redaction and spotlight. Ctrl+wheel zooms. Copy/Save updates shelf and clipboard; Save as exports a PNG. Closing applies pending edits; **Discard** leaves them unapplied.
 - OCR runs locally. Choose **OcrArea** in the editor to read a selected region. Review extracted text for character errors.
 - Pin indefinitely. Detach through the context menu for a resizable desktop pin; restore click-through interaction from the tray.

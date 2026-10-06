@@ -33,7 +33,14 @@ internal static class RuntimeChecks
             var png = ImageService.Png(SyntheticCode(720, 360));
             foreach (var count in new[] { 1, 3, 5, 20 })
             {
-                while (controller.Repository.Captures.Count < count) controller.Repository.Add(png, 720, 360);
+                controller.Settings.DockOpacity = count == 5 ? 0.25 : 0.96;
+                while (controller.Repository.Captures.Count < count)
+                {
+                    var n = controller.Repository.Captures.Count;
+                    var width = n % 3 == 0 ? 720 : n % 3 == 1 ? 360 : 720;
+                    var height = n % 3 == 0 ? 360 : n % 3 == 1 ? 720 : 120;
+                    controller.Repository.Add(ImageService.Png(SyntheticCode(width, height)), width, height);
+                }
                 foreach (var corner in Enum.GetValues<DockCorner>())
                     foreach (var orientation in Enum.GetValues<DockOrientation>())
                     {
@@ -48,8 +55,11 @@ internal static class RuntimeChecks
                         var after = Primary().PointToScreen(new Point(Primary().ActualWidth / 2, Primary().ActualHeight / 2));
                         Assert(Math.Abs(before.X - after.X) <= 1 && Math.Abs(before.Y - after.Y) <= 1, "Primary card anchor survives expansion");
                         Native.GetWindowRect(new WindowInteropHelper(dock).Handle, out var rect);
-                        Assert(((Border)dock.Content).Background == Brushes.Transparent && panel.Background == Brushes.Transparent, "Continuous transparent hover surface");
+                        Assert(((SolidColorBrush)((Border)dock.Content).Background).Color.A > 0 && panel.Background == Brushes.Transparent, "Continuous nonzero-alpha hover surface");
                         Assert(dock.InputHitTest(new Point(1, 1)) is not null, "Hover route includes window padding");
+                        var route = new RenderTargetBitmap(2, 2, 96, 96, PixelFormats.Pbgra32); route.Render(dock);
+                        var pixel = new byte[4]; route.CopyPixels(new Int32Rect(1, 1, 1, 1), pixel, 4, 0);
+                        Assert(pixel[3] > 0, "Native layered-window hover padding is not alpha-zero");
                         foreach (var card in panel.Children.OfType<Border>().Where(b => b.Tag is Guid))
                         {
                             var point = card.PointToScreen(new Point(card.ActualWidth / 2, card.ActualHeight / 2));
@@ -66,15 +76,26 @@ internal static class RuntimeChecks
                         Assert(!dock.Expanded && dock.SelectionCount == 1, "Pointer leave collapses without losing selection");
                         dock.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = Mouse.MouseEnterEvent });
                         Assert(dock.Expanded && dock.SelectionCount == 1, "Re-entry preserves expansion and selection");
+                        Assert(dock.CachedCardCount <= 5 && dock.CachedThumbnailCount <= 12, "Bounded dock caches");
                         dock.ToggleSelection(id);
                         results.Add(new { count, corner, orientation, PrimaryAnchorStable = true, WarmCycleCardBuilds = dock.CardBuildCount - buildsBefore, ThumbnailDecodes = dock.ThumbnailDecodeCount - decodesBefore });
                     }
             }
+            var hoverBuilds = results.ToArray();
+            for (var i = 0; i < 20; i++)
+            {
+                dock.Scroll(1); await Task.Delay(10);
+                Assert(dock.CachedCardCount <= 5 && dock.CachedThumbnailCount <= 12, "Scrolling keeps caches bounded");
+            }
+            dock.Scroll(-20);
+            var beforeEditDecode = dock.ThumbnailDecodeCount;
+            controller.Repository.Replace(controller.Repository.Captures[0], png, 720, 360); dock.Refresh();
+            Assert(dock.ThumbnailDecodeCount == beforeEditDecode + 1, "New revision invalidates the cached image");
             Snapshot(dock, Path.Combine(Path.GetDirectoryName(Path.GetFullPath(destination))!, "dock-layout-synthetic.png"));
             Assert(Native.GetForegroundWindow() == foreground, "Dock probe preserves foreground");
             Native.GetCursorPos(out var afterPointer); Assert(afterPointer.X == pointer.X && afterPointer.Y == pointer.Y, "Dock probe never moves pointer");
             controller.Dispose(); dock.Close();
-            AtomicFile.Write(destination, JsonSerializer.SerializeToUtf8Bytes(new { Result = "PASS", Layouts = results, Scope = "Offscreen synthetic WPF/native layout and raised hover events; no actual pointer gestures, OS clipboard writes or external receivers." }, new JsonSerializerOptions { WriteIndented = true }));
+            AtomicFile.Write(destination, JsonSerializer.SerializeToUtf8Bytes(new { Result = "PASS", Layouts = hoverBuilds, ScrolledItems = 20, RevisionInvalidation = true, CachedCards = dock.CachedCardCount, CachedThumbnails = dock.CachedThumbnailCount, Scope = "Offscreen synthetic WPF/native layout and raised hover events; no actual pointer gestures, OS clipboard writes or external receivers." }, new JsonSerializerOptions { WriteIndented = true }));
         }
         finally
         {

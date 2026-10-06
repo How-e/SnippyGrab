@@ -1,0 +1,37 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: ./scripts/provision-ocr.ps1
+        shell: pwsh
+      - run: dotnet restore --locked-mode
+      - run: dotnet build --no-restore -c Release -warnaserror
+      - run: dotnet test --no-build -c Release
+      - name: Package unsigned portable and per-user installer
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME.TrimStart('v')
+          ./scripts/package.ps1 -Version $version
+      # Add protected external signing BEFORE generating final checksums.
+      # Never expose signing credentials to pull-request builds.
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME.TrimStart('v')
+          $bundle = "artifacts/SnippyGrab-$version-win-x64.zip"
+          $prerelease = if ($version.Contains('-')) { @('--prerelease') } else { @() }
+          gh release create $env:GITHUB_REF_NAME $bundle "$bundle.sha256" --verify-tag --generate-notes @prerelease

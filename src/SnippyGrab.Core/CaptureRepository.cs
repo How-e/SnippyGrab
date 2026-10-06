@@ -28,6 +28,7 @@ public sealed partial class CaptureRepository
     private readonly string root;
     private readonly Dictionary<string, int> leases = new(StringComparer.OrdinalIgnoreCase);
     private RepositoryState state = new();
+    private bool recoveryNeedsBackup;
     public IReadOnlyList<CaptureRecord> Captures => state.Captures;
     public string Root => root;
     public bool HistoryEnabled { get; set; } = true;
@@ -55,32 +56,45 @@ public sealed partial class CaptureRepository
         return Path.Combine(root, name);
     }
     private bool SafeFile(string path) => File.Exists(path) && (File.GetAttributes(path) & FileAttributes.ReparsePoint) == 0;
+    private RepositoryState ReadState(string metadata)
+    {
+        if (!SafeFile(metadata)) throw new InvalidDataException("Invalid metadata location.");
+        if (new FileInfo(metadata).Length > 4 * 1024 * 1024) throw new InvalidDataException("History too large.");
+        var loaded = JsonSerializer.Deserialize<RepositoryState>(File.ReadAllText(metadata)) ?? throw new InvalidDataException("Empty history state.");
+        if (loaded.SchemaVersion != 1) throw new InvalidDataException("Unsupported history version.");
+        if (loaded.Captures is null || loaded.ProtectedUntil is null || loaded.Captures.Any(c => c is null)) throw new InvalidDataException("Invalid history state.");
+        loaded.Captures = loaded.Captures.Where(c => IsSafeName(c.FileName) && c.Width > 0 && c.Height > 0 && SafeFile(PathFor(c)))
+            .DistinctBy(c => c.Id).DistinctBy(c => c.FileName).ToList();
+        loaded.ProtectedUntil = loaded.ProtectedUntil.Where(p => IsSafeName(p.Key) && p.Value > DateTimeOffset.UtcNow).ToDictionary();
+        return loaded;
+    }
     public void Load()
     {
+        state = new(); Recovered = false; CleanupBlocked = false; recoveryNeedsBackup = false;
         var metadata = Path.Combine(root, "history.json");
+        var recovery = Path.Combine(root, "history-recovered.json");
         try
         {
-            if (File.Exists(metadata))
-            {
-                if (!SafeFile(metadata)) throw new InvalidDataException("Invalid metadata location.");
-                if (new FileInfo(metadata).Length > 4 * 1024 * 1024) throw new InvalidDataException("History too large.");
-                state = JsonSerializer.Deserialize<RepositoryState>(File.ReadAllText(metadata)) ?? new();
-                if (state.SchemaVersion != 1) throw new InvalidDataException("Unsupported history version.");
-                if (state.Captures is null || state.ProtectedUntil is null || state.Captures.Any(c => c is null)) throw new InvalidDataException("Invalid history state.");
-                state.Captures = state.Captures.Where(c => IsSafeName(c.FileName) && c.Width > 0 && c.Height > 0 && SafeFile(PathFor(c)))
-                    .DistinctBy(c => c.Id).ToList();
-                state.ProtectedUntil = state.ProtectedUntil.Where(p => IsSafeName(p.Key) && p.Value > DateTimeOffset.UtcNow).ToDictionary();
-            }
+            if (File.Exists(metadata)) state = ReadState(metadata);
+            else if (File.Exists(recovery)) throw new InvalidDataException("Unconfirmed recovered history.");
         }
-        catch (Exception ex) when (ex is IOException or JsonException or InvalidDataException or ArgumentException)
-        { state = new(); Recovered = true; CleanupBlocked = true; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidDataException or ArgumentException)
+        {
+            Recovered = true; CleanupBlocked = true;
+            if (File.Exists(recovery))
+                try { state = ReadState(recovery); }
+                catch (Exception recoveryError) when (recoveryError is IOException or UnauthorizedAccessException or JsonException or InvalidDataException or ArgumentException)
+                { state = new(); recoveryNeedsBackup = true; }
+        }
         var known = state.Captures.Select(c => c.FileName).ToHashSet();
-        foreach (var path in Directory.EnumerateFiles(root, "capture-*.png").Take(2000))
+        var files = Directory.EnumerateFiles(root, "capture-*.png");
+        // During recovery every unknown image may be an old pin, including with history disabled.
+        foreach (var path in CleanupBlocked ? files : files.Take(2000))
         {
             var name = Path.GetFileName(path);
             if (!IsSafeName(name) || !SafeFile(path) || known.Contains(name)) continue;
             // Recovery is metadata-only; the UI validates dimensions when decoding, with a pixel limit.
-            if (HistoryEnabled) state.Captures.Add(new() { FileName = name, CreatedUtc = File.GetLastWriteTimeUtc(path), Width = 1, Height = 1, Dismissed = true });
+            if (HistoryEnabled || CleanupBlocked) state.Captures.Add(new() { FileName = name, CreatedUtc = File.GetLastWriteTimeUtc(path), Width = 1, Height = 1, Dismissed = true, Pinned = CleanupBlocked });
         }
     }
     public CaptureRecord Add(byte[] png, int width, int height, string monitor = "")
@@ -107,12 +121,39 @@ public sealed partial class CaptureRepository
     }
     public void Persist()
     {
+        var metadata = Path.Combine(root, CleanupBlocked ? "history-recovered.json" : "history.json");
+        if (File.Exists(metadata) && !SafeFile(metadata)) throw new InvalidDataException("Invalid metadata location.");
+        if (recoveryNeedsBackup)
+        {
+            File.Copy(metadata, Path.Combine(root, "history-recovered.invalid-" + Guid.NewGuid().ToString("N") + ".json"));
+            recoveryNeedsBackup = false;
+        }
+        AtomicFile.Write(metadata, SerializeState());
+    }
+    private byte[] SerializeState()
+    {
         var saved = new RepositoryState
         {
             Captures = state.Captures.Where(c => HistoryEnabled || c.Pinned).ToList(),
             ProtectedUntil = state.ProtectedUntil
         };
-        AtomicFile.Write(Path.Combine(root, CleanupBlocked ? "history-recovered.json" : "history.json"), JsonSerializer.SerializeToUtf8Bytes(saved));
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(saved);
+        if (bytes.Length > 4 * 1024 * 1024) throw new InvalidDataException("History exceeds the recovery size limit. Metadata has not been replaced; cleanup remains blocked during recovery.");
+        return bytes;
+    }
+    public void ConfirmHistoryRecovery()
+    {
+        if (!CleanupBlocked) return;
+        // Persist the reviewed state first so a failed promotion can be retried after restart.
+        Persist();
+        var metadata = Path.Combine(root, "history.json");
+        if (File.Exists(metadata))
+        {
+            if (!SafeFile(metadata)) throw new InvalidDataException("Invalid metadata location.");
+            File.Copy(metadata, Path.Combine(root, "history.invalid-" + Guid.NewGuid().ToString("N") + ".json"));
+        }
+        AtomicFile.Write(metadata, SerializeState());
+        CleanupBlocked = false;
     }
     public IDisposable Lease(IEnumerable<CaptureRecord> records, bool transfer = false)
     {

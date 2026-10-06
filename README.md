@@ -66,7 +66,7 @@ Settings cover capture/cursor/hotkeys, monitor/corner/orientation/sizing, opacit
 
 Cache: `%LOCALAPPDATA%\SnippyGrab\cache`. Captures are not dumped into Pictures. Retention supports 1/24/168 hours or `-1` for never. Pins survive cleanup. Editors/drags acquire leases; transfers and clipboard-file copies protect sources for **24 hours** after use. Clear/session-only cleanup respects that grace. Receivers must copy before it ends. Saved exports must be outside the cache. Custom cache paths apply on restart; old captures stay in the old cache.
 
-Optional history stores time, dimensions, capture origin and pin/edit/save state, not titles/processes or OCR text. Disabling history preserves pins. Corrupt history blocks cleanup to protect possible pins and preserves original metadata. Cache files are local plaintext, not an encrypted vault.
+Optional history stores time, dimensions, capture origin and pin/edit/save state, not titles/processes or OCR text. Disabling history preserves pins. Unreadable history blocks cleanup and uses a recovery sidecar so new pins and transfers survive restart. Unknown old captures are conservatively pinned, even with history disabled. Open Recent captures to confirm recovered history; the unreadable original is archived before cleanup resumes. Review unknown captures before unpinning them. If recovery exceeds the metadata size limit or storage remains unwritable, cleanup stays blocked. Cache files are local plaintext, not an encrypted vault.
 
 ## Privacy
 

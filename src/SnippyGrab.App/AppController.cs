@@ -57,7 +57,7 @@ internal sealed class AppController : IDisposable
         if (!Settings.FirstRunComplete) ShowWelcome();
         else if (!background && !Settings.StartMinimized) ShowHistory();
         else if (Hotkeys.Warnings.Count > 0) Notify(string.Join("\n", Hotkeys.Warnings));
-        if (settingsService.Recovered || Repository.Recovered) Notify("Recovered invalid local metadata. Cleanup is disabled when pin metadata is unreadable; original history is preserved for recovery.");
+        if (settingsService.Recovered || Repository.Recovered) Notify(Repository.CleanupBlocked ? "History needs recovery. Open Recent captures to review and confirm. Unknown old captures are pinned; cleanup is disabled and the original history is preserved." : "Recovered invalid local settings. Review Settings before continuing.");
     }
     public async Task Capture(CaptureMode mode)
     {

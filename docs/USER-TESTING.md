@@ -20,6 +20,12 @@ Next targeted retest order, after corresponding fixes and agent verification: do
 
 ## First batch: the primary workflow
 
+### P0 implementation retest — /
+
+After installing the updated P0 build, use disposable synthetic captures for : edit then close and paste, Copy then immediately close, Exit with two dirty editors, and Discard an unsaved edit. Confirm applied edits survive restart in Recent captures. Record the build and any premature close, wrong clipboard content or lost edit. Failure messages should keep the editor open and explain retry/Discard.
+
+History recovery is tested automatically in isolated directories. Do not corrupt your real cache. If recovery is already offered naturally, Recent captures explains that unknown old images are pinned and cleanup is disabled. Cancel confirmation first, restart and verify new pins remain. Confirm only after reviewing the explanation; unknown images should remain pinned afterward. Recovery UI interaction remains unverified if the banner is never encountered. Do not run the pointer-moving self-test during normal desktop use.
+
 ### Print Screen → immediate Codex paste
 
 1. Focus an unsent Codex composer with synthetic content visible nearby.

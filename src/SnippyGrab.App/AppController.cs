@@ -16,7 +16,7 @@ internal sealed class AppController : IDisposable
     public CaptureRepository Repository { get; }
     public ClipboardService Clipboard { get; } = new();
     public DragDropService DragDrop { get; }
-    public IOcrService OcrService { get; } = new OcrService();
+    public IOcrService OcrService { get; internal set; } = new OcrService();
     public HotkeyService Hotkeys { get; } = new();
     public DockWindow Dock { get; }
     public bool Exiting { get; private set; }
@@ -33,6 +33,7 @@ internal sealed class AppController : IDisposable
     private readonly string dataDirectory;
     private bool dockWasVisible;
     private bool disposed;
+    private readonly LatestOperation ocr = new();
     private bool exitRequested;
     private string? cacheWarning;
     public AppController(bool background, string? isolatedDataDirectory = null, bool diagnostic = false)
@@ -68,6 +69,7 @@ internal sealed class AppController : IDisposable
     public async Task Capture(CaptureMode mode)
     {
         if (capture.Busy || exitRequested || Exiting) return;
+        ocr.Cancel(); Clipboard.Invalidate();
         var result = await capture.CaptureAsync(mode, Settings.IncludeCursor,
             () => { dockWasVisible = Dock.IsVisible; Dock.Hide(); foreach (var pin in pins.Values) pin.Hide(); },
             () => { if (dockWasVisible) Dock.Reveal(); foreach (var pin in pins.Values) pin.Show(); });
@@ -100,13 +102,28 @@ internal sealed class AppController : IDisposable
         using var lease = Repository.Lease(ordered, transfer: true);
         if (!await Clipboard.FilesAsync(TransferPayload.Files(Repository, ordered))) Notify("Clipboard is busy. Try Copy again.");
     }
+    public async Task<bool> CopyText(string text, CancellationToken cancellation = default)
+    {
+        var success = await Clipboard.TextAsync(text, cancellation);
+        if (!success && !cancellation.IsCancellationRequested) Notify("Text was not copied. Clipboard is busy or a newer copy superseded it; retry Copy.");
+        return success;
+    }
+    public async Task<string> OcrText(BitmapSource image, CancellationToken lifetime = default)
+    {
+        var token = ocr.Begin(lifetime); Clipboard.Invalidate();
+        try
+        {
+            var text = await OcrService.ReadAsync(ImageService.Png(image), token);
+            token.ThrowIfCancellationRequested();
+            if (string.IsNullOrWhiteSpace(text)) return "No text found.";
+            return await CopyText(text, token) ? "OCR text copied." : "OCR text was not copied. Retry OCR when the clipboard is available.";
+        }
+        catch (OperationCanceledException) { return "OCR cancelled."; }
+    }
     public async Task Ocr(CaptureRecord record)
     {
         using var lease = Repository.Lease([record]);
-        var image = ImageService.Load(Repository.PathFor(record));
-        var text = await OcrService.ReadAsync(ImageService.Png(image));
-        if (string.IsNullOrWhiteSpace(text)) { Notify("No text found in this capture."); return; }
-        if (!await Clipboard.TextAsync(text)) Notify("Clipboard is busy. Try OCR again."); else Notify("OCR text copied.");
+        Notify(await OcrText(ImageService.Load(Repository.PathFor(record))));
     }
     public void Edit(CaptureRecord record) => Try(() =>
     {
@@ -245,6 +262,6 @@ internal sealed class AppController : IDisposable
         if (disposed) return; disposed = true;
         Exiting = true; cleanup.Stop(); expiry.Stop();
         SystemEvents.DisplaySettingsChanged -= DisplayChanged; SystemEvents.PowerModeChanged -= PowerChanged; SystemEvents.UserPreferenceChanged -= PreferencesChanged;
-        Hotkeys.Dispose(); tray.Visible = false; tray.ContextMenuStrip?.Dispose(); tray.Icon?.Dispose(); tray.Dispose();
+        ocr.Dispose(); Clipboard.Invalidate(); Hotkeys.Dispose(); tray.Visible = false; tray.ContextMenuStrip?.Dispose(); tray.Icon?.Dispose(); tray.Dispose();
     }
 }

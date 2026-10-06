@@ -24,6 +24,7 @@ internal sealed class EditorWindow : Window
     private readonly ScaleTransform scale = new();
     private Point start;
     private readonly List<Point> points = [];
+    private readonly CancellationTokenSource ocrLifetime = new();
     private bool drawing;
     private bool dirty;
     private int number = 1;
@@ -97,7 +98,7 @@ internal sealed class EditorWindow : Window
             e.Cancel = true;
             controller.Run(async () => { await RequestCloseAsync(); });
         };
-        Closed += (_, _) => { foreach (var lease in leases) lease.Dispose(); };
+        Closed += (_, _) => { ocrLifetime.Cancel(); ocrLifetime.Dispose(); foreach (var lease in leases) lease.Dispose(); };
     }
     private EditTool Tool => (EditTool)(tools.SelectedItem ?? EditTool.Arrow);
     private Point Clamp(Point p) => new(Math.Clamp(p.X, 0, journal.Current.Base.PixelWidth), Math.Clamp(p.Y, 0, journal.Current.Base.PixelHeight));
@@ -208,9 +209,9 @@ internal sealed class EditorWindow : Window
     private async Task CopyOcr(BitmapSource image)
     {
         status.Text = "Reading text locally…";
-        var text = await controller.OcrService.ReadAsync(ImageService.Png(image));
-        if (string.IsNullOrWhiteSpace(text)) { status.Text = "No text found."; return; }
-        await controller.Clipboard.TextAsync(text); status.Text = "OCR text copied.";
+        var token = ocrLifetime.Token;
+        var outcome = await controller.OcrText(image, token);
+        if (!token.IsCancellationRequested) status.Text = outcome;
     }
     internal static BitmapSource Render(EditorState state)
     {

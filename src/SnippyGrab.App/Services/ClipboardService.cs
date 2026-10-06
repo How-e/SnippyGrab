@@ -4,26 +4,19 @@ namespace SnippyGrab.App.Services;
 
 internal sealed class ClipboardService
 {
-    private int generation;
+    private readonly ClipboardWriter writer = new();
+    public void Invalidate() => writer.Invalidate();
     public async Task<bool> ImageAsync(BitmapSource image, bool png, byte[]? encoded = null)
     {
         var data = new DataObject(); data.SetImage(image);
         if (png) data.SetData("PNG", new MemoryStream(encoded ?? ImageService.Png(image)));
         return await SetAsync(data);
     }
-    public Task<bool> TextAsync(string text) => SetAsync(new DataObject(DataFormats.UnicodeText, text));
+    public Task<bool> TextAsync(string text, CancellationToken cancellation = default) => SetAsync(new DataObject(DataFormats.UnicodeText, text), cancellation);
     public Task<bool> FilesAsync(string[] paths) => SetAsync(new DataObject(DataFormats.FileDrop, paths));
-    private async Task<bool> SetAsync(DataObject data)
-    {
-        var operation = ++generation;
-        for (var attempt = 0; attempt < 6; attempt++)
-        {
-            if (operation != generation) return false;
-            try { Clipboard.SetDataObject(data, true); return true; }
-            catch (ExternalException) { await Task.Delay(25 * (attempt + 1)); }
-        }
-        return false;
-    }
+    private Task<bool> SetAsync(DataObject data, CancellationToken cancellation = default) =>
+        writer.WriteAsync(() => Clipboard.SetDataObject(data, true), cancellation: cancellation);
+
 }
 
 internal sealed class DragDropService(CaptureRepository repository)

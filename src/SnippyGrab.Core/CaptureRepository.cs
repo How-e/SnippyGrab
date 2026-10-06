@@ -14,6 +14,7 @@ public sealed class CaptureRecord
     public bool Pinned { get; set; }
     public bool Edited { get; set; }
     public bool Saved { get; set; }
+    public string ExportPath { get; set; } = "";
     public bool Dismissed { get; set; }
 }
 public sealed class RepositoryState

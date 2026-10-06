@@ -9,6 +9,49 @@ namespace SnippyGrab.App.Services;
 
 internal static class RuntimeChecks
 {
+    public static async Task CheckEditorLayout(string destination)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "SnippyGrab-editor-check-" + Guid.NewGuid().ToString("N"));
+        var foreground = Native.GetForegroundWindow();
+        new SettingsService(Path.Combine(root, "settings.json")).Save(new Settings { FirstRunComplete = true, Animate = false, Theme = AppTheme.Dark });
+        try
+        {
+            using var controller = new AppController(true, root, diagnostic: true);
+            var image = SyntheticCode(720, 360); var record = controller.Repository.Add(ImageService.Png(image), 720, 360);
+            CaptureExport.Write(controller.Repository, record, Path.Combine(root, "exports", "synthetic.png"));
+            var editor = new EditorWindow(controller, record) { ShowActivated = false, WindowStartupLocation = WindowStartupLocation.Manual, Left = -30000, Top = -30000 };
+            try
+            {
+                editor.Show(); await Task.Delay(50);
+                foreach (var width in new[] { 660, 1000 })
+                {
+                    editor.Width = width; editor.UpdateLayout(); await Task.Delay(25);
+                    var rootPanel = (DockPanel)editor.Content;
+                    var toolbar = rootPanel.Children.OfType<WrapPanel>().First();
+                    var buttons = toolbar.Children.OfType<Button>().ToArray();
+                    Assert(buttons.Any(b => Equals(b.Content, "Apply + copy")) && buttons.Any(b => Equals(b.Content, "Export PNG…")) && !buttons.Any(b => Equals(b.Content, "Save")), "Explicit apply/export labels");
+                    Assert(buttons.Single(b => Equals(b.Content, "Open export folder")).IsEnabled, "Successful export exposes folder action");
+                    foreach (var button in buttons)
+                    {
+                        var bounds = button.TransformToAncestor(rootPanel).TransformBounds(new Rect(button.RenderSize));
+                        Assert(bounds.Left >= -1 && bounds.Right <= rootPanel.ActualWidth + 1 && bounds.Bottom <= rootPanel.ActualHeight, "Every editor action stays reachable at minimum width");
+                    }
+                    Snapshot(editor, Path.Combine(Path.GetDirectoryName(Path.GetFullPath(destination))!, $"editor-export-{width}.png"));
+                }
+                Assert(Native.GetForegroundWindow() == foreground, "Editor layout probe preserves focus");
+            }
+            finally { await editor.RequestCloseAsync(); }
+            controller.Dispose(); controller.Dock.Close();
+            AtomicFile.Write(destination, JsonSerializer.SerializeToUtf8Bytes(new { Result = "PASS", Widths = new[] { 660, 1000 }, Scope = "Offscreen synthetic editor labels/action bounds; no clipboard writes, file dialogs, folder launch or real annotation gestures." }, new JsonSerializerOptions { WriteIndented = true }));
+        }
+        finally
+        {
+            var absolute = Path.GetFullPath(root);
+            if (!absolute.StartsWith(Path.GetFullPath(Path.GetTempPath()), StringComparison.OrdinalIgnoreCase) || !Path.GetFileName(absolute).StartsWith("SnippyGrab-editor-check-", StringComparison.Ordinal)) throw new InvalidOperationException("Unexpected editor probe path.");
+            Directory.Delete(absolute, true);
+        }
+    }
+
     public static async Task CheckDockLayout(string destination)
     {
         var root = Path.Combine(Path.GetTempPath(), "SnippyGrab-dock-check-" + Guid.NewGuid().ToString("N"));

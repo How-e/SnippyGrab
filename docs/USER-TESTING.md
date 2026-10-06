@@ -75,6 +75,8 @@ Report screen coverage, hidden selections, premature hiding, controls that canno
 
 There is no need to create disk-full/permission failures. Do not rely on unverified close/Exit handling for important edits. Supports //.
 
+ export retest: Apply + copy should update shelf/clipboard without creating a file in the export directory. Export PNG (Ctrl+S) should show that directory on first export and show the previous destination on repeat export. Verify the PNG contains edits, the full path appears, and Open export folder opens the right directory. Cancel a dialog and confirm no new success message/file. Check overwrite confirmation on a disposable export. Export should still work independently of clipboard availability; do not deliberately damage your cache or create real storage failures.
+
 ### Local OCR
 
 1. Capture synthetic compiler/terminal text. Use the dock OCR action and paste into Notepad or an unsent Codex draft.

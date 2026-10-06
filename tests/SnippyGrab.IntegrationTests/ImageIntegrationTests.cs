@@ -42,6 +42,26 @@ public sealed class ImageIntegrationTests
     {
         Sta(() => { var crop = ImageService.Crop(Synthetic(), new(-10, -10, 50, 50)); Assert.Equal(40, crop.PixelWidth); Assert.Equal(40, crop.PixelHeight); Assert.False(crop is CroppedBitmap); Assert.Throws<InvalidDataException>(() => ImageService.Crop(Synthetic(), new(300, 300, 10, 10))); return true; });
     }
+    [Fact]
+    public void ExportedPngContainsAppliedOpaqueRedaction()
+    {
+        Sta(() =>
+        {
+            var root = Path.Combine(Path.GetTempPath(), "SnippyGrab-export-pixels-" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                var repository = new CaptureRepository(Path.Combine(root, "cache")); var original = Synthetic();
+                var record = repository.Add(ImageService.Png(original), original.PixelWidth, original.PixelHeight);
+                var rendered = EditorWindow.Render(new(original, [new Annotation(EditTool.Redact, new(20, 20), new(100, 80), Colors.Black, 3, 24, "", [])]));
+                repository.Replace(record, ImageService.Png(rendered), rendered.PixelWidth, rendered.PixelHeight);
+                var path = Path.Combine(root, "output.png"); CaptureExport.Write(repository, record, path);
+                var exported = ImageService.Load(path); var pixel = new byte[4]; exported.CopyPixels(new Int32Rect(50, 50, 1, 1), pixel, 4, 0);
+                Assert.Equal(new byte[] { 0, 0, 0, 255 }, pixel);
+            }
+            finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+            return true;
+        });
+    }
     [Theory]
     [InlineData(32, 3200)]
     [InlineData(3200, 32)]

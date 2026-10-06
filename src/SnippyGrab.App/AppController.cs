@@ -7,6 +7,9 @@ using Forms = System.Windows.Forms;
 
 namespace SnippyGrab.App;
 
+internal enum ExportStatus { Cancelled, Exported, Failed }
+internal sealed record ExportOutcome(ExportStatus Status, string Path = "", string? Message = null);
+
 internal sealed class AppController : IDisposable
 {
     public Settings Settings { get; private set; }
@@ -103,13 +106,30 @@ internal sealed class AppController : IDisposable
         var editor = new EditorWindow(this, record); editors[record.Id] = editor;
         editor.Closed += (_, _) => editors.Remove(record.Id); editor.Show();
     });
-    public void Save(CaptureRecord record) => Try(() =>
+    public ExportOutcome Save(CaptureRecord record, Window? owner = null)
     {
-        using var lease = Repository.Lease([record]);
-        var dialog = new SaveFileDialog { Filter = "PNG image|*.png", FileName = $"SnippyGrab-{record.CreatedUtc.LocalDateTime:yyyyMMdd-HHmmss}.png", DefaultExt = ".png", AddExtension = true, InitialDirectory = Directory.Exists(Settings.SaveDirectory) ? Settings.SaveDirectory : "" };
-        if (dialog.ShowDialog() != true) return;
-        if (Path.GetFullPath(dialog.FileName).StartsWith(Repository.Root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) throw new IOException("Choose a location outside the managed cache.");
-        AtomicFile.Write(dialog.FileName, File.ReadAllBytes(Repository.PathFor(record))); record.Saved = true; Repository.Persist();
+        try
+        {
+            var priorDirectory = string.IsNullOrWhiteSpace(record.ExportPath) ? null : Path.GetDirectoryName(record.ExportPath);
+            var directory = Directory.Exists(priorDirectory) ? priorDirectory! : Directory.Exists(Settings.SaveDirectory) ? Settings.SaveDirectory : "";
+            var dialog = new SaveFileDialog { Title = "Export PNG outside the managed cache", Filter = "PNG image|*.png", FileName = string.IsNullOrWhiteSpace(record.ExportPath) ? $"SnippyGrab-{record.CreatedUtc.LocalDateTime:yyyyMMdd-HHmmss}.png" : Path.GetFileName(record.ExportPath), DefaultExt = ".png", AddExtension = true, OverwritePrompt = true, InitialDirectory = directory };
+            if ((owner is null ? dialog.ShowDialog() : dialog.ShowDialog(owner)) != true) return new(ExportStatus.Cancelled);
+            var result = CaptureExport.Write(Repository, record, dialog.FileName);
+            var warning = result.MetadataSaved ? null : "PNG exported, but capture history could not be updated. The file is safe; retry later to remember its destination.";
+            Notify(warning ?? "PNG exported to: " + result.Path);
+            Try(() => Dock.Refresh());
+            return new(ExportStatus.Exported, result.Path, warning);
+        }
+        catch (Exception ex)
+        {
+            Failure(ex); return new(ExportStatus.Failed, Message: ex.Message);
+        }
+    }
+    public void OpenExportFolder(string path) => Try(() =>
+    {
+        var directory = Path.GetDirectoryName(Path.GetFullPath(path));
+        if (!Directory.Exists(directory)) throw new IOException("The export folder is no longer available.");
+        Process.Start(new ProcessStartInfo { FileName = directory!, UseShellExecute = true });
     });
     public void Pin(CaptureRecord record) => Try(() => { record.Pinned = !record.Pinned; Repository.Persist(); Dock.Refresh(); });
     public void Detach(CaptureRecord record) => Try(() =>

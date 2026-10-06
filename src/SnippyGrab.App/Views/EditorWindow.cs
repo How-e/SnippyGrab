@@ -15,6 +15,7 @@ internal sealed class EditorWindow : Window
     private readonly EditorSurface surface;
     private readonly ScrollViewer viewport;
     private readonly TextBlock status;
+    private readonly Button openExportFolder;
     private readonly ComboBox tools;
     private readonly TextBox color;
     private readonly TextBox stroke;
@@ -39,10 +40,12 @@ internal sealed class EditorWindow : Window
         journal = new(new EditorState(ImageService.Load(controller.Repository.PathFor(record)), []), 20);
         Title = $"SnippyGrab · {record.Width} × {record.Height}"; Width = 1000; Height = 700; MinWidth = 660; MinHeight = 440; WindowStartupLocation = WindowStartupLocation.CenterScreen;
         var root = new DockPanel { Margin = new Thickness(12) }; Content = root;
-        var actions = new StackPanel { Orientation = Orientation.Horizontal };
-        actions.Children.Add(Ui.Button("Copy", "Apply edits and copy image (Ctrl+C)", () => controller.Run(ApplyCopy)));
-        actions.Children.Add(Ui.Button("Save", "Apply edits to the shelf (Ctrl+S)", () => controller.Run(ApplyCopy)));
-        actions.Children.Add(Ui.Button("Save as…", "Apply and export a PNG", () => controller.Run(async () => { await ApplyCopy(); controller.Save(record); })));
+        var actions = new WrapPanel();
+        actions.Children.Add(Ui.Button("Apply + copy", "Update the managed shelf image and copy it (Ctrl+C); this does not export a file", () => controller.Run(ApplyCopy)));
+        actions.Children.Add(Ui.Button("Export PNG…", "Apply edits and export a PNG outside the cache (Ctrl+S); clipboard is unchanged", () => controller.Run(ExportPng)));
+        openExportFolder = Ui.Button("Open export folder", "Open the last successful export directory", () => controller.OpenExportFolder(record.ExportPath));
+        openExportFolder.IsEnabled = !string.IsNullOrWhiteSpace(record.ExportPath); actions.Children.Add(openExportFolder);
+        openExportFolder.ToolTip = string.IsNullOrWhiteSpace(record.ExportPath) ? "Export a PNG first" : "Last PNG export: " + record.ExportPath;
         actions.Children.Add(Ui.Button("Undo", "Undo (Ctrl+Z)", Undo)); actions.Children.Add(Ui.Button("Redo", "Redo (Ctrl+Y)", Redo));
         actions.Children.Add(Ui.Button("−", "Zoom out", () => Zoom(scale.ScaleX / 1.2))); actions.Children.Add(Ui.Button("+", "Zoom in", () => Zoom(scale.ScaleX * 1.2)));
         actions.Children.Add(Ui.Button("Fit", "Fit image", Fit));
@@ -58,7 +61,7 @@ internal sealed class EditorWindow : Window
         caption = new TextBox { Text = "Look here", MaxLength = 2000, Width = 220, ToolTip = "Text annotation content" }; toolbar.Children.Add(caption);
         toolbar.Children.Add(Ui.Text("  Draw on the image · Ctrl+wheel to zoom", 12, true));
         DockPanel.SetDock(toolbar, Dock.Top); root.Children.Add(toolbar);
-        status = Ui.Text("Changes stay local. Closing applies edits; Discard leaves the capture unchanged.", 12, true);
+        status = Ui.Text(string.IsNullOrWhiteSpace(record.ExportPath) ? "Apply + copy updates the managed shelf image. Export PNG writes a separate file. Closing applies edits; Discard leaves pending edits unapplied." : "Last PNG export: " + record.ExportPath, 12, true);
         status.TextWrapping = TextWrapping.Wrap;
         DockPanel.SetDock(status, Dock.Bottom); root.Children.Add(status);
         surface = new EditorSurface(journal.Current) { LayoutTransform = scale, Cursor = Cursors.Cross, Focusable = true };
@@ -84,7 +87,7 @@ internal sealed class EditorWindow : Window
             if (e.Key == Key.Escape) { if (drawing) { drawing = false; surface.ReleaseMouseCapture(); surface.Preview = null; surface.InvalidateVisual(); } else Close(); e.Handled = true; }
             if (commits.Busy) { e.Handled = true; return; }
             if (Keyboard.Modifiers != ModifierKeys.Control || Keyboard.FocusedElement is TextBox) return;
-            if (e.Key == Key.Z) Undo(); else if (e.Key == Key.Y) Redo(); else if (e.Key is Key.C or Key.S) controller.Run(ApplyCopy); else return;
+            if (e.Key == Key.Z) Undo(); else if (e.Key == Key.Y) Redo(); else if (e.Key == Key.C) controller.Run(ApplyCopy); else if (e.Key == Key.S) controller.Run(ExportPng); else return;
             e.Handled = true;
         };
         Loaded += (_, _) => Fit();
@@ -132,7 +135,7 @@ internal sealed class EditorWindow : Window
     private void Redo() { journal.Redo(); dirty = true; Refresh(); }
     private void Refresh() { surface.State = journal.Current; surface.Width = journal.Current.Base.PixelWidth; surface.Height = journal.Current.Base.PixelHeight; surface.InvalidateVisual(); }
     private void Fit() => Zoom(Math.Min(1, Math.Min(Math.Max(200, viewport.ActualWidth - 24) / journal.Current.Base.PixelWidth, Math.Max(200, viewport.ActualHeight - 24) / journal.Current.Base.PixelHeight)));
-    private void Zoom(double value) { scale.ScaleX = scale.ScaleY = Math.Clamp(value, 0.03, 8); status.Text = $"{scale.ScaleX:P0} · {journal.Current.Base.PixelWidth} × {journal.Current.Base.PixelHeight} · Esc closes and applies"; }
+    private void Zoom(double value) { scale.ScaleX = scale.ScaleY = Math.Clamp(value, 0.03, 8); status.Text = $"{scale.ScaleX:P0} · {journal.Current.Base.PixelWidth} × {journal.Current.Base.PixelHeight} · Esc closes and applies" + (string.IsNullOrWhiteSpace(record.ExportPath) ? "" : " · Last PNG export: " + record.ExportPath); }
     private BitmapSource Apply()
     {
         var image = Render(journal.Current);
@@ -148,12 +151,38 @@ internal sealed class EditorWindow : Window
         {
             var image = dirty ? Apply() : ImageService.Load(controller.Repository.PathFor(record));
             copyRetryNeeded = !await controller.CopyImage(image);
-            status.Text = copyRetryNeeded ? "Edits are saved to the shelf. Clipboard is busy; retry Copy or close again, or Discard to close." : "Applied to shelf and copied to clipboard.";
+            status.Text = copyRetryNeeded ? "Edits are saved to the shelf. Clipboard is busy; retry Apply + copy or close again, or Discard to close." : "Applied to the managed shelf image and copied to clipboard. Use Export PNG for a separate file.";
             return !copyRetryNeeded;
         }
         catch
         {
             status.Text = "Could not apply edits. This editor stays open. Retry Copy or close again, or choose Discard to close without applying.";
+            throw;
+        }
+        finally { content.IsEnabled = true; }
+    });
+
+    private Task<bool> ExportPng() => commits.RunAsync(async () =>
+    {
+        var content = (UIElement)Content; content.IsEnabled = false;
+        try
+        {
+            if (dirty) Apply();
+            var outcome = controller.Save(record, this);
+            status.Text = outcome.Status switch
+            {
+                ExportStatus.Exported => "PNG exported: " + outcome.Path + (outcome.Message is null ? "" : " · " + outcome.Message),
+                ExportStatus.Cancelled => "Export cancelled. No file was written; applied edits remain in the managed shelf image.",
+                _ => "Export failed: " + outcome.Message + ". Applied edits remain in the shelf; retry Export PNG."
+            };
+            openExportFolder.IsEnabled = !string.IsNullOrWhiteSpace(record.ExportPath);
+            openExportFolder.ToolTip = string.IsNullOrWhiteSpace(record.ExportPath) ? "Export a PNG first" : "Last PNG export: " + record.ExportPath;
+            await Task.CompletedTask;
+            return outcome.Status == ExportStatus.Exported;
+        }
+        catch
+        {
+            status.Text = "Could not apply edits for export. This editor stays open; retry Export PNG or choose Discard.";
             throw;
         }
         finally { content.IsEnabled = true; }

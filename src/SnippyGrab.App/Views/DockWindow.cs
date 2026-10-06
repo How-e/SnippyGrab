@@ -14,7 +14,7 @@ internal sealed class DockWindow : Window
     private HashSet<Guid> selected => selection.Selected;
     private readonly BoundedCache<(string File, int Pixels), BitmapSource> thumbnails = new(12);
     private readonly BoundedCache<CardStamp, CardVisual> cards = new(5);
-    private sealed record CardStamp(Guid Id, string File, int Width, int Height, int Size, int Number, int Total, bool Pinned, Brush Surface, Brush Accent);
+    private sealed record CardStamp(Guid Id, string File, int Width, int Height, int Size, int Number, int Total, bool Pinned, string ExportPath, Brush Surface, Brush Accent);
     private sealed record CardVisual(Border Frame, StackPanel Controls, TextBlock State, bool Available);
     private readonly DispatcherTimer hideTimer = new();
     private readonly DispatcherTimer collapseTimer = new() { Interval = TimeSpan.FromMilliseconds(180) };
@@ -167,7 +167,7 @@ internal sealed class DockWindow : Window
     }
     private UIElement Card(CaptureRecord capture)
     {
-        var stamp = new CardStamp(capture.Id, capture.FileName, capture.Width, capture.Height, controller.Settings.ThumbnailSize, visible.IndexOf(capture) + 1, visible.Count, capture.Pinned, (Brush)FindResource("Surface"), (Brush)FindResource("Accent"));
+        var stamp = new CardStamp(capture.Id, capture.FileName, capture.Width, capture.Height, controller.Settings.ThumbnailSize, visible.IndexOf(capture) + 1, visible.Count, capture.Pinned, capture.ExportPath, (Brush)FindResource("Surface"), (Brush)FindResource("Accent"));
         if (cards.TryGetValue(stamp, out var old) && !old.Available) cards.Remove(stamp);
         var card = cards.GetOrAdd(stamp, () => CreateCard(capture));
         card.Frame.BorderBrush = (Brush)FindResource(selected.Contains(capture.Id) ? "Accent" : "Muted");
@@ -284,9 +284,10 @@ internal sealed class DockWindow : Window
             ("Copy file path", () => controller.Run(() => controller.Clipboard.TextAsync(controller.Repository.PathFor(record)))),
             ("Copy filename", () => controller.Run(() => controller.Clipboard.TextAsync(record.FileName))),
             ("Copy OCR text", () => controller.Run(() => controller.Ocr(record))), ("Save as…", () => controller.Save(record)),
+            ("Open last export folder", () => controller.OpenExportFolder(record.ExportPath)),
             (record.Pinned ? "Unpin" : "Pin indefinitely", () => controller.Pin(record)), ("Detach pin", () => controller.Detach(record)),
             ("Dismiss", () => controller.Dismiss(SelectedOr(record))), ("Recent captures", controller.ShowHistory)
-        }) { var item = new MenuItem { Header = name }; item.Click += (_, _) => action(); menu.Items.Add(item); }
+        }) { var item = new MenuItem { Header = name, IsEnabled = name != "Open last export folder" || !string.IsNullOrWhiteSpace(record.ExportPath) }; item.Click += (_, _) => action(); menu.Items.Add(item); }
         return menu;
     }
     private List<CaptureRecord> SelectedOr(CaptureRecord record) => selected.Contains(record.Id) ? visible.Where(c => selected.Contains(c.Id)).ToList() : [record];

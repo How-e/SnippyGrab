@@ -38,7 +38,7 @@ internal sealed class HistoryWindow : Window
         DockPanel.SetDock(toolbar, Dock.Top); root.Children.Add(toolbar);
         DockPanel.SetDock(preview, Dock.Bottom); root.Children.Add(preview); root.Children.Add(list);
         VirtualizingPanel.SetIsVirtualizing(list, true); VirtualizingPanel.SetVirtualizationMode(list, VirtualizationMode.Recycling);
-        list.SelectionChanged += (_, _) => controller.Try(() => { var c = Selected().FirstOrDefault(); preview.Source = c is null ? null : Services.ImageService.Load(controller.Repository.PathFor(c), 600); });
+        list.SelectionChanged += (_, _) => controller.Try(() => { var c = Selected().FirstOrDefault(); if (c is not null) controller.Repository.ResolveDimensions(c); preview.Source = c is null ? null : Services.ImageService.Load(controller.Repository.PathFor(c), 600); });
         list.MouseDoubleClick += (_, _) => { if (Selected().FirstOrDefault() is { } c) controller.Edit(c); };
         list.PreviewMouseMove += (_, e) => { if (e.LeftButton == MouseButtonState.Pressed && Selected().Count > 0 && (Keyboard.Modifiers & ModifierKeys.Alt) != 0) controller.Try(() => controller.DragDrop.Drag(list, Selected())); };
         KeyDown += (_, e) => { if (e.Key == Key.Escape) Close(); if (e.Key == Key.Delete) { controller.Dismiss(Selected()); Refresh(); } };

@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.Buffers.Binary;
+using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 
 namespace SnippyGrab.Core;
@@ -11,6 +13,7 @@ public sealed class CaptureRecord
     public DateTimeOffset? RestoredUtc { get; set; }
     public int Width { get; set; }
     public int Height { get; set; }
+    public bool DimensionsPending { get; set; }
     public string Monitor { get; set; } = "";
     public bool Pinned { get; set; }
     public bool Edited { get; set; }
@@ -21,6 +24,7 @@ public sealed class CaptureRecord
 public sealed class RepositoryState
 {
     public int SchemaVersion { get; set; } = 1;
+    public List<string> Pages { get; set; } = [];
     public List<CaptureRecord> Captures { get; set; } = [];
     public Dictionary<string, DateTimeOffset> ProtectedUntil { get; set; } = [];
 }
@@ -69,6 +73,14 @@ public sealed partial class CaptureRepository
         if (new FileInfo(metadata).Length > 4 * 1024 * 1024) throw new InvalidDataException("History too large.");
         var loaded = JsonSerializer.Deserialize<RepositoryState>(File.ReadAllText(metadata)) ?? throw new InvalidDataException("Empty history state.");
         if (loaded.SchemaVersion != 1) throw new InvalidDataException("Unsupported history version.");
+        if (loaded.Pages is null || loaded.Pages.Count > 10000) throw new InvalidDataException("Invalid history pages.");
+        foreach (var page in loaded.Pages)
+        {
+            if (!PagePattern().IsMatch(page)) throw new InvalidDataException("Invalid history page name.");
+            var path = Path.Combine(root, page);
+            if (!SafeFile(path) || new FileInfo(path).Length > 4 * 1024 * 1024) throw new InvalidDataException("Invalid history page.");
+            loaded.Captures.AddRange(JsonSerializer.Deserialize<List<CaptureRecord>>(File.ReadAllText(path)) ?? throw new InvalidDataException("Empty history page."));
+        }
         if (loaded.Captures is null || loaded.ProtectedUntil is null || loaded.Captures.Any(c => c is null)) throw new InvalidDataException("Invalid history state.");
         loaded.Captures = loaded.Captures.Where(c => IsSafeName(c.FileName) && c.Width > 0 && c.Height > 0 && SafeFile(PathFor(c)))
             .DistinctBy(c => c.Id).DistinctBy(c => c.FileName).ToList();
@@ -96,13 +108,25 @@ public sealed partial class CaptureRepository
         var known = state.Captures.Select(c => c.FileName).ToHashSet();
         var files = Directory.EnumerateFiles(root, "capture-*.png");
         // During recovery every unknown image may be an old pin, including with history disabled.
-        foreach (var path in CleanupBlocked ? files : files.Take(2000))
+        foreach (var path in files)
         {
             var name = Path.GetFileName(path);
             if (!IsSafeName(name) || !SafeFile(path) || known.Contains(name)) continue;
             // Recovery is metadata-only; the UI validates dimensions when decoding, with a pixel limit.
-            if (HistoryEnabled || CleanupBlocked) state.Captures.Add(new() { FileName = name, CreatedUtc = File.GetLastWriteTimeUtc(path), Width = 1, Height = 1, Dismissed = true, Pinned = CleanupBlocked });
+            if (HistoryEnabled || CleanupBlocked) state.Captures.Add(new() { FileName = name, CreatedUtc = File.GetLastWriteTimeUtc(path), Width = 1, Height = 1, DimensionsPending = true, Dismissed = true, Pinned = CleanupBlocked });
         }
+    }
+    [GeneratedRegex(@"^history-page-[a-f0-9]{64}\.json\z", RegexOptions.CultureInvariant)]
+    private static partial Regex PagePattern();
+    public void ResolveDimensions(CaptureRecord record)
+    {
+        if (!record.DimensionsPending) return;
+        using var stream = File.OpenRead(PathFor(record));
+        Span<byte> header = stackalloc byte[24]; stream.ReadExactly(header);
+        if (!header[..8].SequenceEqual(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 }) || !header.Slice(12, 4).SequenceEqual("IHDR"u8)) throw new InvalidDataException("Invalid recovered PNG.");
+        var width = BinaryPrimitives.ReadInt32BigEndian(header.Slice(16, 4)); var height = BinaryPrimitives.ReadInt32BigEndian(header.Slice(20, 4));
+        if (width <= 0 || height <= 0 || (long)width * height > 80_000_000) throw new InvalidDataException("Recovered PNG dimensions are invalid.");
+        record.Width = width; record.Height = height; record.DimensionsPending = false;
     }
     public CaptureRecord Add(byte[] png, int width, int height, string monitor = "")
     {
@@ -156,6 +180,22 @@ public sealed partial class CaptureRepository
             Captures = state.Captures.Where(c => HistoryEnabled || c.Pinned).ToList(),
             ProtectedUntil = state.ProtectedUntil
         };
+        if (!CleanupBlocked && saved.Captures.Count > 512)
+        {
+            var captures = saved.Captures; saved.Captures = [];
+            // Chunk from the oldest end so inserting a new capture only rewrites the newest page.
+            var first = captures.Count % 512; if (first == 0) first = 512;
+            for (var offset = 0; offset < captures.Count;)
+            {
+                var count = offset == 0 ? first : 512;
+                var page = JsonSerializer.SerializeToUtf8Bytes(captures.GetRange(offset, count));
+                if (page.Length > 4 * 1024 * 1024) throw new InvalidDataException("History page exceeds the size limit.");
+                var name = "history-page-" + Convert.ToHexString(SHA256.HashData(page)).ToLowerInvariant() + ".json";
+                var path = Path.Combine(root, name);
+                if (!SafeFile(path)) write(path, page);
+                saved.Pages.Add(name); offset += count;
+            }
+        }
         var bytes = JsonSerializer.SerializeToUtf8Bytes(saved);
         if (bytes.Length > 4 * 1024 * 1024) throw new InvalidDataException("History exceeds the recovery size limit. Metadata has not been replaced; cleanup remains blocked during recovery.");
         return bytes;

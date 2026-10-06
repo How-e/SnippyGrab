@@ -4,6 +4,20 @@ Start with ****, about 20–30 minutes. These validate the actual AI workflow th
 
 Use the current **0.1.0 alpha** and record whether it is the portable or installed build. Capture only synthetic content: a Notepad window with `CAPTURE A`, `CAPTURE B`, `CAPTURE C` and `error CS1002: ; expected`, for example. Test attachment/paste in an unsent draft; there is no need to send a message or publish an issue. Keep personal screenshots, OCR output and private logs out of the repository.
 
+## Recorded user results — 2026-10-06
+
+| Test | Reported result | Findings | Queue follow-up |
+|---|---|---|---|
+| Dock first-hover /  /  | FAIL | With multiple captures, first hover causes visible glitching/movement before settling. When expanded, moving to the top image makes the dock lose hover and collapse, preventing access. | //: first-hover stability and reachable expansion; highest P1 work. |
+|  | PASS — reported cases | Capture preserved Codex composer focus; Ctrl+V uploaded the correct latest image. Esc and click without selection created no capture and left no dimming. | //: retain success; exact repeat count/timing and other capture cases remain unreported. |
+|  | PARTIAL — correct single drag; order observed | One dragged image was correct despite multiple captures. Selecting 3, 2, 1 displayed 1, 2, 3 in Codex, matching PiP order rather than selection-click order. Latest capture is 1; previous captures move down. No explicit exact-count/nonadjacent/delayed-read result supplied. | : define ordering contract and verify payload versus receiver order; / remain open for remaining cases. |
+|  | FAIL / PARTIAL | Without selection, pointer leave collapses as intended. With selections, leaving keeps up to three captures open; re-hover instantly collapses without a click, preserving selections. Alt-reorder works but moving 1 to 2 requires dropping on 3; upward moves accept the adjacent item. Delete did not work on a selected capture; Enter did not work on hover. Dismiss works; clicking a capture opens the editor. | : collapse/hover/reorder; /: explicit keyboard focus/actions; : retest after fixes. Keyboard focus during failed shortcuts was not confirmed. |
+|  | PARTIAL — editor reported successful; Save unclear | Editor behavior was reported working well. Save destination could not be verified: no images found in the configured directory. Save As opened the correct directory. | : distinguish apply/copy from permanent export and show destination. Current source labels apply/copy as Save. // retain detailed/unreported and fault/large-image checks. |
+|  | PASS — reported behavior | OCR was reported working as intended; no errors reported. Separate full-image/area results, input cases and timing were not supplied. | /: preserve successful observation; fault/cancellation/package and unreported cases remain open. |
+|  | PARTIAL — prerequisite confirmed | Windows “Use the Print Screen key to open screen capture” had to be off to prevent Snipping Tool taking control of SnippyGrab. Other modes/fallback/pause/repeat cases were not reported. | : actionable setup/help and fallback; : remaining capture-mode checks. |
+
+Next targeted retest order, after corresponding fixes and agent verification: dock first-hover/top-card reachability and selection leave/re-enter; adjacent Alt-reorder both ways; dock focus/Delete/Enter; Save/Save As destination; selected transfer order after reordering. Check Codex focus/latest paste again after dock changes.  have no separate completed report; the initial dock performance observation is relevant to .
+
 ## First batch: the primary workflow
 
 ### Print Screen → immediate Codex paste
@@ -35,7 +49,9 @@ If a browser/editor rejects the drop, report what happened and its version; rece
 5. Try Enter to edit, Ctrl+S to export, and Escape to close/deselect where supported. Check hover buttons/tooltips and accidental clicks while beginning a drag.
 6. Change thumbnail size, orientation, opacity, topmost, auto-collapse and auto-hide in Settings. Check that the dock stays on-screen and usable.
 
-Report screen coverage, hidden selections, premature hiding, controls that cannot be reached and any action using the wrong capture. Supports //////.
+For the reported regressions, also check first hover with 3/5/20 captures, move from the collapsed dock to the top expanded card, leave/re-enter with selections, and Alt-move adjacent items both upward and downward. Confirm keyboard focus is visibly on the dock before testing Delete/Enter; hovering alone may leave keys with the previous application.
+
+Report screen coverage, hidden selections, premature hiding, controls that cannot be reached and any action using the wrong capture. Supports ///////; transfer ordering is .
 
 ### Editor and updated screenshot
 
@@ -63,6 +79,8 @@ OCR is local; English is the current bundled language. Review output before rely
 Test region, desktop, active window and window picker shortcuts from the README; verify modes and Esc behavior. Test a configurable fallback, pause/resume and whether holding a key produces duplicate captures. If Print Screen opens Windows capture instead, check that SnippyGrab offers useful guidance/fallback.
 
 If comfortable, test Windows **Settings → Accessibility → Keyboard → Use the Print Screen key to open screen capture** both on and off, restarting SnippyGrab as instructed. Record and restore your preferred setting afterward. Do not edit the registry or terminate other hotkey applications just for this test. Supports /.
+
+The 2026-10-06 user test confirmed this setting needed to be **off** for SnippyGrab to receive Print Screen on the tested system. If you prefer to keep Windows interception enabled, use a configurable SnippyGrab fallback shortcut; remaining fallback acceptance is tracked in .
 
 ### Your monitor/DPI layout
 

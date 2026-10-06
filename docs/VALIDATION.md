@@ -25,8 +25,12 @@ Status: runnable **0.1.0 alpha**, not stable acceptance.
 
 These exclude screen acquisition, user selection, receiver work and OS clipboard transfer. Fresh tray: 128.1 MB working set, 15.625 ms CPU over 5 seconds. After 4K/8K work and twenty captures: 156.1 MB, 0 ms CPU over 5 seconds. Short samples do not establish all-day resource behavior; memory tuning remains a target.
 
-## Pending stable gates
+## User-reported desktop testing — 2026-10-06
 
-ACCEPTANCE.md covers real Codex paste/drop, other receivers, clipboard-lock injection, 125/175/200% scaling, HDR/vertical displays, Explorer restart, sleep/resume, display reconnection, fresh-user startup/install/remove, text scaling/high contrast and long resource stress. Hosted workflows cannot be observed before publication. Signing is not configured.
+[Recorded  results](USER-TESTING.md#recorded-user-results--2026-10-06) establish reported real Codex focus/latest-image paste/cancellation, correct single-image drag, a three-image drop matching PiP order, generally working editor behavior and OCR. Windows Print Screen interception needed to be off. Exact build/environment versions and full checklist coverage were not supplied; these are user reports, not fresh agent verification.
+
+## Remaining stable gates
+
+ACCEPTANCE.md covers remaining Codex paste/drop cases and regression retests after fixes, other receivers, clipboard-lock injection, 125/175/200% scaling, HDR/vertical displays, Explorer restart, sleep/resume, display reconnection, fresh-user startup/install/remove, text scaling/high contrast and long resource stress. Hosted workflows cannot be observed before publication. Signing is not configured.
 
 Generated reports remain in ignored artifacts or user-selected paths. Never commit desktop captures. This summarizes observed evidence, not an invented hardware PASS.

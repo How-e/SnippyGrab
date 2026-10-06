@@ -17,18 +17,11 @@ internal sealed class HotkeyService : IDisposable
         active.Clear(); Paused = paused;
         if (paused) return;
         Warnings.Clear();
-        var requested = new[] { (settings.PrimaryHotkey, settings.DefaultCaptureMode), (settings.DesktopHotkey, CaptureMode.Desktop), (settings.WindowHotkey, CaptureMode.Window), (settings.ActiveWindowHotkey, CaptureMode.ActiveWindow), (settings.FallbackHotkey, CaptureMode.Region) };
-        var idNext = 1;
-        foreach (var (key, mode) in requested)
-        {
-            var id = idNext++;
-            if (key.Key == 0) continue;
-            if (Native.RegisterHotKey(source.Handle, id, key.Modifiers | 0x4000, key.Key)) active[id] = mode;
-            else Warnings.Add($"{key} is unavailable. Choose another hotkey in Settings.");
-        }
+        foreach (var entry in HotkeyRegistration.Register(settings, (id, key) => Native.RegisterHotKey(source.Handle, id, key.Modifiers, key.Key), Warnings))
+            active[entry.Key] = entry.Value;
         using var keyboard = Registry.CurrentUser.OpenSubKey(@"Control Panel\Keyboard");
         if (Convert.ToInt32(keyboard?.GetValue("PrintScreenKeyForSnippingEnabled", 0)) == 1)
-            Warnings.Add("Windows uses Print Screen for screen snipping. In Settings → Accessibility → Keyboard, turn off ‘Use the Print Screen key to open screen capture’, then restart SnippyGrab. Ctrl+Shift+S is the fallback.");
+            Warnings.Add(HotkeyRegistration.Guidance(settings));
     }
     private nint Hook(nint hwnd, int message, nint wParam, nint lParam, ref bool handled)
     {

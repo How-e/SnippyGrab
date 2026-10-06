@@ -164,7 +164,7 @@ internal sealed class AppController : IDisposable
     {
         if (settingsWindow is not null) { settingsWindow.Activate(); return; }
         var wasPaused = Hotkeys.Paused; Hotkeys.Configure(Settings, true);
-        settingsWindow = new(this, welcome); settingsWindow.Closed += (_, _) => { settingsWindow = null; Hotkeys.Configure(Settings, wasPaused); BuildTray(); }; settingsWindow.Show();
+        settingsWindow = new(this, welcome); settingsWindow.Closed += (_, _) => { settingsWindow = null; Hotkeys.Configure(Settings, welcomeWindow is not null || wasPaused); BuildTray(); }; settingsWindow.Show();
     }
     public void ShowHistory()
     {
@@ -187,7 +187,7 @@ internal sealed class AppController : IDisposable
         Item("Capture active window", () => Run(() => Capture(CaptureMode.ActiveWindow)));
         Item("Capture entire desktop", () => Run(() => Capture(CaptureMode.Desktop)));
         menu.Items.Add(new Forms.ToolStripSeparator());
-        Item("Show screenshot shelf", Dock.Reveal); Item("Focus screenshot shelf (keyboard)", Dock.FocusShelf); Item("Open recent captures", ShowHistory); Item("Open settings", ShowSettings);
+        Item("Show screenshot shelf", Dock.Reveal); Item("Focus screenshot shelf (keyboard)", Dock.FocusShelf); Item("Open recent captures", ShowHistory); Item("Hotkey help / conflicts", () => MessageBox.Show(HotkeyRegistration.Guidance(Settings) + "\n\n" + string.Join("\n", Hotkeys.Warnings), "SnippyGrab · Hotkey help")); Item("Open settings", ShowSettings);
         Item("Restore pins", () => { foreach (var pin in pins.Values) pin.RestoreInteraction(); });
         Item("Pause hotkeys", () => { Hotkeys.Configure(Settings, !Hotkeys.Paused); BuildTray(); }, Hotkeys.Paused);
         Item("Clear temporary screenshots", ClearTemporary);

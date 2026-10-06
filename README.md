@@ -110,3 +110,7 @@ CI builds/tests, verifies formatting and audits dependencies. CodeQL runs separa
 ## Contributing
 
 [CONTRIBUTING.md](CONTRIBUTING.md) covers checks and privacy-safe evidence. MIT licensed; OCR licenses are under `licenses/`. Recording, cloud sharing and accounts are out of scope.
+
+### Print Screen setup and conflicts
+
+Windows Settings → Accessibility → Keyboard → **Use the Print Screen key to open screen capture** must be off when Windows intercepts Print Screen. Restart SnippyGrab afterward; the app never changes this preference. The default region fallback is **Ctrl+Shift+S**, configurable in Settings. If another app owns that combination, choose a different fallback. Tray → Capture region works even when every hotkey is unavailable. Tray → Hotkey help / conflicts shows the complete guidance if a notification is truncated. Setup and Settings temporarily suspend hotkeys and preserve your paused state on close. Held keys do not repeat captures.

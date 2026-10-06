@@ -76,7 +76,7 @@ Windows clipboard history/sync and receiving applications have their own policie
 
 ## Build and verify
 
-.NET 10 SDK on Windows:
+Pinned .NET SDK 10.0.400 on Windows:
 
 ```powershell
 pwsh ./scripts/provision-ocr.ps1

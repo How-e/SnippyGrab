@@ -5,6 +5,8 @@ namespace SnippyGrab.App.Views;
 
 internal static class Ui
 {
+    private static readonly HashSet<double> fontSizes = [];
+    private static double textScale = 1;
     public static Button Button(string label, string hint, Action action)
     {
         var button = new Button { Content = label, ToolTip = hint };
@@ -15,11 +17,19 @@ internal static class Ui
     public static void StyleWindow(Window window) => window.Style = (Style)Application.Current.FindResource(typeof(Window));
     public static TextBlock Text(string text, double size = 13, bool muted = false)
     {
-        var block = new TextBlock { Text = text, FontSize = size, Margin = new Thickness(0, 3, 0, 3) };
+        fontSizes.Add(size);
+        var fontKey = "TextSize." + size.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        Application.Current.Resources[fontKey] = size * textScale;
+        var block = new TextBlock { Text = text, Margin = new Thickness(0, 3, 0, 3) };
+        block.SetResourceReference(TextBlock.FontSizeProperty, fontKey);
         block.SetResourceReference(TextBlock.ForegroundProperty, muted ? "Muted" : "Ink"); return block;
     }
     public static void Theme(AppTheme theme)
     {
+        using (var accessibility = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Accessibility"))
+            textScale = Math.Clamp(Convert.ToDouble(accessibility?.GetValue("TextScaleFactor", 100)) / 100.0, 1, 2.25);
+        Application.Current.Resources["BodyTextSize"] = 13 * textScale;
+        foreach (var size in fontSizes) Application.Current.Resources["TextSize." + size.ToString(System.Globalization.CultureInfo.InvariantCulture)] = size * textScale;
         bool light = theme == AppTheme.Light;
         if (theme == AppTheme.System)
         {

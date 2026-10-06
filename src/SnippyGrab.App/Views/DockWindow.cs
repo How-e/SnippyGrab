@@ -25,7 +25,7 @@ internal sealed class DockWindow : Window
         this.controller = controller;
         Title = "SnippyGrab shelf"; WindowStyle = WindowStyle.None; AllowsTransparency = true;
         Background = Brushes.Transparent; ResizeMode = ResizeMode.NoResize; ShowInTaskbar = false;
-        ShowActivated = false; SizeToContent = SizeToContent.WidthAndHeight;
+        ShowActivated = false; Focusable = true; SizeToContent = SizeToContent.WidthAndHeight;
         Content = shelf; Padding = new Thickness(4);
         AutomationProperties.SetName(this, "Screenshot shelf. Ctrl-click to select multiple captures; drag to attach.");
         MouseEnter += (_, _) => { hideTimer.Stop(); expanded = true; Rebuild(); };
@@ -61,6 +61,7 @@ internal sealed class DockWindow : Window
     }
     private void Rebuild()
     {
+        var restoreFocus = IsKeyboardFocusWithin;
         shelf.Children.Clear(); Topmost = controller.Settings.AlwaysOnTop;
         BeginAnimation(OpacityProperty, null); Opacity = controller.Settings.DockOpacity;
         shelf.Orientation = controller.Settings.Orientation == DockOrientation.Horizontal ? Orientation.Horizontal : Orientation.Vertical;
@@ -82,6 +83,7 @@ internal sealed class DockWindow : Window
             for (var i = 0; i < Math.Min(2, visible.Count - 1); i++)
                 shelf.Children.Add(new Border { Width = controller.Settings.ThumbnailSize - (i + 1) * 12, Height = 4, CornerRadius = new CornerRadius(0, 0, 4, 4), Background = new SolidColorBrush(Color.FromArgb((byte)(150 - i * 40), 81, 99, 124)), HorizontalAlignment = HorizontalAlignment.Center });
         }
+        if (restoreFocus) Keyboard.Focus(this);
     }
     private UIElement Card(CaptureRecord capture)
     {

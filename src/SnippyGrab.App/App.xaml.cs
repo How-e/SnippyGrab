@@ -11,13 +11,14 @@ public partial class App : Application
     {
         base.OnStartup(e);
         Native.SetDefaultDllDirectories(0x1000); // Default safe locations; never the working directory.
-        if (e.Args.Contains("--check-overlay-layout") || e.Args.Contains("--check-dock-layout") || e.Args.Contains("--check-editor-layout"))
+        if (e.Args.Contains("--check-reliability") || e.Args.Contains("--check-overlay-layout") || e.Args.Contains("--check-dock-layout") || e.Args.Contains("--check-editor-layout"))
         {
-            var destination = e.Args.SkipWhile(a => a is not ("--check-overlay-layout" or "--check-dock-layout" or "--check-editor-layout")).Skip(1).FirstOrDefault();
+            var destination = e.Args.SkipWhile(a => a is not ("--check-reliability" or "--check-overlay-layout" or "--check-dock-layout" or "--check-editor-layout")).Skip(1).FirstOrDefault();
             if (destination is null) { Shutdown(1); return; }
             try
             {
-                if (e.Args.Contains("--check-dock-layout")) await RuntimeChecks.CheckDockLayout(destination);
+                if (e.Args.Contains("--check-reliability")) await RuntimeChecks.CheckReliability(destination);
+                else if (e.Args.Contains("--check-dock-layout")) await RuntimeChecks.CheckDockLayout(destination);
                 else if (e.Args.Contains("--check-editor-layout")) await RuntimeChecks.CheckEditorLayout(destination);
                 else await RuntimeChecks.CheckOverlayLayout(destination);
                 Shutdown(0);

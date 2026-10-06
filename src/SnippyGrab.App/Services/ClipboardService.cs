@@ -2,7 +2,7 @@ using System.Runtime.InteropServices;
 
 namespace SnippyGrab.App.Services;
 
-internal sealed class ClipboardService
+internal sealed class ClipboardService(Action<DataObject>? write = null, Func<int, Task>? delay = null)
 {
     private readonly ClipboardWriter writer = new();
     public void Invalidate() => writer.Invalidate();
@@ -15,7 +15,7 @@ internal sealed class ClipboardService
     public Task<bool> TextAsync(string text, CancellationToken cancellation = default) => SetAsync(new DataObject(DataFormats.UnicodeText, text), cancellation);
     public Task<bool> FilesAsync(string[] paths) => SetAsync(new DataObject(DataFormats.FileDrop, paths));
     private Task<bool> SetAsync(DataObject data, CancellationToken cancellation = default) =>
-        writer.WriteAsync(() => Clipboard.SetDataObject(data, true), cancellation: cancellation);
+        writer.WriteAsync(() => { if (write is null) Clipboard.SetDataObject(data, true); else write(data); }, delay, cancellation);
 
 }
 

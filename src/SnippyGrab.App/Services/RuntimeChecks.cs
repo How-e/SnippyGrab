@@ -9,6 +9,55 @@ namespace SnippyGrab.App.Services;
 
 internal static class RuntimeChecks
 {
+    private sealed class PendingOcr : IOcrService
+    {
+        public readonly TaskCompletionSource<string> Completion = new();
+        public Task<string> ReadAsync(byte[] png, CancellationToken cancellation = default) => Completion.Task;
+    }
+    public static async Task CheckReliability(string destination)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "SnippyGrab-reliability-" + Guid.NewGuid().ToString("N"));
+        var foreground = Native.GetForegroundWindow();
+        new SettingsService(Path.Combine(root, "settings.json")).Save(new Settings { FirstRunComplete = true, Animate = false, AutoCopy = false });
+        try
+        {
+            using var controller = new AppController(true, root, diagnostic: true);
+            var image = SyntheticCode(320, 160); var png = ImageService.Png(image);
+            var record = controller.Repository.Add(png, 320, 160);
+            var history = new HistoryWindow(controller) { ShowActivated = false, WindowStartupLocation = WindowStartupLocation.Manual, Left = -30000, Top = -30000 };
+            var pin = new PinWindow(controller, record) { ShowActivated = false, Topmost = false, Left = -30000, Top = -30000 };
+            try
+            {
+                history.Show(); pin.Show(); await Task.Delay(30);
+                var list = ((DockPanel)history.Content).Children.OfType<ListBox>().Single(); list.SelectedIndex = 0;
+                controller.Repository.Add(png, 320, 160); Assert(list.Items.Count == 2 && list.SelectedItems.Count == 1, "Open history refresh preserves selection after capture");
+                controller.Repository.Replace(record, ImageService.Png(SyntheticCode(640, 240)), 640, 240);
+                var historyImage = ((DockPanel)history.Content).Children.OfType<Image>().Single();
+                var pinImage = (Image)((Border)pin.Content).Child;
+                Assert(((BitmapSource)historyImage.Source).PixelWidth == 600 && ((BitmapSource)pinImage.Source).PixelWidth == 640, $"History and detached pin refresh committed pixels (history={((BitmapSource)historyImage.Source).PixelWidth}, pin={((BitmapSource)pinImage.Source).PixelWidth})");
+                controller.Repository.SetPinned(record, false); controller.Repository.Cleanup(DateTimeOffset.UtcNow, 1, true);
+                Assert(File.Exists(controller.Repository.PathFor(record)), "Unpinned open view protects current source");
+                pin.Close(); controller.Repository.Cleanup(DateTimeOffset.UtcNow, 1, true); Assert(list.Items.Count == 0, "Pin close releases source and history removes cleaned rows");
+
+                var writes = new List<DataObject>(); controller.Clipboard = new ClipboardService(data => writes.Add(data), _ => Task.CompletedTask);
+                var pending = new PendingOcr(); controller.OcrService = pending;
+                var oldOcr = controller.OcrText(image); await controller.CopyText("newer synthetic copy"); pending.Completion.SetResult("stale synthetic OCR");
+                Assert(await oldOcr == "OCR cancelled." && writes.Count == 1, "New copy supersedes pending OCR before clipboard publication");
+                pending = new PendingOcr(); controller.OcrService = pending;
+                using var lifetime = new CancellationTokenSource(); oldOcr = controller.OcrText(image, lifetime.Token); lifetime.Cancel(); pending.Completion.SetResult("closed editor OCR");
+                Assert(await oldOcr == "OCR cancelled." && writes.Count == 1, "Closed editor lifetime prevents clipboard publication");
+                Assert(Native.GetForegroundWindow() == foreground, "Reliability probe preserves foreground");
+            }
+            finally { pin.Close(); history.Close(); controller.Dock.Close(); }
+            AtomicFile.Write(destination, JsonSerializer.SerializeToUtf8Bytes(new { Result = "PASS", Scope = "Offscreen synthetic history/pin revision and lease lifecycle, injected OCR/clipboard; no pointer movement, real capture, OS clipboard write or startup registration change." }));
+        }
+        finally
+        {
+            var absolute = Path.GetFullPath(root);
+            if (!absolute.StartsWith(Path.GetFullPath(Path.GetTempPath()), StringComparison.OrdinalIgnoreCase) || !Path.GetFileName(absolute).StartsWith("SnippyGrab-reliability-", StringComparison.Ordinal)) throw new InvalidOperationException("Unexpected reliability probe path.");
+            Directory.Delete(absolute, true);
+        }
+    }
     public static async Task CheckEditorLayout(string destination)
     {
         var root = Path.Combine(Path.GetTempPath(), "SnippyGrab-editor-check-" + Guid.NewGuid().ToString("N"));

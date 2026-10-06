@@ -26,6 +26,7 @@ public sealed class RepositoryState
     public int SchemaVersion { get; set; } = 1;
     public List<string> Pages { get; set; } = [];
     public List<CaptureRecord> Captures { get; set; } = [];
+    public Dictionary<string, DateTimeOffset> Superseded { get; set; } = [];
     public Dictionary<string, DateTimeOffset> ProtectedUntil { get; set; } = [];
 }
 
@@ -60,7 +61,7 @@ public sealed partial class CaptureRepository
     }
     [GeneratedRegex(@"^capture-[a-f0-9]{32}\.png\z", RegexOptions.CultureInvariant)]
     private static partial Regex NamePattern();
-    [GeneratedRegex(@"^(capture-[a-f0-9]{32}\.png|history\.json)\.[a-f0-9]{32}\.tmp\z", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"^(capture-[a-f0-9]{32}\.png|history(?:-recovered)?\.json|history-page-[a-f0-9]{64}\.json)\.[a-f0-9]{32}\.tmp\z", RegexOptions.CultureInvariant)]
     private static partial Regex TemporaryPattern();
     public static bool IsSafeName(string? name) => name is not null && NamePattern().IsMatch(name);
     public string PathFor(CaptureRecord capture) => PathForName(capture.FileName);
@@ -75,18 +76,21 @@ public sealed partial class CaptureRepository
         if (!SafeFile(metadata)) throw new InvalidDataException("Invalid metadata location.");
         if (new FileInfo(metadata).Length > 4 * 1024 * 1024) throw new InvalidDataException("History too large.");
         var loaded = JsonSerializer.Deserialize<RepositoryState>(File.ReadAllText(metadata)) ?? throw new InvalidDataException("Empty history state.");
-        if (loaded.SchemaVersion != 1) throw new InvalidDataException("Unsupported history version.");
-        if (loaded.Pages is null || loaded.Pages.Count > 10000) throw new InvalidDataException("Invalid history pages.");
+        if (loaded.SchemaVersion is < 1 or > 2) throw new InvalidDataException("Unsupported history version.");
+        if (loaded.Captures is null || loaded.Superseded is null || loaded.Pages is null || loaded.Pages.Count > 10000) throw new InvalidDataException("Invalid history pages.");
         foreach (var page in loaded.Pages)
         {
             if (!PagePattern().IsMatch(page)) throw new InvalidDataException("Invalid history page name.");
             var path = Path.Combine(root, page);
             if (!SafeFile(path) || new FileInfo(path).Length > 4 * 1024 * 1024) throw new InvalidDataException("Invalid history page.");
-            loaded.Captures.AddRange(JsonSerializer.Deserialize<List<CaptureRecord>>(File.ReadAllText(path)) ?? throw new InvalidDataException("Empty history page."));
+            var bytes = File.ReadAllBytes(path);
+            if ("history-page-" + Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant() + ".json" != page) throw new InvalidDataException("History page checksum mismatch.");
+            loaded.Captures.AddRange(JsonSerializer.Deserialize<List<CaptureRecord>>(bytes) ?? throw new InvalidDataException("Empty history page."));
         }
         if (loaded.Captures is null || loaded.ProtectedUntil is null || loaded.Captures.Any(c => c is null)) throw new InvalidDataException("Invalid history state.");
         loaded.Captures = loaded.Captures.Where(c => IsSafeName(c.FileName) && c.Width > 0 && c.Height > 0 && SafeFile(PathFor(c)))
             .DistinctBy(c => c.Id).DistinctBy(c => c.FileName).ToList();
+        loaded.Superseded = loaded.Superseded.Where(p => IsSafeName(p.Key) && SafeFile(PathForName(p.Key))).ToDictionary();
         loaded.ProtectedUntil = loaded.ProtectedUntil.Where(p => IsSafeName(p.Key) && p.Value > clock()).ToDictionary();
         return loaded;
     }
@@ -108,7 +112,7 @@ public sealed partial class CaptureRepository
                 catch (Exception recoveryError) when (recoveryError is IOException or UnauthorizedAccessException or JsonException or InvalidDataException or ArgumentException)
                 { state = new(); recoveryNeedsBackup = true; }
         }
-        var known = state.Captures.Select(c => c.FileName).ToHashSet();
+        var known = state.Captures.Select(c => c.FileName).Concat(state.Superseded.Keys).Concat(state.ProtectedUntil.Keys).ToHashSet();
         var files = Directory.EnumerateFiles(root, "capture-*.png");
         // During recovery every unknown image may be an old pin, including with history disabled.
         foreach (var path in files)
@@ -168,38 +172,51 @@ public sealed partial class CaptureRepository
         var name = "capture-" + Guid.NewGuid().ToString("N") + ".png";
         write(PathForName(name), png);
         sessionFiles.Add(name);
-        var previous = (record.FileName, record.Width, record.Height, record.Edited);
-        record.FileName = name; record.Width = width; record.Height = height; record.Edited = true;
+        var previous = (record.FileName, record.Width, record.Height, record.Edited, record.DimensionsPending);
+        state.Superseded[record.FileName] = clock();
+        record.FileName = name; record.Width = width; record.Height = height; record.Edited = true; record.DimensionsPending = false;
         try { Persist(); }
         catch
         {
-            (record.FileName, record.Width, record.Height, record.Edited) = previous;
+            state.Superseded.Remove(previous.FileName);
+            (record.FileName, record.Width, record.Height, record.Edited, record.DimensionsPending) = previous;
             throw;
         }
-            RevisionChanged?.Invoke(record);
+        RevisionChanged?.Invoke(record);
     }
     public void Persist()
     {
-        var metadata = Path.Combine(root, CleanupBlocked ? "history-recovered.json" : "history.json");
-        if (File.Exists(metadata) && !SafeFile(metadata)) throw new InvalidDataException("Invalid metadata location.");
-        if (recoveryNeedsBackup)
+        try
         {
-            File.Copy(metadata, Path.Combine(root, "history-recovered.invalid-" + Guid.NewGuid().ToString("N") + ".json"));
-            recoveryNeedsBackup = false;
+            var metadata = Path.Combine(root, CleanupBlocked ? "history-recovered.json" : "history.json");
+            if (File.Exists(metadata) && !SafeFile(metadata)) throw new InvalidDataException("Invalid metadata location.");
+            if (recoveryNeedsBackup)
+            {
+                File.Copy(metadata, Path.Combine(root, "history-recovered.invalid-" + Guid.NewGuid().ToString("N") + ".json"));
+                recoveryNeedsBackup = false;
+            }
+            write(metadata, SerializeState()); PersistencePending = false;
         }
-        try { write(metadata, SerializeState()); PersistencePending = false; }
         catch { PersistencePending = true; throw; }
         Changed?.Invoke();
+    }
+    public void ProbeWritable()
+    {
+        var path = Path.Combine(root, ".write-probe-" + Guid.NewGuid().ToString("N"));
+        try { write(path, [0]); }
+        finally { if (File.Exists(path)) File.Delete(path); }
     }
     private byte[] SerializeState()
     {
         var saved = new RepositoryState
         {
             Captures = state.Captures.Where(c => HistoryEnabled || c.Pinned).ToList(),
+            Superseded = state.Superseded,
             ProtectedUntil = state.ProtectedUntil
         };
         if (!CleanupBlocked && saved.Captures.Count > 512)
         {
+            saved.SchemaVersion = 2; // Older builds fail closed instead of ignoring pinned page records.
             var captures = saved.Captures; saved.Captures = [];
             // Chunk from the oldest end so inserting a new capture only rewrites the newest page.
             var first = captures.Count % 512; if (first == 0) first = 512;
@@ -210,6 +227,7 @@ public sealed partial class CaptureRepository
                 if (page.Length > 4 * 1024 * 1024) throw new InvalidDataException("History page exceeds the size limit.");
                 var name = "history-page-" + Convert.ToHexString(SHA256.HashData(page)).ToLowerInvariant() + ".json";
                 var path = Path.Combine(root, name);
+                if (File.Exists(path) && !SafeFile(path)) throw new InvalidDataException("Invalid history page location.");
                 if (!SafeFile(path)) write(path, page);
                 saved.Pages.Add(name); offset += count;
             }
@@ -274,7 +292,7 @@ public sealed partial class CaptureRepository
             var record = records.GetValueOrDefault(name);
             var created = record is null ? new DateTimeOffset(File.GetLastWriteTimeUtc(path)) : record.RestoredUtc ?? record.CreatedUtc;
             if (!clear && (retentionHours < 0 || created.AddHours(retentionHours) > now)) continue;
-            try { File.Delete(path); state.Captures.RemoveAll(c => c.FileName == name); removed++; }
+            try { File.Delete(path); state.Superseded.Remove(name); state.Captures.RemoveAll(c => c.FileName == name); removed++; }
             catch (IOException) { }
             catch (UnauthorizedAccessException) { }
         }
@@ -288,7 +306,8 @@ public sealed partial class CaptureRepository
         // Only owned pages unreferenced by the durable manifest and older than the crash grace are removable.
         var manifest = Path.Combine(root, "history.json");
         var pages = File.Exists(manifest) ? JsonSerializer.Deserialize<RepositoryState>(File.ReadAllText(manifest))?.Pages.ToHashSet() ?? [] : new HashSet<string>();
-        foreach (var path in Directory.EnumerateFiles(root, "history-page-*.json"))
+        var hasArchivedHistory = Directory.EnumerateFiles(root, "history.invalid-*.json").Any();
+        foreach (var path in hasArchivedHistory ? Enumerable.Empty<string>() : Directory.EnumerateFiles(root, "history-page-*.json"))
             if (PagePattern().IsMatch(Path.GetFileName(path)) && !pages.Contains(Path.GetFileName(path)) && SafeFile(path) && File.GetLastWriteTimeUtc(path) < now.UtcDateTime.AddDays(-1))
                 try { File.Delete(path); } catch (IOException) { } catch (UnauthorizedAccessException) { }
         return removed;

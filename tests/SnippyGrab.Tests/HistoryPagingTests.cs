@@ -5,6 +5,16 @@ namespace SnippyGrab.Tests;
 public sealed class HistoryPagingTests : IDisposable
 {
     private readonly string root = Path.Combine(Path.GetTempPath(), "SnippyGrab-pages-" + Guid.NewGuid().ToString("N"));
+    [Fact] public void CorruptPageFailsClosedAndPreservesPossiblePins()
+    {
+        var repository = new CaptureRepository(root);
+        for (var i = 0; i < 513; i++) File.WriteAllBytes(Path.Combine(root, "capture-" + Guid.NewGuid().ToString("N") + ".png"), [1]);
+        repository.Load(); repository.Persist();
+        File.WriteAllText(Directory.GetFiles(root, "history-page-*.json")[0], "[]");
+        var reopened = new CaptureRepository(root); reopened.Load(); Assert.True(reopened.CleanupBlocked);
+        Assert.Equal(513, reopened.Captures.Count); Assert.All(reopened.Captures, capture => Assert.True(capture.Pinned));
+        Assert.Equal(0, reopened.Cleanup(DateTimeOffset.UtcNow, 1, true));
+    }
     [Fact] public void ThousandsOfOrphansPersistAsBoundedPagesWithoutLosingPins()
     {
         var repository = new CaptureRepository(root);
@@ -15,6 +25,7 @@ public sealed class HistoryPagingTests : IDisposable
         foreach (var capture in repository.Captures) capture.ExportPath = new string('a', 2100);
         repository.Persist();
         Assert.True(new FileInfo(Path.Combine(root, "history.json")).Length < 4 * 1024 * 1024);
+        Assert.Equal(2, JsonSerializer.Deserialize<RepositoryState>(File.ReadAllText(Path.Combine(root, "history.json")))!.SchemaVersion);
         var reopened = new CaptureRepository(root); reopened.Load(); Assert.False(reopened.CleanupBlocked); Assert.Equal(2100, reopened.Captures.Count);
         Assert.Contains(reopened.Captures, c => c.Id == pin && c.Pinned);
         Assert.Equal(0, reopened.Cleanup(DateTimeOffset.UtcNow.AddYears(1), -1));

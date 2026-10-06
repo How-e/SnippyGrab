@@ -14,7 +14,7 @@ internal sealed class AppController : IDisposable
 {
     public Settings Settings { get; private set; }
     public CaptureRepository Repository { get; }
-    public ClipboardService Clipboard { get; } = new();
+    public ClipboardService Clipboard { get; internal set; } = new();
     public DragDropService DragDrop { get; }
     public IOcrService OcrService { get; internal set; } = new OcrService();
     public HotkeyService Hotkeys { get; } = new();
@@ -33,6 +33,7 @@ internal sealed class AppController : IDisposable
     private readonly string dataDirectory;
     private bool dockWasVisible;
     private bool disposed;
+    private readonly HotkeyPauseState hotkeyPause = new();
     private readonly LatestOperation ocr = new();
     private bool exitRequested;
     private string? cacheWarning;
@@ -92,6 +93,7 @@ internal sealed class AppController : IDisposable
     public Task<bool> CopyImage(BitmapSource image) => CopyImageCore(image);
     private async Task<bool> CopyImageCore(BitmapSource image, byte[]? encoded = null)
     {
+        ocr.Cancel();
         var success = await Clipboard.ImageAsync(image, Settings.ClipboardPng, encoded);
         if (!success) Notify("Clipboard is busy. Capture is in the shelf; use Copy again."); return success;
     }
@@ -101,12 +103,19 @@ internal sealed class AppController : IDisposable
     }
     public async Task CopyFiles(IReadOnlyList<CaptureRecord> records)
     {
+        ocr.Cancel();
         var ordered = TransferPayload.Ordered(Repository, records);
         using var lease = Repository.Lease(ordered, transfer: true);
         if (!await Clipboard.FilesAsync(TransferPayload.Files(Repository, ordered))) Notify("Clipboard is busy. Try Copy again.");
     }
+    public async Task CopyPath(CaptureRecord record, bool filename = false)
+    {
+        using var lease = Repository.Lease([record], transfer: true);
+        await CopyText(filename ? record.FileName : Repository.PathFor(record));
+    }
     public async Task<bool> CopyText(string text, CancellationToken cancellation = default)
     {
+        if (cancellation == default) ocr.Cancel();
         var success = await Clipboard.TextAsync(text, cancellation);
         if (!success && !cancellation.IsCancellationRequested) Notify("Text was not copied. Clipboard is busy or a newer copy superseded it; retry Copy.");
         return success;
@@ -122,6 +131,7 @@ internal sealed class AppController : IDisposable
             return await CopyText(text, token) ? "OCR text copied." : "OCR text was not copied. Retry OCR when the clipboard is available.";
         }
         catch (OperationCanceledException) { return "OCR cancelled."; }
+        catch (Exception ex) { Log("failure_category=Ocr; exception_type=" + ex.GetType().Name); return "OCR failed. Check the local English model and complete package/runtime, then retry OCR. Capture remains available."; }
     }
     public async Task Ocr(CaptureRecord record)
     {
@@ -184,15 +194,16 @@ internal sealed class AppController : IDisposable
     public void ClearTemporary() => Try(() => { if (Repository.CleanupBlocked) { Notify("Cleanup is disabled because history is unreadable. Original metadata is preserved; recover it before deleting captures."); return; } var count = Repository.Cleanup(DateTimeOffset.UtcNow, Settings.RetentionHours, clear: true); Dock.Refresh(); Notify($"Cleared {count} temporary capture(s). Pins and transfers are protected."); });
     private void ShowWelcome()
     {
-        var wasPaused = Hotkeys.Paused; Hotkeys.Configure(Settings, true);
-        welcomeWindow = new(this); welcomeWindow.Closed += (_, _) => { welcomeWindow = null; Hotkeys.Configure(Settings, wasPaused); BuildTray(); }; welcomeWindow.Show();
+        Hotkeys.Configure(Settings, hotkeyPause.Enter(Hotkeys.Paused));
+        welcomeWindow = new(this); welcomeWindow.Closed += (_, _) => { welcomeWindow = null; Hotkeys.Configure(Settings, hotkeyPause.Exit()); BuildTray(); }; welcomeWindow.Show();
     }
+    public void FinishSetup() => welcomeWindow?.Close();
     public void ShowSettings() => ShowSettings(false);
     private void ShowSettings(bool welcome)
     {
         if (settingsWindow is not null) { settingsWindow.Activate(); return; }
-        var wasPaused = Hotkeys.Paused; Hotkeys.Configure(Settings, true);
-        settingsWindow = new(this, welcome); settingsWindow.Closed += (_, _) => { settingsWindow = null; Hotkeys.Configure(Settings, welcomeWindow is not null || wasPaused); BuildTray(); }; settingsWindow.Show();
+        Hotkeys.Configure(Settings, hotkeyPause.Enter(Hotkeys.Paused));
+        settingsWindow = new(this, welcome); settingsWindow.Closed += (_, _) => { settingsWindow = null; Hotkeys.Configure(Settings, hotkeyPause.Exit()); BuildTray(); }; settingsWindow.Show();
     }
     public void ShowHistory()
     {
@@ -217,7 +228,7 @@ internal sealed class AppController : IDisposable
         menu.Items.Add(new Forms.ToolStripSeparator());
         Item("Show screenshot shelf", Dock.Reveal); Item("Focus screenshot shelf (keyboard)", Dock.FocusShelf); Item("Open recent captures", ShowHistory); Item("Hotkey help / conflicts", () => MessageBox.Show(HotkeyRegistration.Guidance(Settings) + "\n\n" + string.Join("\n", Hotkeys.Warnings), "SnippyGrab · Hotkey help")); Item("Open settings", ShowSettings);
         Item("Restore pins", () => { foreach (var pin in pins.Values) pin.RestoreInteraction(); });
-        Item("Pause hotkeys", () => { Hotkeys.Configure(Settings, !Hotkeys.Paused); BuildTray(); }, Hotkeys.Paused);
+        Item("Pause hotkeys", () => { Hotkeys.Configure(Settings, hotkeyPause.Toggle(Hotkeys.Paused)); BuildTray(); }, Hotkeys.Paused);
         Item("Clear temporary screenshots", ClearTemporary); Item("Retry history save", () => { Repository.Persist(); Notify("History saved. Cleanup can resume."); });
         Item("Launch at Windows login", () => { var draft = System.Text.Json.JsonSerializer.Deserialize<Settings>(System.Text.Json.JsonSerializer.Serialize(Settings))!; draft.LaunchOnStartup = !StartupService.Enabled; ApplySettings(draft); }, StartupService.Enabled);
         Item("Last operation details", () => MessageBox.Show(lastNotice, "SnippyGrab · Operation details"));

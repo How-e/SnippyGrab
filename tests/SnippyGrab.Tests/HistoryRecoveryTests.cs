@@ -22,7 +22,7 @@ public sealed class HistoryRecoveryTests : IDisposable
         {
             "truncated" => "{\"Captures\":[",
             "oversized" => new string(' ', 4 * 1024 * 1024 + 1),
-            "newer" => JsonSerializer.Serialize(new RepositoryState { SchemaVersion = 2, Captures = [oldPin] }),
+            "newer" => JsonSerializer.Serialize(new RepositoryState { SchemaVersion = 3, Captures = [oldPin] }),
             _ => "broken history"
         };
         File.WriteAllText(metadata, invalid);

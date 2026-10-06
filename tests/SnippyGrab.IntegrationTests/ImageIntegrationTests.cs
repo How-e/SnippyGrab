@@ -12,6 +12,24 @@ namespace SnippyGrab.IntegrationTests;
 
 public sealed class ImageIntegrationTests
 {
+    [Fact] public void EveryClipboardRepresentationReportsItsOwnOutcomeWithoutWritingOsClipboard()
+    {
+        Sta(() =>
+        {
+            var writes = new List<System.Windows.DataObject>(); bool busy = false; int attempts = 0;
+            var clipboard = new ClipboardService(data => { attempts++; if (busy) throw new System.Runtime.InteropServices.ExternalException(); writes.Add(data); }, _ => Task.CompletedTask);
+            Assert.True(clipboard.ImageAsync(Synthetic(), true).GetAwaiter().GetResult());
+            Assert.True(writes[^1].GetDataPresent(System.Windows.DataFormats.Bitmap)); Assert.True(writes[^1].GetDataPresent("PNG"));
+            Assert.True(clipboard.ImageAsync(Synthetic(), false).GetAwaiter().GetResult()); Assert.False(writes[^1].GetDataPresent("PNG", false));
+            Assert.True(clipboard.FilesAsync([@"C:\synthetic.png"]).GetAwaiter().GetResult()); Assert.Equal(new[] { @"C:\synthetic.png" }, writes[^1].GetData(System.Windows.DataFormats.FileDrop));
+            foreach (var text in new[] { "synthetic OCR text", @"C:\synthetic.png", "synthetic.png" })
+            { Assert.True(clipboard.TextAsync(text).GetAwaiter().GetResult()); Assert.Equal(text, writes[^1].GetData(System.Windows.DataFormats.UnicodeText)); }
+            busy = true;
+            foreach (var action in new Func<Task<bool>>[] { () => clipboard.ImageAsync(Synthetic(), true), () => clipboard.FilesAsync([@"C:\synthetic.png"]), () => clipboard.TextAsync("synthetic") })
+            { var before = attempts; Assert.False(action().GetAwaiter().GetResult()); Assert.Equal(6, attempts - before); }
+            return true;
+        });
+    }
     private static T Sta<T>(Func<T> action)
     {
         T result = default!; Exception? error = null;

@@ -3,6 +3,13 @@ namespace SnippyGrab.Tests;
 public sealed class TransferLifecycleTests : IDisposable
 {
     private readonly string root = Path.Combine(Path.GetTempPath(), "SnippyGrab-transfer-" + Guid.NewGuid().ToString("N"));
+    [Fact] public void SupersededRevisionsDoNotReappearInHistoryAfterRestart()
+    {
+        var repository = new CaptureRepository(root); var record = repository.Add([1], 2, 3);
+        using (repository.Lease([record], true)) repository.Replace(record, [2], 4, 5);
+        var reopened = new CaptureRepository(root); reopened.Load(); Assert.Equal(record.Id, Assert.Single(reopened.Captures).Id);
+        Assert.Equal(record.FileName, reopened.Captures[0].FileName);
+    }
     [Fact] public void GraceExtendsAtReleaseAndSurvivesCrashRestartAndRevision()
     {
         var now = DateTimeOffset.Parse("2026-01-01T00:00:00Z"); var repository = new CaptureRepository(root, utcNow: () => now);

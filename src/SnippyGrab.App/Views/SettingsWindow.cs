@@ -24,7 +24,7 @@ internal sealed class SettingsWindow : Window
         header.Children.Add(Ui.Text(welcome ? "Print Screen → drag a region → release. Paste immediately with Ctrl+V, drag from the shelf to attach, or click to annotate. Everything stays local. Choose startup below." : "A quiet shelf, configured for your workflow.", 13, true));
         DockPanel.SetDock(header, Dock.Top); root.Children.Add(header);
         var footer = new StackPanel();
-        status = Ui.Text(string.Join("\n", controller.Hotkeys.Warnings), 12, true); footer.Children.Add(status);
+        status = Ui.Text(string.Join("\n", controller.Hotkeys.Warnings), 12, true); status.TextWrapping = TextWrapping.Wrap; footer.Children.Add(status);
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
         buttons.Children.Add(Ui.Button("Reset", "Reset settings to defaults", () => { draft = new Settings { FirstRunComplete = true }; Populate(); }));
         buttons.Children.Add(Ui.Button("Cancel", "Close without applying", Close));
@@ -54,6 +54,7 @@ internal sealed class SettingsWindow : Window
         Section("Editor"); Add(nameof(Settings.AnnotationColor), "Default color (#RRGGBB)"); Add(nameof(Settings.StrokeSize), "Stroke thickness"); Add(nameof(Settings.TextSize), "Text size");
         Section("Application"); Add(nameof(Settings.LaunchOnStartup), "Launch at Windows login"); Add(nameof(Settings.StartMinimized), "Start silently in tray after setup"); Add(nameof(Settings.Theme), "Theme");
         body.Children.Add(Ui.Text("Updates are manual through GitHub Releases. No automatic network requests, accounts or analytics. SnippyGrab 0.1.0 alpha · MIT", 12, true));
+        foreach (var text in body.Children.OfType<TextBlock>()) text.TextWrapping = TextWrapping.Wrap;
     }
     private void Section(string title) => body.Children.Add(new TextBlock { Text = title, FontSize = 16, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 20, 0, 8) });
     private void Add(string name, string label)
@@ -101,8 +102,8 @@ internal sealed class SettingsWindow : Window
                 if (!Path.IsPathFullyQualified(draft.CachePath) || draft.CachePath.StartsWith(@"\\", StringComparison.Ordinal)) throw new InvalidDataException("Cache path must be absolute and local.");
                 if (Path.GetFullPath(draft.CachePath) == Path.GetPathRoot(draft.CachePath)) throw new InvalidDataException("Choose a dedicated cache directory.");
             }
-            if (draft.CachePath.Length > 0) _ = new CaptureRepository(draft.CachePath);
-            controller.ApplySettings(draft); Close();
+            if (draft.CachePath.Length > 0) new CaptureRepository(draft.CachePath).ProbeWritable();
+            controller.ApplySettings(draft); controller.FinishSetup(); Close();
         }
         catch (Exception ex) when (ex is FormatException or InvalidDataException or ArgumentException or IOException or System.Security.SecurityException or TargetInvocationException or UnauthorizedAccessException or AggregateException)
         { status.Text = "Settings could not be applied: " + ex.Message; }

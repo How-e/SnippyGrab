@@ -18,13 +18,21 @@ public sealed class StorageFailureTests : IDisposable
         var repository = new CaptureRepository(root, (_, _) => throw new UnauthorizedAccessException());
         Assert.Throws<UnauthorizedAccessException>(() => repository.Add([1], 2, 3)); Assert.Empty(repository.Captures);
     }
+    [Fact] public void UnchangedStartupDoesNotRequireRegistryWriteAndCacheProbeIsIsolated()
+    {
+        var saved = false;
+        SettingsTransaction.Apply(new(), false, _ => throw new UnauthorizedAccessException(), _ => saved = true); Assert.True(saved);
+        var repository = new CaptureRepository(root); repository.ProbeWritable(); Assert.Empty(Directory.GetFiles(root));
+        Assert.Throws<IOException>(() => new CaptureRepository(root, (_, _) => throw new IOException()).ProbeWritable());
+    }
     [Fact] public void StartupAndSaveFailuresRollBackRegistration()
     {
         bool enabled = false;
         Assert.Throws<IOException>(() => SettingsTransaction.Apply(new() { LaunchOnStartup = true }, false, value => enabled = value, _ => throw new IOException()));
         Assert.False(enabled);
         var saves = 0;
-        Assert.Throws<UnauthorizedAccessException>(() => SettingsTransaction.Apply(new(), false, _ => throw new UnauthorizedAccessException(), _ => saves++));
+        var failure = Assert.Throws<AggregateException>(() => SettingsTransaction.Apply(new() { LaunchOnStartup = true }, false, _ => throw new UnauthorizedAccessException(), _ => saves++));
+        Assert.All(failure.InnerExceptions, error => Assert.IsType<UnauthorizedAccessException>(error));
         Assert.Equal(0, saves);
     }
     public void Dispose() { if (Directory.Exists(root)) Directory.Delete(root, true); }

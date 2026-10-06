@@ -18,5 +18,6 @@ internal sealed class WelcomeWindow : Window
         actions.Children.Add(Ui.Button("Settings", "Configure hotkeys and shelf", () => controller.ShowSettings()));
         actions.Children.Add(Ui.Button("Start snipping", "Finish setup and stay in tray", () => controller.Try(() => { var draft = System.Text.Json.JsonSerializer.Deserialize<Settings>(System.Text.Json.JsonSerializer.Serialize(controller.Settings))!; draft.FirstRunComplete = true; draft.LaunchOnStartup = startup.IsChecked == true; controller.ApplySettings(draft); Close(); })));
         panel.Children.Add(actions);
+        foreach (var text in panel.Children.OfType<TextBlock>()) text.TextWrapping = TextWrapping.Wrap;
     }
 }

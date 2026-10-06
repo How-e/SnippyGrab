@@ -2,6 +2,12 @@ using SnippyGrab.Core;
 namespace SnippyGrab.Tests;
 public sealed class HotkeyRegistrationTests
 {
+    [Theory] [InlineData(false)] [InlineData(true)]
+    public void OverlappingSetupWindowsPreservePauseInEitherCloseOrder(bool paused)
+    {
+        var state = new HotkeyPauseState(); Assert.True(state.Enter(paused)); Assert.True(state.Enter(true));
+        Assert.True(state.Exit()); Assert.Equal(paused, state.Exit());
+    }
     [Fact] public void ConflictDoesNotPreventFallbackAndDisablesRepeat()
     {
         var warnings = new List<string>(); var keys = new List<Hotkey>();

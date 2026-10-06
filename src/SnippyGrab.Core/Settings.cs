@@ -87,10 +87,10 @@ public sealed class SettingsService(string file)
             settings.Validate();
             return settings;
         }
-        catch (Exception ex) when (ex is JsonException or IOException or InvalidDataException)
+        catch (Exception ex) when (ex is JsonException or IOException or InvalidDataException or UnauthorizedAccessException)
         {
             Recovered = true;
-            try { File.Move(file, file + ".invalid-" + Guid.NewGuid().ToString("N")); } catch (IOException) { }
+            try { File.Move(file, file + ".invalid-" + Guid.NewGuid().ToString("N")); } catch (IOException) { } catch (UnauthorizedAccessException) { }
             return new();
         }
     }

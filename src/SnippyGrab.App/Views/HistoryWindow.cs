@@ -11,7 +11,7 @@ internal sealed class HistoryWindow : Window
     private readonly Image preview = new() { Stretch = Stretch.Uniform, MaxHeight = 180, Margin = new Thickness(6) };
     private sealed record Row(CaptureRecord Capture)
     {
-        public string Label => $"{Capture.CreatedUtc.LocalDateTime:g}    {Capture.Width} × {Capture.Height}    {(Capture.Pinned ? "PIN" : "")}{(Capture.Edited ? "  edited" : "")}{(Capture.Saved ? "  saved" : "")}";
+        public string Label => $"{Capture.CreatedUtc.LocalDateTime:g}    {(Capture.DimensionsPending ? "dimensions pending" : $"{Capture.Width} × {Capture.Height}")}    {(Capture.Pinned ? "PIN" : "")}{(Capture.Edited ? "  edited" : "")}{(Capture.Saved ? "  saved" : "")}";
     }
     public HistoryWindow(AppController controller)
     {
@@ -44,7 +44,7 @@ internal sealed class HistoryWindow : Window
         DockPanel.SetDock(toolbar, Dock.Top); root.Children.Add(toolbar);
         DockPanel.SetDock(preview, Dock.Bottom); root.Children.Add(preview); root.Children.Add(list);
         VirtualizingPanel.SetIsVirtualizing(list, true); VirtualizingPanel.SetVirtualizationMode(list, VirtualizationMode.Recycling);
-        list.SelectionChanged += (_, _) => controller.Try(() => { var c = Selected().FirstOrDefault(); if (c is not null) controller.Repository.ResolveDimensions(c); preview.Source = c is null ? null : Services.ImageService.Load(controller.Repository.PathFor(c), 600); });
+        list.SelectionChanged += (_, _) => controller.Try(RefreshPreview);
         list.MouseDoubleClick += (_, _) => { if (Selected().FirstOrDefault() is { } c) controller.Edit(c); };
         list.PreviewMouseMove += (_, e) => { if (e.LeftButton == MouseButtonState.Pressed && Selected().Count > 0 && (Keyboard.Modifiers & ModifierKeys.Alt) != 0) controller.Try(() => controller.DragDrop.Drag(list, Selected())); };
         KeyDown += (_, e) => { if (e.Key == Key.Escape) Close(); if (e.Key == Key.Delete) { controller.Dismiss(Selected()); Refresh(); } };
@@ -58,6 +58,12 @@ internal sealed class HistoryWindow : Window
         notice.TextWrapping = TextWrapping.Wrap; DockPanel.SetDock(notice, Dock.Top); return notice;
     }
     private List<CaptureRecord> Selected() => list.SelectedItems.Cast<Row>().Select(r => r.Capture).ToList();
+    private void RefreshPreview()
+    {
+        var capture = Selected().FirstOrDefault();
+        if (capture is not null) controller.Repository.ResolveDimensions(capture);
+        preview.Source = capture is null ? null : Services.ImageService.Load(controller.Repository.PathFor(capture), 600);
+    }
     private void RepositoryChanged() => controller.Try(Refresh);
     private void Refresh()
     {
@@ -65,6 +71,7 @@ internal sealed class HistoryWindow : Window
         page = Math.Min(page, Math.Max(0, (controller.Repository.Captures.Count - 1) / HistoryPage.Size));
         list.ItemsSource = HistoryPage.Read(controller.Repository.Captures, page).Select(c => new Row(c)).ToList();
         pageStatus.Text = $"Page {page + 1} · {controller.Repository.Captures.Count} captures";
-        foreach (var row in list.Items.Cast<Row>().Where(r => selected.Contains(r.Capture.Id))) list.SelectedItems.Add(row);
+        foreach (var row in list.Items.Cast<Row>().Where(r => selected.Contains(r.Capture.Id))) if (!list.SelectedItems.Contains(row)) list.SelectedItems.Add(row);
+        RefreshPreview();
     }
 }

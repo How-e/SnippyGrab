@@ -30,6 +30,7 @@ public sealed partial class CaptureRepository
     private readonly Action<string, byte[]> write;
     public bool PersistencePending { get; private set; }
     public event Action? PersistenceFailed;
+    public event Action<CaptureRecord>? RevisionChanged;
     private readonly Dictionary<string, int> leases = new(StringComparer.OrdinalIgnoreCase);
     private RepositoryState state = new();
     private bool recoveryNeedsBackup;
@@ -124,6 +125,7 @@ public sealed partial class CaptureRepository
             (record.FileName, record.Width, record.Height, record.Edited) = previous;
             throw;
         }
+            RevisionChanged?.Invoke(record);
     }
     public void Persist()
     {

@@ -8,6 +8,7 @@ internal sealed class PinWindow : Window
     private readonly AppController controller;
     private readonly CaptureRecord record;
     private readonly Image preview;
+    private readonly CaptureViewLease lease;
     public PinWindow(AppController controller, CaptureRecord record)
     {
         Ui.StyleWindow(this);
@@ -26,7 +27,14 @@ internal sealed class PinWindow : Window
             ("Return to shelf", () => { record.Dismissed = false; controller.Repository.Persist(); controller.Dock.Reveal(); Close(); }), ("Close pin window", Close)
         }) { var item = new MenuItem { Header = label }; item.Click += (_, _) => controller.Try(action); menu.Items.Add(item); }
         ContextMenu = menu;
+        lease = new(controller.Repository, record);
+        controller.Repository.RevisionChanged += RevisionChanged;
+        Closed += (_, _) => { controller.Repository.RevisionChanged -= RevisionChanged; lease.Dispose(); };
         KeyDown += (_, e) => { if (e.Key == Key.Escape) Close(); };
+    }
+    private void RevisionChanged(CaptureRecord changed)
+    {
+        if (changed.Id == record.Id) controller.Try(() => preview.Source = ImageService.Load(controller.Repository.PathFor(record), 800));
     }
     public void RestoreInteraction()
     {

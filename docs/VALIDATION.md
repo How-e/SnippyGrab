@@ -34,3 +34,9 @@ These exclude screen acquisition, user selection, receiver work and OS clipboard
 ACCEPTANCE.md covers remaining Codex paste/drop cases and regression retests after fixes, other receivers, clipboard-lock injection, 125/175/200% scaling, HDR/vertical displays, Explorer restart, sleep/resume, display reconnection, fresh-user startup/install/remove, text scaling/high contrast and long resource stress. Hosted workflows cannot be observed before publication. Signing is not configured.
 
 Generated reports remain in ignored artifacts or user-selected paths. Never commit desktop captures. This summarizes observed evidence, not an invented hardware PASS.
+
+##  implementation — 2026-10-06
+
+Close and Exit await shared editor apply/clipboard work. Apply failure retains the editor and its leases; retry/discard guidance appears in the editor. A metadata replace failure rolls back the capture record, preserving its original revision. Clipboard exhaustion reports a saved shelf image and retains the editor for retry or explicit Discard. Exit pauses capture hotkeys, waits for editors and cancels shutdown on failure.
+
+Release build: zero warnings/errors. 53 core and 10 Windows integration tests passed on this Windows checkout. New regressions exercise pending-work sharing, clipboard false results, retry after storage failure, separate editor work and locked-history rollback using isolated storage. These are coordinator/storage checks, not fresh WPF interaction or OS clipboard-lock acceptance. Targeted manual checks: edit then close and paste; Copy then immediately close/Exit; Exit with multiple dirty editors; Discard unsaved edits. Do not damage the real cache to induce faults.

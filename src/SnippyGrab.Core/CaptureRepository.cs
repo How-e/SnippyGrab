@@ -96,8 +96,14 @@ public sealed partial class CaptureRepository
         // Immutable file identity keeps existing receiver/clipboard payloads intact after editing.
         var name = "capture-" + Guid.NewGuid().ToString("N") + ".png";
         AtomicFile.Write(PathForName(name), png);
+        var previous = (record.FileName, record.Width, record.Height, record.Edited);
         record.FileName = name; record.Width = width; record.Height = height; record.Edited = true;
-        Persist();
+        try { Persist(); }
+        catch
+        {
+            (record.FileName, record.Width, record.Height, record.Edited) = previous;
+            throw;
+        }
     }
     public void Persist()
     {

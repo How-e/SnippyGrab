@@ -49,6 +49,25 @@ public sealed class LifecycleTests : IDisposable
     public void HistoryRoundTripsPinsAndEdits()
     { var a = Add(); a.Pinned = true; a.Edited = true; a.Saved = true; repository.Persist(); var copy = new CaptureRepository(root); copy.Load(); var record = Assert.Single(copy.Captures); Assert.True(record.Pinned && record.Edited && record.Saved); Assert.Equal(a.Id, record.Id); }
     [Fact]
+    public void FailedEditorMetadataCommitRetainsOriginalRecordAndLease()
+    {
+        var record = Add(); var original = record.FileName;
+        using var lease = repository.Lease([record]);
+        var metadata = Path.Combine(root, "history.json");
+        using (var locked = new FileStream(metadata, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            var failure = Record.Exception(() => repository.Replace(record, [1, 2, 3], 100, 200));
+            Assert.True(failure is IOException or UnauthorizedAccessException);
+            Assert.Equal(original, record.FileName); Assert.Equal(640, record.Width); Assert.False(record.Edited);
+            Assert.Equal(Synthetic, File.ReadAllBytes(repository.PathFor(record)));
+        }
+        repository.Replace(record, [1, 2, 3], 100, 200);
+        var reopened = new CaptureRepository(root); reopened.Load();
+        Assert.Contains(reopened.Captures, c => c.Id == record.Id && c.FileName == record.FileName && c.Edited);
+        repository.Cleanup(DateTimeOffset.UtcNow, 1, true);
+        Assert.True(File.Exists(Path.Combine(root, original)));
+    }
+    [Fact]
     public void OptionalHistoryStillPersistsPins()
     { var a = Add(); var b = Add(); a.Pinned = true; repository.HistoryEnabled = false; repository.Persist(); var copy = new CaptureRepository(root) { HistoryEnabled = false }; copy.Load(); Assert.Equal(a.Id, Assert.Single(copy.Captures).Id); Assert.True(File.Exists(repository.PathFor(b))); }
     [Fact]

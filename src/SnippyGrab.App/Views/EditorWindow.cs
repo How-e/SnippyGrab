@@ -27,6 +27,10 @@ internal sealed class EditorWindow : Window
     private bool dirty;
     private int number = 1;
     private bool discard;
+    private bool closeApproved;
+    private bool copyRetryNeeded;
+    private readonly EditorCommitCoordinator commits = new();
+    private readonly EditorCommitCoordinator closes = new();
     public EditorWindow(AppController controller, CaptureRecord record)
     {
         Ui.StyleWindow(this);
@@ -55,6 +59,7 @@ internal sealed class EditorWindow : Window
         toolbar.Children.Add(Ui.Text("  Draw on the image · Ctrl+wheel to zoom", 12, true));
         DockPanel.SetDock(toolbar, Dock.Top); root.Children.Add(toolbar);
         status = Ui.Text("Changes stay local. Closing applies edits; Discard leaves the capture unchanged.", 12, true);
+        status.TextWrapping = TextWrapping.Wrap;
         DockPanel.SetDock(status, Dock.Bottom); root.Children.Add(status);
         surface = new EditorSurface(journal.Current) { LayoutTransform = scale, Cursor = Cursors.Cross, Focusable = true };
         viewport = new ScrollViewer { Content = surface, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Background = new SolidColorBrush(Color.FromRgb(12, 15, 19)) };
@@ -77,14 +82,17 @@ internal sealed class EditorWindow : Window
         PreviewKeyDown += (_, e) =>
         {
             if (e.Key == Key.Escape) { if (drawing) { drawing = false; surface.ReleaseMouseCapture(); surface.Preview = null; surface.InvalidateVisual(); } else Close(); e.Handled = true; }
+            if (commits.Busy) { e.Handled = true; return; }
             if (Keyboard.Modifiers != ModifierKeys.Control || Keyboard.FocusedElement is TextBox) return;
             if (e.Key == Key.Z) Undo(); else if (e.Key == Key.Y) Redo(); else if (e.Key is Key.C or Key.S) controller.Run(ApplyCopy); else return;
             e.Handled = true;
         };
         Loaded += (_, _) => Fit();
-        Closing += (_, _) =>
+        Closing += (_, e) =>
         {
-            if (!discard && dirty && !controller.Exiting) controller.Try(() => { var image = Apply(); controller.Run(() => controller.CopyImage(image)); });
+            if (closeApproved) return;
+            e.Cancel = true;
+            controller.Run(async () => { await RequestCloseAsync(); });
         };
         Closed += (_, _) => { foreach (var lease in leases) lease.Dispose(); };
     }
@@ -132,10 +140,41 @@ internal sealed class EditorWindow : Window
         leases.Add(controller.Repository.Lease([record]));
         dirty = false; controller.Dock.Refresh(); return image;
     }
-    private async Task ApplyCopy()
+    private Task<bool> ApplyCopy() => commits.RunAsync(async () =>
     {
-        var image = dirty ? Apply() : ImageService.Load(controller.Repository.PathFor(record));
-        await controller.CopyImage(image); status.Text = "Applied to shelf and copied to clipboard.";
+        var content = (UIElement)Content;
+        content.IsEnabled = false;
+        try
+        {
+            var image = dirty ? Apply() : ImageService.Load(controller.Repository.PathFor(record));
+            copyRetryNeeded = !await controller.CopyImage(image);
+            status.Text = copyRetryNeeded ? "Edits are saved to the shelf. Clipboard is busy; retry Copy or close again, or Discard to close." : "Applied to shelf and copied to clipboard.";
+            return !copyRetryNeeded;
+        }
+        catch
+        {
+            status.Text = "Could not apply edits. This editor stays open. Retry Copy or close again, or choose Discard to close without applying.";
+            throw;
+        }
+        finally { content.IsEnabled = true; }
+    });
+
+    internal Task<bool> RequestCloseAsync() => closes.RunAsync(CloseCoreAsync);
+    private async Task<bool> CloseCoreAsync()
+    {
+        if (closeApproved) return true;
+        try
+        {
+            if (!discard && (dirty || commits.Busy || copyRetryNeeded) && !await ApplyCopy()) return false;
+            closeApproved = true;
+            Close();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            controller.Notify("Editor remains open: " + ex.Message + " Retry close/Copy or choose Discard.");
+            return false;
+        }
     }
     private async Task CopyOcr(BitmapSource image)
     {

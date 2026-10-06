@@ -30,6 +30,7 @@ internal sealed class AppController : IDisposable
     private readonly string dataDirectory;
     private bool dockWasVisible;
     private bool disposed;
+    private bool exitRequested;
     public AppController(bool background, string? isolatedDataDirectory = null)
     {
         dataDirectory = isolatedDataDirectory ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SnippyGrab");
@@ -60,11 +61,11 @@ internal sealed class AppController : IDisposable
     }
     public async Task Capture(CaptureMode mode)
     {
-        if (capture.Busy) return;
+        if (capture.Busy || exitRequested || Exiting) return;
         var result = await capture.CaptureAsync(mode, Settings.IncludeCursor,
             () => { dockWasVisible = Dock.IsVisible; Dock.Hide(); foreach (var pin in pins.Values) pin.Hide(); },
             () => { if (dockWasVisible) Dock.Reveal(); foreach (var pin in pins.Values) pin.Show(); });
-        if (result is null) return;
+        if (result is null || exitRequested || Exiting) return;
         var ready = Stopwatch.StartNew();
         var png = ImageService.Png(result.Image);
         var record = Repository.Add(png, result.Image.PixelWidth, result.Image.PixelHeight, $"{result.Bounds.X},{result.Bounds.Y}");
@@ -97,6 +98,7 @@ internal sealed class AppController : IDisposable
     }
     public void Edit(CaptureRecord record) => Try(() =>
     {
+        if (exitRequested) return;
         if (editors.TryGetValue(record.Id, out var existing)) { existing.Activate(); return; }
         var editor = new EditorWindow(this, record); editors[record.Id] = editor;
         editor.Closed += (_, _) => editors.Remove(record.Id); editor.Show();
@@ -187,12 +189,28 @@ internal sealed class AppController : IDisposable
     public void Notify(string message) { if (!Exiting) tray.ShowBalloonTip(3500, "SnippyGrab", message.Length > 250 ? message[..250] : message, Forms.ToolTipIcon.Info); }
     public void Exit()
     {
-        if (Exiting) return;
-        // Closing editors applies pending changes before shutdown and before releasing their leases.
-        foreach (var editor in editors.Values.ToArray()) editor.Close();
-        Exiting = true;
-        Try(() => { if (Settings.SessionOnly) Repository.Cleanup(DateTimeOffset.UtcNow, Settings.RetentionHours, true); else Repository.Persist(); });
-        Application.Current.Shutdown();
+        if (Exiting || exitRequested) return;
+        Run(ExitAsync);
+    }
+    private async Task ExitAsync()
+    {
+        exitRequested = true;
+        var wasPaused = Hotkeys.Paused;
+        Hotkeys.Configure(Settings, true);
+        try
+        {
+            foreach (var editor in editors.Values.ToArray())
+                if (!await editor.RequestCloseAsync()) return;
+            if (Settings.SessionOnly) Repository.Cleanup(DateTimeOffset.UtcNow, Settings.RetentionHours, true);
+            else Repository.Persist();
+            Exiting = true;
+            Application.Current.Shutdown();
+        }
+        finally
+        {
+            exitRequested = false;
+            if (!Exiting) Hotkeys.Configure(Settings, wasPaused);
+        }
     }
     public void Dispose()
     {

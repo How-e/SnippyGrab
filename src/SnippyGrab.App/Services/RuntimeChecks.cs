@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Windows.Interop;
 using SnippyGrab.App.Views;
@@ -8,6 +9,81 @@ namespace SnippyGrab.App.Services;
 
 internal static class RuntimeChecks
 {
+    public static async Task CheckDockLayout(string destination)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "SnippyGrab-dock-check-" + Guid.NewGuid().ToString("N"));
+        var results = new List<object>();
+        var foreground = Native.GetForegroundWindow(); Native.GetCursorPos(out var pointer);
+        new SettingsService(Path.Combine(root, "settings.json")).Save(new Settings { FirstRunComplete = true, Animate = false, AutoCopy = false, AutoHideSeconds = 0 });
+        try
+        {
+            using var controller = new AppController(true, root, diagnostic: true);
+            var dock = controller.Dock;
+            dock.SourceInitialized += (_, _) => HwndSource.FromHwnd(new WindowInteropHelper(dock).Handle).AddHook((nint h, int msg, nint w, nint l, ref bool handled) =>
+            {
+                if (msg == 0x0046)
+                {
+                    var pos = Marshal.PtrToStructure<Native.WINDOWPOS>(l);
+                    var placement = DockLayout.Place(new(-30000, -30000, 10000, 10000), pos.Width, pos.Height, controller.Settings.Corner);
+                    pos.X = placement.X; pos.Y = placement.Y; pos.Flags &= ~0x0002u;
+                    Marshal.StructureToPtr(pos, l, false);
+                }
+                return 0;
+            });
+            var png = ImageService.Png(SyntheticCode(720, 360));
+            foreach (var count in new[] { 1, 3, 5, 20 })
+            {
+                while (controller.Repository.Captures.Count < count) controller.Repository.Add(png, 720, 360);
+                foreach (var corner in Enum.GetValues<DockCorner>())
+                    foreach (var orientation in Enum.GetValues<DockOrientation>())
+                    {
+                        controller.Settings.Corner = corner; controller.Settings.Orientation = orientation;
+                        dock.SetExpanded(false); dock.Reveal(); await Task.Delay(35); dock.UpdateLayout();
+                        var panel = (StackPanel)((Border)dock.Content).Child;
+                        var id = controller.Repository.Captures[0].Id;
+                        Border Primary() => panel.Children.OfType<Border>().Single(b => b.Tag is Guid guid && guid == id);
+                        var before = Primary().PointToScreen(new Point(Primary().ActualWidth / 2, Primary().ActualHeight / 2));
+                        var buildsBefore = dock.CardBuildCount; var decodesBefore = dock.ThumbnailDecodeCount;
+                        dock.SetExpanded(true); await Task.Delay(35); dock.UpdateLayout();
+                        var after = Primary().PointToScreen(new Point(Primary().ActualWidth / 2, Primary().ActualHeight / 2));
+                        Assert(Math.Abs(before.X - after.X) <= 1 && Math.Abs(before.Y - after.Y) <= 1, "Primary card anchor survives expansion");
+                        Native.GetWindowRect(new WindowInteropHelper(dock).Handle, out var rect);
+                        Assert(((Border)dock.Content).Background == Brushes.Transparent && panel.Background == Brushes.Transparent, "Continuous transparent hover surface");
+                        Assert(dock.InputHitTest(new Point(1, 1)) is not null, "Hover route includes window padding");
+                        foreach (var card in panel.Children.OfType<Border>().Where(b => b.Tag is Guid))
+                        {
+                            var point = card.PointToScreen(new Point(card.ActualWidth / 2, card.ActualHeight / 2));
+                            Assert(point.X >= rect.Left && point.X < rect.Right && point.Y >= rect.Top && point.Y < rect.Bottom, "Every displayed card is inside hover HWND");
+                            var local = card.TranslatePoint(new Point(card.ActualWidth / 2, card.ActualHeight / 2), dock);
+                            Assert(dock.InputHitTest(local) is not null, "Card is reachable through the hover surface");
+                        }
+                        var rebuilds = dock.RebuildCount;
+                        for (var i = 0; i < 5; i++) dock.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = Mouse.MouseEnterEvent });
+                        Assert(dock.RebuildCount == rebuilds, "Repeated enter does not rebuild expanded cards");
+                        dock.ToggleSelection(id);
+                        dock.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = Mouse.MouseLeaveEvent });
+                        await Task.Delay(220);
+                        Assert(!dock.Expanded && dock.SelectionCount == 1, "Pointer leave collapses without losing selection");
+                        dock.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = Mouse.MouseEnterEvent });
+                        Assert(dock.Expanded && dock.SelectionCount == 1, "Re-entry preserves expansion and selection");
+                        dock.ToggleSelection(id);
+                        results.Add(new { count, corner, orientation, PrimaryAnchorStable = true, WarmCycleCardBuilds = dock.CardBuildCount - buildsBefore, ThumbnailDecodes = dock.ThumbnailDecodeCount - decodesBefore });
+                    }
+            }
+            Snapshot(dock, Path.Combine(Path.GetDirectoryName(Path.GetFullPath(destination))!, "dock-layout-synthetic.png"));
+            Assert(Native.GetForegroundWindow() == foreground, "Dock probe preserves foreground");
+            Native.GetCursorPos(out var afterPointer); Assert(afterPointer.X == pointer.X && afterPointer.Y == pointer.Y, "Dock probe never moves pointer");
+            controller.Dispose(); dock.Close();
+            AtomicFile.Write(destination, JsonSerializer.SerializeToUtf8Bytes(new { Result = "PASS", Layouts = results, Scope = "Offscreen synthetic WPF/native layout and raised hover events; no actual pointer gestures, OS clipboard writes or external receivers." }, new JsonSerializerOptions { WriteIndented = true }));
+        }
+        finally
+        {
+            var absolute = Path.GetFullPath(root);
+            if (!absolute.StartsWith(Path.GetFullPath(Path.GetTempPath()), StringComparison.OrdinalIgnoreCase) || !Path.GetFileName(absolute).StartsWith("SnippyGrab-dock-check-", StringComparison.Ordinal)) throw new InvalidOperationException("Unexpected dock probe path.");
+            Directory.Delete(absolute, true);
+        }
+    }
+
     // Safe during normal desktop use: only synthetic, offscreen windows; no pointer/clipboard/capture activity.
     public static async Task CheckOverlayLayout(string destination)
     {

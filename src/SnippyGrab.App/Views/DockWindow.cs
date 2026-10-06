@@ -9,16 +9,30 @@ namespace SnippyGrab.App.Views;
 internal sealed class DockWindow : Window
 {
     private readonly AppController controller;
-    private readonly StackPanel shelf = new();
+    private readonly StackPanel shelf = new() { Background = Brushes.Transparent };
     private readonly HashSet<Guid> selected = [];
     private readonly Dictionary<string, BitmapSource> thumbnails = [];
     private readonly DispatcherTimer hideTimer = new();
+    private readonly DispatcherTimer collapseTimer = new() { Interval = TimeSpan.FromMilliseconds(180) };
+    private MonitorInfo? anchor;
+    private int configuredMonitor = int.MinValue;
+    private bool positionQueued;
+    private bool keyboardMode;
     private bool expanded;
     private bool dragging;
     private int index;
     private Point down;
     private CaptureRecord? pressed;
     private List<CaptureRecord> visible = [];
+    internal int RebuildCount { get; private set; }
+    internal int CardBuildCount { get; private set; }
+    internal int ThumbnailDecodeCount { get; private set; }
+    internal bool Expanded => expanded;
+    internal int SelectionCount => selected.Count;
+    internal void ToggleSelection(Guid id)
+    {
+        if (!selected.Add(id)) selected.Remove(id);
+    }
     public DockWindow(AppController controller)
     {
         Ui.StyleWindow(this);
@@ -26,19 +40,30 @@ internal sealed class DockWindow : Window
         Title = "SnippyGrab shelf"; WindowStyle = WindowStyle.None; AllowsTransparency = true;
         Background = Brushes.Transparent; ResizeMode = ResizeMode.NoResize; ShowInTaskbar = false;
         ShowActivated = false; Focusable = true; SizeToContent = SizeToContent.WidthAndHeight;
-        Content = shelf; Padding = new Thickness(4);
+        Content = new Border { Background = Brushes.Transparent, Padding = new Thickness(4), Child = shelf };
         AutomationProperties.SetName(this, "Screenshot shelf. Ctrl-click to select multiple captures; drag to attach.");
-        MouseEnter += (_, _) => { hideTimer.Stop(); expanded = true; Rebuild(); };
-        MouseLeave += (_, _) => { if (!dragging && !IsKeyboardFocusWithin) { expanded = !controller.Settings.AutoCollapse; Rebuild(); ScheduleHide(); } };
+        MouseEnter += (_, _) => { hideTimer.Stop(); collapseTimer.Stop(); SetExpanded(true); };
+        MouseLeave += (_, _) => { collapseTimer.Stop(); collapseTimer.Start(); };
+        collapseTimer.Tick += (_, _) =>
+        {
+            collapseTimer.Stop();
+            if (dragging || pressed is not null || (keyboardMode && IsKeyboardFocusWithin) || HasOpenMenu() || PointerInside()) return;
+            SetExpanded(!controller.Settings.AutoCollapse); ScheduleHide();
+        };
         MouseWheel += (_, e) => { index = Math.Clamp(index + (e.Delta < 0 ? 1 : -1), 0, Math.Max(0, visible.Count - 1)); Rebuild(); e.Handled = true; };
         KeyDown += OnKey;
-        hideTimer.Tick += (_, _) => { hideTimer.Stop(); if (!IsMouseOver && !dragging) Hide(); };
-        SizeChanged += (_, _) => Position();
+        hideTimer.Tick += (_, _) => { hideTimer.Stop(); if (!PointerInside() && !dragging && pressed is null && !HasOpenMenu() && !(keyboardMode && IsKeyboardFocusWithin)) Hide(); };
+        SizeChanged += (_, _) => QueuePosition();
+        LostKeyboardFocus += (_, _) => { if (!IsKeyboardFocusWithin) { keyboardMode = false; collapseTimer.Start(); } };
+        IsVisibleChanged += (_, _) => { if (!IsVisible) { hideTimer.Stop(); collapseTimer.Stop(); } };
+        Closed += (_, _) => { hideTimer.Stop(); collapseTimer.Stop(); };
         Closing += (_, e) => { if (!controller.Exiting) { e.Cancel = true; Hide(); } };
     }
     public void Refresh(bool newCapture = false)
     {
-        if (newCapture) { index = 0; selected.Clear(); }
+        if (newCapture) { index = 0; selected.Clear(); keyboardMode = false; expanded = !controller.Settings.AutoCollapse; anchor = null; }
+        if (configuredMonitor != controller.Settings.DockMonitor) { configuredMonitor = controller.Settings.DockMonitor; anchor = null; }
+        anchor ??= MonitorService.ForPointer(controller.Settings.DockMonitor);
         visible = controller.Repository.Captures.Where(c => CaptureLifetime.Visible(c, controller.Settings.DockLifetimeMinutes, DateTimeOffset.UtcNow)).ToList();
         selected.RemoveWhere(id => visible.All(c => c.Id != id));
         var files = visible.Select(c => c.FileName).ToHashSet();
@@ -53,7 +78,19 @@ internal sealed class DockWindow : Window
                 BeginAnimation(OpacityProperty, new DoubleAnimation(0, controller.Settings.DockOpacity, TimeSpan.FromMilliseconds(130)));
         }
     }
-    public void Reveal() { Refresh(); if (visible.Count > 0) { Show(); Position(); ScheduleHide(); } }
+    public void Reveal() { if (!IsVisible) anchor = null; Refresh(); if (visible.Count > 0) { Show(); UpdateLayout(); Position(); ScheduleHide(); } }
+    internal void SetExpanded(bool value)
+    {
+        if (expanded == value) return;
+        expanded = value; Rebuild();
+    }
+    private bool PointerInside()
+    {
+        if (!IsVisible) return false;
+        Native.GetCursorPos(out var pointer); Native.GetWindowRect(new WindowInteropHelper(this).Handle, out var rect);
+        return pointer.X >= rect.Left && pointer.X < rect.Right && pointer.Y >= rect.Top && pointer.Y < rect.Bottom;
+    }
+    private bool HasOpenMenu() => shelf.Children.OfType<Border>().Any(b => b.ContextMenu?.IsOpen == true);
     private void ScheduleHide()
     {
         hideTimer.Stop();
@@ -61,19 +98,20 @@ internal sealed class DockWindow : Window
     }
     private void Rebuild()
     {
+        RebuildCount++;
         var restoreFocus = IsKeyboardFocusWithin;
         shelf.Children.Clear(); Topmost = controller.Settings.AlwaysOnTop;
         BeginAnimation(OpacityProperty, null); Opacity = controller.Settings.DockOpacity;
         shelf.Orientation = controller.Settings.Orientation == DockOrientation.Horizontal ? Orientation.Horizontal : Orientation.Vertical;
         if (visible.Count == 0) return;
         var count = expanded ? controller.Settings.ExpandedItems : 1;
-        var monitor = MonitorService.ForPointer(controller.Settings.DockMonitor);
+        var monitor = anchor ??= MonitorService.ForPointer(controller.Settings.DockMonitor);
         var horizontal = shelf.Orientation == Orientation.Horizontal;
         var budget = DpiGeometry.ToDip(horizontal ? monitor.Work.Width : monitor.Work.Height, monitor.Dpi) * (horizontal ? 0.55 : 0.48);
         double used = 0;
         foreach (var capture in visible.Skip(index).Take(count))
         {
-            var extent = horizontal ? controller.Settings.ThumbnailSize : Math.Clamp(controller.Settings.ThumbnailSize * (double)capture.Height / Math.Max(1, capture.Width), 72, controller.Settings.ThumbnailSize * 0.65) + 8;
+            var extent = (horizontal ? controller.Settings.ThumbnailSize : Math.Clamp(controller.Settings.ThumbnailSize * (double)capture.Height / Math.Max(1, capture.Width), 72, controller.Settings.ThumbnailSize * 0.65)) + 10;
             if (used > 0 && used + extent > budget) break;
             shelf.Children.Add(Card(capture)); used += extent;
         }
@@ -81,22 +119,28 @@ internal sealed class DockWindow : Window
         {
             // Two understated offset edges communicate a stack without creating a gallery.
             for (var i = 0; i < Math.Min(2, visible.Count - 1); i++)
-                shelf.Children.Add(new Border { Width = controller.Settings.ThumbnailSize - (i + 1) * 12, Height = 4, CornerRadius = new CornerRadius(0, 0, 4, 4), Background = new SolidColorBrush(Color.FromArgb((byte)(150 - i * 40), 81, 99, 124)), HorizontalAlignment = HorizontalAlignment.Center });
+                shelf.Children.Add(new Border { Width = horizontal ? 4 : controller.Settings.ThumbnailSize - (i + 1) * 12, Height = horizontal ? 64 : 4, CornerRadius = new CornerRadius(2), Background = new SolidColorBrush(Color.FromArgb((byte)(150 - i * 40), 81, 99, 124)), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center });
+        }
+        if (DockLayout.Reverse(controller.Settings.Orientation, controller.Settings.Corner))
+        {
+            var ordered = shelf.Children.Cast<UIElement>().Reverse().ToArray(); shelf.Children.Clear();
+            foreach (var child in ordered) shelf.Children.Add(child);
         }
         if (restoreFocus) Keyboard.Focus(this);
     }
     private UIElement Card(CaptureRecord capture)
     {
+        CardBuildCount++;
         var size = controller.Settings.ThumbnailSize;
         var grid = new Grid { Width = size, Height = Math.Clamp(size * (double)capture.Height / Math.Max(1, capture.Width), 72, size * 0.65), ClipToBounds = true };
         try
         {
-            if (!thumbnails.TryGetValue(capture.FileName, out var thumb)) thumbnails[capture.FileName] = thumb = ImageService.Load(controller.Repository.PathFor(capture), size * 2);
+            if (!thumbnails.TryGetValue(capture.FileName, out var thumb)) { thumbnails[capture.FileName] = thumb = ImageService.Load(controller.Repository.PathFor(capture), size * 2); ThumbnailDecodeCount++; }
             grid.Children.Add(new Image { Source = thumb, Stretch = Stretch.Uniform });
         }
         catch (Exception ex) when (ex is IOException or NotSupportedException or InvalidDataException or ArgumentException)
         { grid.Children.Add(Ui.Text("Image unavailable", 12)); }
-        var border = new Border { Child = grid, CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(selected.Contains(capture.Id) ? 2 : 1), BorderBrush = selected.Contains(capture.Id) ? (Brush)FindResource("Accent") : new SolidColorBrush(Color.FromArgb(90, 120, 136, 156)), Background = (Brush)FindResource("Surface"), Margin = new Thickness(0, 3, 0, 3), Focusable = true };
+        var border = new Border { Child = grid, CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(2), BorderBrush = selected.Contains(capture.Id) ? (Brush)FindResource("Accent") : new SolidColorBrush(Color.FromArgb(90, 120, 136, 156)), Background = (Brush)FindResource("Surface"), Margin = new Thickness(3), Focusable = true, Tag = capture.Id };
         AutomationProperties.SetName(border, $"Screenshot {capture.Width} by {capture.Height}{(capture.Pinned ? ", pinned" : "")}. Click to edit; drag to attach.");
         var badge = Ui.Button($"{visible.IndexOf(capture) + 1}/{visible.Count}{(capture.Pinned ? " · pin" : "")}", "Open recent captures", controller.ShowHistory);
         badge.FontSize = 10; badge.Padding = new Thickness(6, 2, 6, 2); badge.HorizontalAlignment = HorizontalAlignment.Right; badge.VerticalAlignment = VerticalAlignment.Top; badge.Opacity = 0.9; grid.Children.Add(badge);
@@ -119,14 +163,13 @@ internal sealed class DockWindow : Window
         border.PreviewMouseLeftButtonDown += (_, e) =>
         {
             if (FindButton(e.OriginalSource as DependencyObject)) return;
-            down = e.GetPosition(this); pressed = capture; dragging = false;
+            keyboardMode = false; down = e.GetPosition(this); pressed = capture; dragging = false;
             if ((Keyboard.Modifiers & ModifierKeys.Control) != 0)
             {
-                if (!selected.Add(capture.Id)) selected.Remove(capture.Id);
+                ToggleSelection(capture.Id);
                 border.BorderBrush = (Brush)FindResource(selected.Contains(capture.Id) ? "Accent" : "Muted");
-                border.BorderThickness = new Thickness(selected.Contains(capture.Id) ? 2 : 1);
             }
-            border.Focus(); e.Handled = true;
+            border.Focus(); border.CaptureMouse(); e.Handled = true;
         };
         border.MouseMove += (_, e) =>
         {
@@ -134,24 +177,33 @@ internal sealed class DockWindow : Window
             var now = e.GetPosition(this);
             if (Math.Abs(now.X - down.X) < SystemParameters.MinimumHorizontalDragDistance && Math.Abs(now.Y - down.Y) < SystemParameters.MinimumVerticalDragDistance) return;
             dragging = true;
-            if ((Keyboard.Modifiers & ModifierKeys.Alt) != 0)
+            border.ReleaseMouseCapture();
+            try
             {
-                var data = new DataObject("SnippyGrab.Reorder", capture.Id.ToString()); DragDrop.DoDragDrop(border, data, DragDropEffects.Move);
+                if ((Keyboard.Modifiers & ModifierKeys.Alt) != 0)
+                {
+                    var data = new DataObject("SnippyGrab.Reorder", capture.Id.ToString()); DragDrop.DoDragDrop(border, data, DragDropEffects.Move);
+                }
+                else
+                {
+                    if (!selected.Contains(capture.Id)) { selected.Clear(); selected.Add(capture.Id); }
+                    controller.DragDrop.Drag(border, visible.Where(c => selected.Contains(c.Id)).ToList());
+                }
             }
-            else
-            {
-                if (!selected.Contains(capture.Id)) { selected.Clear(); selected.Add(capture.Id); }
-                controller.Try(() => controller.DragDrop.Drag(border, visible.Where(c => selected.Contains(c.Id)).ToList()));
-            }
-            pressed = null; dragging = false; Rebuild();
+            catch (Exception ex) { controller.Notify("Drag could not complete: " + ex.Message); }
+            finally { pressed = null; dragging = false; Rebuild(); collapseTimer.Start(); }
         };
         border.MouseLeftButtonUp += (_, e) =>
         {
-            if (pressed == capture && !dragging && (Keyboard.Modifiers & ModifierKeys.Control) == 0) { selected.Clear(); selected.Add(capture.Id); controller.Edit(capture); }
+            var point = e.GetPosition(border);
+            var inside = point.X >= 0 && point.Y >= 0 && point.X < border.ActualWidth && point.Y < border.ActualHeight;
+            if (pressed == capture && !dragging && inside && (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Alt)) == 0) { selected.Clear(); selected.Add(capture.Id); controller.Edit(capture); }
+            border.ReleaseMouseCapture(); collapseTimer.Start();
             pressed = null; e.Handled = true;
         };
         border.AllowDrop = true;
-        border.DragOver += (_, e) => { e.Effects = e.Data.GetDataPresent("SnippyGrab.Reorder") ? DragDropEffects.Move : DragDropEffects.None; e.Handled = true; };
+        border.DragOver += (_, e) => { e.Effects = e.Data.GetDataPresent("SnippyGrab.Reorder") ? DragDropEffects.Move : DragDropEffects.None; if (e.Effects == DragDropEffects.Move) { border.BorderBrush = (Brush)FindResource("Accent"); border.ToolTip = "Move screenshot to this position"; } e.Handled = true; };
+        border.DragLeave += (_, _) => { border.BorderBrush = (Brush)FindResource(selected.Contains(capture.Id) ? "Accent" : "Muted"); border.ToolTip = null; };
         border.Drop += (_, e) =>
         {
             if (e.Data.GetData("SnippyGrab.Reorder") is string id && Guid.TryParse(id, out var guid)) controller.Reorder(guid, capture.Id);
@@ -182,6 +234,7 @@ internal sealed class DockWindow : Window
     private List<CaptureRecord> SelectedOr(CaptureRecord record) => selected.Contains(record.Id) ? visible.Where(c => selected.Contains(c.Id)).ToList() : [record];
     private void OnKey(object sender, KeyEventArgs e)
     {
+        keyboardMode = true; hideTimer.Stop(); collapseTimer.Stop();
         var current = visible.ElementAtOrDefault(index); if (current is null) return;
         if (e.Key == Key.Delete) controller.Dismiss(SelectedOr(current));
         else if (e.Key == Key.Enter) controller.Edit(current);
@@ -195,13 +248,17 @@ internal sealed class DockWindow : Window
     private void Position()
     {
         if (!IsVisible) return;
-        var monitor = MonitorService.ForPointer(controller.Settings.DockMonitor);
+        var monitor = anchor ??= MonitorService.ForPointer(controller.Settings.DockMonitor);
         // SetWindowPos uses physical origin; only size is converted with the destination monitor DPI.
-        var right = controller.Settings.Corner is DockCorner.BottomRight or DockCorner.TopRight;
-        var bottom = controller.Settings.Corner is DockCorner.BottomRight or DockCorner.BottomLeft;
         var width = DpiGeometry.ToPixel(ActualWidth, monitor.Dpi); var height = DpiGeometry.ToPixel(ActualHeight, monitor.Dpi);
+        var placement = DockLayout.Place(monitor.Work, width, height, controller.Settings.Corner);
         Native.SetWindowPos(new WindowInteropHelper(this).Handle, controller.Settings.AlwaysOnTop ? -1 : -2,
-            right ? monitor.Work.Right - width - 16 : monitor.Work.X + 16,
-            bottom ? monitor.Work.Bottom - height - 16 : monitor.Work.Y + 16, width, height, 0x0010);
+            placement.X, placement.Y, placement.Width, placement.Height, 0x0010);
+    }
+    private void QueuePosition()
+    {
+        if (positionQueued) return;
+        positionQueued = true;
+        Dispatcher.BeginInvoke(DispatcherPriority.Render, () => { positionQueued = false; Position(); });
     }
 }

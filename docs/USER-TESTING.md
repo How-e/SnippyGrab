@@ -18,6 +18,8 @@ Use the current **0.1.0 alpha** and record whether it is the portable or install
 
 Next targeted retest order, after corresponding fixes and agent verification: dock first-hover/top-card reachability and selection leave/re-enter; adjacent Alt-reorder both ways; dock focus/Delete/Enter; Save/Save As destination; selected transfer order after reordering. Check Codex focus/latest paste again after dock changes.  have no separate completed report; the initial dock performance observation is relevant to .
 
+Overlay follow-up: user reported that the corrected overlay now covers the monitors properly after the overlay-bounds fix (`c4b78ab`). This establishes reported coverage only; bottom-edge/cross-monitor crop accuracy, Esc and paste were not separately reported. Exact running build/version was not supplied. Keep broader / and hardware gates open.
+
 ## First batch: the primary workflow
 
 ### P0 implementation retest — /

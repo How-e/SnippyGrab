@@ -31,7 +31,7 @@ internal sealed class AppController : IDisposable
     private bool dockWasVisible;
     private bool disposed;
     private bool exitRequested;
-    public AppController(bool background, string? isolatedDataDirectory = null)
+    public AppController(bool background, string? isolatedDataDirectory = null, bool diagnostic = false)
     {
         dataDirectory = isolatedDataDirectory ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SnippyGrab");
         Directory.CreateDirectory(dataDirectory);
@@ -43,10 +43,10 @@ internal sealed class AppController : IDisposable
         { Repository = new(Path.Combine(dataDirectory, "cache")); Settings.CachePath = ""; }
         Repository.HistoryEnabled = Settings.HistoryEnabled; Repository.Load();
         DragDrop = new(Repository); Dock = new(this);
-        tray = new Forms.NotifyIcon { Icon = System.Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath!) ?? System.Drawing.SystemIcons.Application, Text = "SnippyGrab · Print Screen to capture", Visible = true };
+        tray = new Forms.NotifyIcon { Icon = System.Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath!) ?? System.Drawing.SystemIcons.Application, Text = "SnippyGrab · Print Screen to capture", Visible = !diagnostic };
         tray.DoubleClick += (_, _) => Run(() => Capture(CaptureMode.Region));
         Hotkeys.Capture += mode => Run(() => Capture(mode));
-        Hotkeys.Configure(Settings); BuildTray();
+        Hotkeys.Configure(Settings, diagnostic); BuildTray();
         cleanup.Tick += (_, _) => Try(() => { Repository.Cleanup(DateTimeOffset.UtcNow, Settings.RetentionHours); Dock.Refresh(); });
         cleanup.Interval = TimeSpan.FromMinutes(Settings.CleanupMinutes); cleanup.Start();
         expiry.Tick += (_, _) => { if (Repository.Captures.Any(c => !c.Dismissed)) Dock.Refresh(); }; expiry.Start();
@@ -123,9 +123,8 @@ internal sealed class AppController : IDisposable
     {
         // Shelf order is persisted directly in the repository list; history sorts by timestamp independently.
         var items = (List<CaptureRecord>)Repository.Captures;
-        var record = items.FirstOrDefault(c => c.Id == from); var destination = items.FirstOrDefault(c => c.Id == target);
-        if (record is null || destination is null || record == destination) return;
-        items.Remove(record); items.Insert(items.IndexOf(destination), record); Repository.Persist(); Dock.Refresh();
+        if (!ShelfOrder.Move(items, from, target)) return;
+        Repository.Persist(); Dock.Refresh();
     });
     public void Import(string path) => Try(() =>
     {

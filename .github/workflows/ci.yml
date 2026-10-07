@@ -19,6 +19,7 @@ jobs:
       - name: Isolated installer, upgrade and packaging boundary fixtures
         shell: pwsh
         run: |
+          ./scripts/test-release-gates.ps1
           ./scripts/test-signing.ps1
           ./scripts/test-installer.ps1
           ./scripts/test-install-files.ps1
@@ -26,4 +27,5 @@ jobs:
           ./scripts/audit-dependencies.ps1 -SelfTest
       - run: ./scripts/audit-dependencies.ps1
         shell: pwsh
+
 

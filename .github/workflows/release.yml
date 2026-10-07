@@ -22,6 +22,7 @@ jobs:
       - name: Isolated release boundary fixtures
         shell: pwsh
         run: |
+          ./scripts/test-release-gates.ps1
           ./scripts/test-signing.ps1
           ./scripts/test-installer.ps1
           ./scripts/test-install-files.ps1
@@ -47,4 +48,5 @@ jobs:
           $prerelease = if ($version.Contains('-')) { @('--prerelease') } else { @() }
           $installer = "artifacts/SnippyGrab-$version-Setup.exe"
           gh release create $env:GITHUB_REF_NAME $bundle "$bundle.sha256" $installer "$installer.sha256" --verify-tag --notes-file CHANGELOG.md @prerelease
+
 

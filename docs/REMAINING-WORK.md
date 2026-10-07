@@ -1,3 +1,5 @@
+Latest [targeted keyboard acceptance](NEXT-GATE-ACCEPTANCE-20261007.md) closes Q15; **31 required gates remain open, 20 entries checked**. Earlier dated counts below are historical.
+
 # Remaining acceptance review — 2026-10-07
 
 Current [P0 acceptance](P0-ACCEPTANCE-20261007.md) closes Q02/Q03: native storage/clipboard/editor Exit and recovery Cancel/failure/restart/retry PASS. **32 required gates remain open; 19 entries checked.** The earlier 34/17 reconciliation below is historical. Q02/Q03 need no further input for their stated gates; broader editor/receiver/hardware acceptance stays open.

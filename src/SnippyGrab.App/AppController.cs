@@ -41,7 +41,7 @@ internal sealed class AppController : IDisposable
     private string? cacheWarning;
     private string lastNotice = "No recent notification.";
     private DateTimeOffset lastNoticeUtc;
-    public AppController(bool background, string? isolatedDataDirectory = null, bool diagnostic = false)
+    public AppController(bool background, string? isolatedDataDirectory = null, bool diagnostic = false, Action<string, byte[]>? storageWriter = null)
     {
         lifecycle = new(action => Application.Current.Dispatcher.BeginInvoke(action));
         dataDirectory = isolatedDataDirectory ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SnippyGrab");
@@ -60,9 +60,9 @@ internal sealed class AppController : IDisposable
         Ui.Theme(Settings.Theme);
         Settings.LaunchOnStartup = StartupService.Enabled;
         if (!diagnostic && StartupService.Stale) cacheWarning = "Windows startup points to another or older SnippyGrab path. Enable Launch at Windows login in Settings to register this executable, or disable it to remove the old entry.";
-        try { Repository = new(Settings.CachePath.Length == 0 ? Path.Combine(dataDirectory, "cache") : Settings.CachePath); }
+        try { Repository = new(Settings.CachePath.Length == 0 ? Path.Combine(dataDirectory, "cache") : Settings.CachePath, storageWriter); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or ArgumentException)
-        { Repository = new(Path.Combine(dataDirectory, "cache")); Settings.CachePath = ""; cacheWarning = "Custom cache is unavailable. Using the default local cache; review Settings and retry the custom path."; }
+        { Repository = new(Path.Combine(dataDirectory, "cache"), storageWriter); Settings.CachePath = ""; cacheWarning = "Custom cache is unavailable. Using the default local cache; review Settings and retry the custom path."; }
         Repository.HistoryEnabled = Settings.HistoryEnabled; Repository.Load();
         DragDrop = new(Repository); Dock = new(this);
         tray = new Forms.NotifyIcon { Icon = System.Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath!) ?? System.Drawing.SystemIcons.Application, Text = "SnippyGrab · Print Screen to capture", Visible = !diagnostic };
@@ -94,15 +94,19 @@ internal sealed class AppController : IDisposable
         if (result is null || exitRequested || Exiting) return;
         var ready = Stopwatch.StartNew();
         var png = await Task.Run(() => ImageService.Png(result.Image));
-        try { Repository.Add(png, result.Image.PixelWidth, result.Image.PixelHeight, string.Join(",", Forms.Screen.AllScreens.Where(screen => !result.Bounds.Intersect(new PixelRect(screen.Bounds.X, screen.Bounds.Y, screen.Bounds.Width, screen.Bounds.Height)).IsEmpty).Select(screen => screen.DeviceName))); Dock.Refresh(newCapture: true); }
+        await PreserveCaptureAsync(result.Image, png, string.Join(",", Forms.Screen.AllScreens.Where(screen => !result.Bounds.Intersect(new PixelRect(screen.Bounds.X, screen.Bounds.Y, screen.Bounds.Width, screen.Bounds.Height)).IsEmpty).Select(screen => screen.DeviceName)), () => Dock.Refresh(newCapture: true));
+        Log($"capture_ready_ms={ready.ElapsedMilliseconds}; capture_total_ms={result.ElapsedMilliseconds + ready.ElapsedMilliseconds}");
+    }
+    internal async Task PreserveCaptureAsync(BitmapSource image, byte[] png, string monitor, Action refreshDock)
+    {
+        try { Repository.Add(png, image.PixelWidth, image.PixelHeight, monitor); refreshDock(); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
         {
-            if (Settings.AutoCopy && await Clipboard.ImageAsync(result.Image, Settings.ClipboardPng, png)) Notify("Capture copied, but cache storage failed. Paste it now; check cache permissions/free space before retrying capture.");
+            if (Settings.AutoCopy && await Clipboard.ImageAsync(image, Settings.ClipboardPng, png)) Notify("Capture copied, but cache storage failed. Paste it now; check cache permissions/free space before retrying capture.");
             else Notify("Capture storage and clipboard could not preserve this image. Check cache permissions/free space and retry capture.");
             return;
         }
-        if (Settings.AutoCopy) await CopyImageCore(result.Image, png);
-        Log($"capture_ready_ms={ready.ElapsedMilliseconds}; capture_total_ms={result.ElapsedMilliseconds + ready.ElapsedMilliseconds}");
+        if (Settings.AutoCopy) await CopyImageCore(image, png);
     }
     public Task<bool> CopyImage(BitmapSource image) => CopyImageCore(image);
     private async Task<bool> CopyImageCore(BitmapSource image, byte[]? encoded = null)

@@ -40,5 +40,20 @@ public sealed class StorageFailureTests : IDisposable
         Assert.All(failure.InnerExceptions, error => Assert.IsType<UnauthorizedAccessException>(error));
         Assert.Equal(0, saves);
     }
+    [Fact]
+    public void LockedSettingsReplaceKeepsPreviousValuesAndAllowsRetry()
+    {
+        Directory.CreateDirectory(root); var path = Path.Combine(root, "settings.json");
+        var service = new SettingsService(path); service.Save(new Settings { ThumbnailSize = 180 });
+        using (var locked = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            var failure = Record.Exception(() => service.Save(new Settings { ThumbnailSize = 300 }));
+            Assert.True(failure is IOException or UnauthorizedAccessException);
+            Assert.Equal(180, service.Load().ThumbnailSize);
+        }
+        Assert.Empty(Directory.GetFiles(root, "*.tmp"));
+        service.Save(new Settings { ThumbnailSize = 300 });
+        Assert.Equal(300, new SettingsService(path).Load().ThumbnailSize);
+    }
     public void Dispose() { if (Directory.Exists(root)) Directory.Delete(root, true); }
 }

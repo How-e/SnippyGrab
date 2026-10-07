@@ -63,3 +63,13 @@ Agent work: Reject noncurrent capture objects before export writes, with stale-r
 Checks: CaptureExportTests 6/6 PASS after correcting guard ordering and Windows lock exception expectation; exported redaction integration 1/1 PASS; six-width/text-scale editor layout final PASS; Release build zero warnings/errors.
 
 Status / remaining acceptance: OPEN: configured/remembered destination, actual dialog cancel/overwrite, folder opening and Apply/copy versus export interaction with OS clipboard. Current labels and file/metadata outcomes pass automated checks.
+
+## Q07
+
+Inspected: Capture PNG/storage/metadata salvage, retry-history action, custom-cache fallback, atomic settings save and startup transaction rollback.
+
+Agent work: Extracted the existing post-capture persistence path for synthetic execution and injected repository writer in internal controller. Offscreen probe now executes PNG-failure clipboard salvage and metadata-failure shelf/clipboard preservation, cleanup blocking and recovery retry. Added locked-settings replacement preservation/retry regression.
+
+Checks: StorageFailure/StartupRegistration/ManagedPath tests 13/13 PASS; zero-warning Release build; q07-reliability.json PASS through production persistence/fallback helper using isolated injected writes.
+
+Status / remaining acceptance: OPEN: actual settings/setup failure and retry feedback, custom-cache fallback visibility and real disk/permission failure interaction. No real cache, registry or OS preference was altered.

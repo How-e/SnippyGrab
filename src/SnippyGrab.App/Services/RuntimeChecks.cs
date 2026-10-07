@@ -92,6 +92,7 @@ internal static class RuntimeChecks
                 var close = editor.RequestCloseAsync();
                 await work; Assert(await close && editedRecord.Edited && writes.Count == 2, "Close during worker effect waits and applies/copies final document");
                 await CheckFailedEditorClose(controller, png);
+                await CheckCapturePersistenceFailures(root, image, png);
                 Assert(Native.GetForegroundWindow() == foreground, "Reliability probe preserves foreground");
             }
             finally { pin.Close(); history.Close(); controller.Dock.Close(); }
@@ -133,6 +134,36 @@ internal static class RuntimeChecks
         {
             foreach (var window in new[] { editor, other }.Where(w => w.IsVisible))
                 ((DockPanel)window.Content).Children.OfType<WrapPanel>().First().Children.OfType<Button>().Single(b => Equals(b.Content, "Discard")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        }
+    }
+    private static async Task CheckCapturePersistenceFailures(string parent, BitmapSource image, byte[] png)
+    {
+        foreach (var boundary in new[] { "png", "metadata" })
+        {
+            var root = Path.Combine(parent, "storage-" + boundary);
+            new SettingsService(Path.Combine(root, "settings.json")).Save(new Settings { FirstRunComplete = true, Animate = false, AutoCopy = true });
+            var fail = false;
+            using var controller = new AppController(true, root, diagnostic: true, storageWriter: (path, bytes) =>
+            {
+                if (fail && (boundary == "png" ? path.EndsWith(".png", StringComparison.Ordinal) : path.EndsWith("history.json", StringComparison.Ordinal))) throw new IOException("injected storage failure");
+                AtomicFile.Write(path, bytes);
+            });
+            var copies = 0; var refreshes = 0;
+            controller.Clipboard = new ClipboardService(data => { Assert(data.GetDataPresent(DataFormats.Bitmap) && data.GetDataPresent("PNG"), "Fallback retains image and PNG clipboard formats"); copies++; }, _ => Task.CompletedTask);
+            fail = true;
+            await controller.PreserveCaptureAsync(image, png, "synthetic", () => refreshes++);
+            Assert(copies == 1, "Capture reaches clipboard despite PNG or metadata storage failure");
+            if (boundary == "png") Assert(controller.Repository.Captures.Count == 0 && refreshes == 0, "Failed PNG creates no misleading shelf record");
+            else
+            {
+                Assert(controller.Repository.Captures.Count == 1 && refreshes == 1 && controller.Repository.PersistencePending, "Metadata failure preserves shelf pixels with cleanup paused");
+                Assert(controller.Repository.Cleanup(DateTimeOffset.UtcNow, 1, true) == 0, "Pending history cannot authorize cleanup");
+            }
+            fail = false; controller.Repository.Persist();
+            Assert(!controller.Repository.PersistencePending, "History retry clears persistence warning state");
+            await controller.PreserveCaptureAsync(image, png, "synthetic", () => refreshes++);
+            Assert(copies == 2 && refreshes > 0, "Capture can be retried after storage recovers");
+            controller.Dispose(); controller.Dock.Close();
         }
     }
     public static async Task CheckEditorLayout(string destination)

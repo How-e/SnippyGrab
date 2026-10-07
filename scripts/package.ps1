@@ -49,3 +49,6 @@ $installerPath = Join-Path $artifactRoot "SnippyGrab-$Version-Setup.exe"
 Copy-Item -LiteralPath (Join-Path $installerStage 'SnippyGrab-Setup.exe') -Destination $installerPath -Force
 '{0}  {1}' -f (Get-FileHash -LiteralPath $installerPath -Algorithm SHA256).Hash.ToLowerInvariant(), [IO.Path]::GetFileName($installerPath) | Set-Content -LiteralPath "$installerPath.sha256" -Encoding utf8
 Write-Output $installerPath
+. (Join-Path $PSScriptRoot 'artifact-retention.ps1')
+Register-SnippyArtifacts -Root $artifactRoot -Names @([IO.Path]::GetFileName($bundlePath), [IO.Path]::GetFileName($zipPath), [IO.Path]::GetFileName("$zipPath.sha256"), [IO.Path]::GetFileName($installerPath), [IO.Path]::GetFileName("$installerPath.sha256"), [IO.Path]::GetFileName($installerStage))
+Remove-OldSnippyArtifacts -Root $artifactRoot -Keep 3 -Apply $true

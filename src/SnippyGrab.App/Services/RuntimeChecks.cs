@@ -221,6 +221,7 @@ internal static class RuntimeChecks
                     foreach (var orientation in Enum.GetValues<DockOrientation>())
                     {
                         controller.Settings.Corner = corner; controller.Settings.Orientation = orientation;
+                        dock.ResetPreviewCachesForCheck();
                         dock.SetExpanded(false); dock.Reveal(); await Task.Delay(35); dock.UpdateLayout();
                         var panel = (StackPanel)((Border)dock.Content).Child;
                         var id = controller.Repository.Captures[0].Id;
@@ -230,6 +231,19 @@ internal static class RuntimeChecks
                         dock.SetExpanded(true); await Task.Delay(35); dock.UpdateLayout();
                         var after = Primary().PointToScreen(new Point(Primary().ActualWidth / 2, Primary().ActualHeight / 2));
                         Assert(Math.Abs(before.X - after.X) <= 1 && Math.Abs(before.Y - after.Y) <= 1, "Primary card anchor survives expansion");
+                        var samples = new List<Point>();
+                        for (var cycle = 0; cycle < 3; cycle++)
+                        {
+                            dock.SetExpanded(false); await Task.Delay(20);
+                            dock.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = Mouse.MouseEnterEvent });
+                            for (var sample = 0; sample < 4; sample++)
+                            {
+                                await Task.Delay(20); dock.UpdateLayout();
+                                var center = Primary().PointToScreen(new Point(Primary().ActualWidth / 2, Primary().ActualHeight / 2));
+                                Assert(Math.Abs(center.X - before.X) <= 1 && Math.Abs(center.Y - before.Y) <= 1, "Repeated cold/warm hover samples keep primary anchor stable");
+                                samples.Add(center);
+                            }
+                        }
                         Native.GetWindowRect(new WindowInteropHelper(dock).Handle, out var rect);
                         Assert(((SolidColorBrush)((Border)dock.Content).Background).Color.A > 0 && panel.Background == Brushes.Transparent, "Continuous nonzero-alpha hover surface");
                         Assert(dock.InputHitTest(new Point(1, 1)) is not null, "Hover route includes window padding");
@@ -254,7 +268,7 @@ internal static class RuntimeChecks
                         Assert(dock.Expanded && dock.SelectionCount == 1, "Re-entry preserves expansion and selection");
                         Assert(dock.CachedCardCount <= 5 && dock.CachedThumbnailCount <= 12, "Bounded dock caches");
                         dock.ToggleSelection(id);
-                        results.Add(new { count, corner, orientation, PrimaryAnchorStable = true, WarmCycleCardBuilds = dock.CardBuildCount - buildsBefore, ThumbnailDecodes = dock.ThumbnailDecodeCount - decodesBefore });
+                        results.Add(new { count, corner, orientation, Animate = controller.Settings.Animate, controller.Settings.DockOpacity, ColdCachesReset = true, AnchorSamples = samples, PrimaryAnchorStable = true, WarmCycleCardBuilds = dock.CardBuildCount - buildsBefore, ThumbnailDecodes = dock.ThumbnailDecodeCount - decodesBefore });
                     }
             }
             var hoverBuilds = results.ToArray();

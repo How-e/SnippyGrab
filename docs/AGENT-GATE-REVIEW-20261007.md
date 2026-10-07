@@ -23,3 +23,13 @@ Agent work: Added promotion-write failure after successful sidecar persistence, 
 Checks: HistoryRecoveryTests 11/11 PASS, corrupt/truncated/oversized/newer schema across launches and injected promotion failure; git diff --check PASS.
 
 Status / remaining acceptance: OPEN: actual recovery confirmation/cancel dialog, failed promotion feedback and retry interaction using isolated data. Durable recovery and cleanup blocking pass.
+
+## Q49
+
+Inspected: DockWindow expansion/leave timers, fixed selection borders, anchored placement and coalesced render-position dispatch; prior jitter fixes retained.
+
+Agent work: Cold-cache reset for diagnostic runs; 12 temporal primary-anchor samples per layout over three raised hover cycles, recorded counts/orientation/placement/opacity/animation settings and thumbnail/card work.
+
+Checks: DockLayoutTests 15/15 PASS; zero-warning Release build; 64-layout native offscreen dock retry PASS with 768 stable anchor samples. Initial run failed foreground preservation; retained q49-dock.json, successful q49-dock-retry.json.
+
+Status / remaining acceptance: OPEN: visible cold/warm first-hover and re-entry with 1/3/5/20 captures using actual pointer, no jump/freeze, all displayed captures reachable, collapse with/without selections. Desktop idle was not confirmed; no pointer gestures run.

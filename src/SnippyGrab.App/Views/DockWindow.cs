@@ -33,6 +33,10 @@ internal sealed class DockWindow : Window
     internal int RebuildCount { get; private set; }
     internal int CardBuildCount { get; private set; }
     internal int ThumbnailDecodeCount { get; private set; }
+    internal void ResetPreviewCachesForCheck()
+    {
+        cards.RemoveWhere(_ => true); thumbnails.RemoveWhere(_ => true);
+    }
     internal bool Expanded => expanded;
     internal int SelectionCount => selected.Count;
     internal int CachedThumbnailCount => thumbnails.Count;

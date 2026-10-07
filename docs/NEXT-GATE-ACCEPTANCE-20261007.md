@@ -45,8 +45,14 @@ Local ignored evidence: `export-final-20261007.json` SHA-256 `52115D5DC090D629AF
 
 Validation after the focus fix: zero-warning warnings-as-errors Release build, full **170 core + 61 Windows tests**, no failures/skips, full formatting PASS. Queue and milestone/release policy checks retain stable blocking with **30 required gates open; 21 entries checked**.
 
-## Next owner acceptance
+## Owner receiver handoff — completed after native checks
 
 Q30/Q50: exact nonadjacent receiver membership/order and one-minute delayed file paste, using the new local `0.1.0-alpha.acceptance.20261007.2` candidate. The launcher verifies committed source and matching bundle hashes/revision. Exit all installed/fixture SnippyGrab instances normally first, then run `pwsh ./scripts/start-acceptance.ps1 -RealApp`. Follow USER-TESTING's targeted receiver instructions; use only synthetic A/B/C content and unsent drafts. Record candidate and Codex version, count/content/displayed order and supported/unsupported separately for each case. Earlier ordinary paste/drop successes stand.
 
 Q16/Q49 remaining gesture/settings coverage, Q18 motion/contrast, Q19 accessibility and later storage/history/OS/hardware gates stay open. This continuation closes only evidenced Q15/Q21 and fixes the independently reproduced canvas shortcut issue; it does not waive the other required acceptance criteria.
+
+## Q50 — real Codex transfer-order acceptance
+
+PASS / CLOSED. Owner reports **Codex 0.160.1, steps 2–4 all PASS** on the preceding handoff's `0.1.0-alpha.acceptance.20261007.2` candidate (clean source `06f4c9a`, verified bundle provenance). Nonadjacent C/A drop, reordered A/C drop and one-minute delayed selected-file paste satisfy the prescribed receiver count/content/order checks. Existing independent reverse/nonadjacent/duplicate/reordered/restart/scrolling payload checks establish SnippyGrab's ascending-current-shelf-number contract.
+
+The owner reported PASS, without a separate exact order trace; retain that evidence level. This is actual user-reported receiver acceptance, not synthetic receiver or agent-observed attachment evidence. Other receivers remain Q12; native drag/retention/crash and longer delayed reads remain Q13. The one-minute case does not prove a receiver defers reads after first ingesting files.

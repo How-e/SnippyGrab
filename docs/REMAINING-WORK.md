@@ -1,4 +1,6 @@
-Latest [targeted keyboard acceptance](NEXT-GATE-ACCEPTANCE-20261007.md) closes Q15/Q21; **30 required gates remain open, 21 entries checked**. Earlier dated counts below are historical.
+Latest owner acceptance: Q50 CLOSED, Codex 0.160.1 steps 2–4 PASS; see [recorded receiver results](USER-TESTING.md#codex-selected-transfer-acceptance--pass).
+
+Latest [targeted keyboard acceptance](NEXT-GATE-ACCEPTANCE-20261007.md) closes Q15/Q21; **29 required gates remain open, 22 entries checked**. Earlier dated counts below are historical.
 
 # Remaining acceptance review — 2026-10-07
 

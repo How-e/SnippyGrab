@@ -30,7 +30,23 @@ Owner tested `0.1.0-alpha.acceptance.20261007.1+6849be66527cc69254addb551b2dcc6d
 
 These reports improve the recorded native interaction evidence without automatically closing broad queue gates. The reorder expectation is resolved; insertion is the accepted contract. Earlier reported failures remain historical results of their tested builds.
 
-### Next targeted real-receiver check
+### Codex selected-transfer acceptance — PASS
+
+Owner report in chat: **Codex 0.160.1; all prescribed steps 2–4 PASS**. Tested candidate from the preceding handoff: **0.1.0-alpha.acceptance.20261007.2**, clean source `06f4c9acd70be3253fbb11fcc02d75ffea391ed1` as verified in its local BUILD-PROVENANCE.json. These are owner-reported real receiver results, not agent automation.
+
+| Case | Owner result |
+|---|---|
+| Nonadjacent shelf 1/3 drop, expected exactly C and A | PASS |
+| Drop after Alt-reorder to B,A,C, expected exactly A and C | PASS |
+| Selected-file Ctrl+C, one minute without another clipboard write, then paste in an empty draft | PASS |
+
+No failure, missing image or missing-file error was reported. PASS covers the prescribed count/content/order checks; no separate attachment-order trace or screenshot was supplied. The delayed case proves the tested one-minute paste/file availability, not deferred reads by an already-reading receiver or the full 24-hour crash grace.
+
+Q50 transfer-order receiver acceptance closes with these results plus existing independent payload/order/scrolling regressions. Q30 primary Codex acceptance closes with these results and the earlier U01/single-drop passes. Q12 stays open for exact-version coverage of other receivers; Q13 keeps its native retention/crash criteria.
+
+### Completed targeted real-receiver procedure
+
+The procedure below is retained as the exact test specification for the PASS above. No immediate repetition is needed. Documentation commits made after acceptance do not change the tested binary; the launcher's strict HEAD check will require a newly matching package for a future relaunch through that script.
 
 Use the newly prepared local **0.1.0-alpha.acceptance.20261007.2** candidate, which includes the verified canvas-shortcut fix. Q15 and Q21 are closed in [targeted native acceptance](NEXT-GATE-ACCEPTANCE-20261007.md); full accessibility and receiver gates remain open. The default launcher now selects this candidate and checks its source revision/hashes.
 

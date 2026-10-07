@@ -11,6 +11,14 @@ public partial class App : Application
     {
         base.OnStartup(e);
         Native.SetDefaultDllDirectories(0x1000); // Default safe locations; never the working directory.
+        if (e.Args.Contains("--check-resource-stress"))
+        {
+            var args = e.Args.SkipWhile(a => a != "--check-resource-stress").Skip(1).ToArray();
+            if (args.Length == 0) { Shutdown(1); return; }
+            try { await ResourceStressChecks.Run(args[0], args.Length > 1 ? int.Parse(args[1], System.Globalization.CultureInfo.InvariantCulture) : 7200); Shutdown(0); }
+            catch (Exception ex) { File.WriteAllText(args[0], "FAILED: " + ex); Shutdown(1); }
+            return;
+        }
         if (e.Args.Contains("--check-pipeline-latency"))
         {
             var report = e.Args.SkipWhile(a => a != "--check-pipeline-latency").Skip(1).FirstOrDefault();

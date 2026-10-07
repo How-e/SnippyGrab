@@ -1,4 +1,4 @@
-param([string]$Bundle = (Join-Path $PSScriptRoot '../artifacts/SnippyGrab-0.1.0-alpha.acceptance.20261007.1-win-x64'), [switch]$RealApp)
+param([string]$Bundle = (Join-Path $PSScriptRoot '../artifacts/SnippyGrab-0.1.0-alpha.acceptance.20261007.1-win-x64'), [switch]$RealApp, [switch]$ValidateOnly)
 $ErrorActionPreference = 'Stop'
 $bundlePath = (Resolve-Path -LiteralPath $Bundle).Path
 $provenance = Get-Content -LiteralPath (Join-Path $bundlePath 'BUILD-PROVENANCE.json') -Raw | ConvertFrom-Json
@@ -9,6 +9,9 @@ if ($LASTEXITCODE -ne 0) { throw 'Git revision unavailable.' }
 if ($provenance.Commit -ne $currentRevision) { throw 'Acceptance build is stale. Prepare a build from the current commit before testing.' }
 Write-Output "Testing $($provenance.Version), source $($provenance.Commit), Dirty=$($provenance.Dirty)"
 if ($provenance.Dirty) { throw 'Acceptance requires committed source.' }
+$workingChanges = git -C (Split-Path -Parent $PSScriptRoot) status --porcelain
+if ($LASTEXITCODE -ne 0 -or $workingChanges) { throw 'Commit or set aside working changes before testing this acceptance build.' }
+if ($ValidateOnly) { Write-Output 'PASS: bundle integrity, matching source revision and committed source.'; return }
 $executable = Join-Path $bundlePath 'SnippyGrab.exe'
 if ($RealApp) {
     $existing = @(Get-Process -Name SnippyGrab -ErrorAction SilentlyContinue)

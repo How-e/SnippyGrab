@@ -21,6 +21,22 @@
     <Content Include="..\..\LICENSE" Link="LICENSE" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <!-- The OCR wrapper uses Assembly.Location; retain it and its native dependencies as sidecars. -->
+  <PropertyGroup><SnippyNativeRoot>$(MSBuildThisFileDirectory)..\..\artifacts\native-ocr\current\</SnippyNativeRoot></PropertyGroup>
+  <Target Name="BuildPinnedNativeOcr" BeforeTargets="PrepareForBuild">
+    <Exec Command="pwsh -NoProfile -File &quot;$(MSBuildThisFileDirectory)..\..\scripts\build-native-ocr.ps1&quot;" />
+  </Target>
+  <Target Name="CopyPinnedNativeOcr" AfterTargets="CopyFilesToOutputDirectory">
+    <ItemGroup><SnippyNativeFiles Include="$(SnippyNativeRoot)x64\*.dll" /></ItemGroup>
+    <Copy SourceFiles="@(SnippyNativeFiles)" DestinationFolder="$(TargetDir)x64" />
+    <Copy SourceFiles="$(SnippyNativeRoot)NATIVE-OCR-PROVENANCE.json" DestinationFolder="$(TargetDir)" />
+  </Target>
+  <Target Name="PublishPinnedNativeOcr" AfterTargets="ComputeFilesToPublish">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(FileName)' == 'tesseract50' or '%(FileName)' == 'leptonica-1.82.0'" />
+      <ResolvedFileToPublish Include="$(SnippyNativeRoot)x64\*.dll"><RelativePath>x64\%(Filename)%(Extension)</RelativePath><CopyToPublishDirectory>Always</CopyToPublishDirectory><ExcludeFromSingleFile>true</ExcludeFromSingleFile></ResolvedFileToPublish>
+      <ResolvedFileToPublish Include="$(SnippyNativeRoot)NATIVE-OCR-PROVENANCE.json"><RelativePath>NATIVE-OCR-PROVENANCE.json</RelativePath><CopyToPublishDirectory>Always</CopyToPublishDirectory><ExcludeFromSingleFile>true</ExcludeFromSingleFile></ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
   <Target Name="KeepOcrSidecars" BeforeTargets="_ComputeFilesToBundle">
     <ItemGroup>
       <ResolvedFileToPublish Update="@(ResolvedFileToPublish)" Condition="'%(FileName)' == 'Tesseract' or '%(FileName)' == 'tesseract50' or '%(FileName)' == 'leptonica-1.82.0'">

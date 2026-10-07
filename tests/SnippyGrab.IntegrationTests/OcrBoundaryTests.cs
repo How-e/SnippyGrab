@@ -11,34 +11,40 @@ namespace SnippyGrab.IntegrationTests;
 public sealed class OcrBoundaryTests
 {
     [Fact]
-    public void RawPixelsMatchNativePngReference()
+    public void RawPixelsPreserveKnownColorAlphaResolutionAndMetadata()
     {
         var png = ImageIntegrationTests.Sta(() =>
         {
-            var visual = new DrawingVisual();
-            using (var dc = visual.RenderOpen()) { dc.DrawRectangle(Brushes.White, null, new Rect(0, 0, 720, 360)); dc.DrawText(new FormattedText("Build failed\nError CS1002: semicolon expected", CultureInfo.InvariantCulture, FlowDirection.LeftToRight, new Typeface("Consolas"), 32, Brushes.Black, 1), new Point(30, 70)); }
-            var bitmap = new RenderTargetBitmap(720, 360, 96, 96, PixelFormats.Pbgra32); bitmap.Render(visual); return ImageService.Png(bitmap);
+            var pixels = new byte[] { 0, 0, 255, 255, 0, 255, 0, 255, 255, 0, 0, 128, 255, 255, 255, 255 };
+            return ImageService.Png(BitmapSource.Create(2, 2, 144, 144, PixelFormats.Bgra32, null, pixels, 8));
         });
-        using var native = Tesseract.Pix.LoadFromMemory(png);
         using var raw = OcrService.DecodePixels(png);
-        Assert.Equal(native.XRes, raw.XRes); Assert.Equal(native.YRes, raw.YRes);
-        Assert.Equal(native.Depth, raw.Depth);
-        var before = new int[native.GetData().WordsPerLine * native.Height];
+        Assert.Equal(144, raw.XRes); Assert.Equal(144, raw.YRes); Assert.Equal(32, raw.Depth);
         var after = new int[raw.GetData().WordsPerLine * raw.Height];
-        System.Runtime.InteropServices.Marshal.Copy(native.GetData().Data, before, 0, before.Length);
         System.Runtime.InteropServices.Marshal.Copy(raw.GetData().Data, after, 0, after.Length);
-        Assert.Equal(before, after);
+        Assert.Equal(new[] { unchecked((int)0xFF0000FF), 0x00FF00FF, 0x0000FF80, unchecked((int)0xFFFFFFFF) }, after);
         var field = typeof(Tesseract.Pix).GetField("handle", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
         var lib = System.Runtime.InteropServices.NativeLibrary.Load(Path.Combine(AppContext.BaseDirectory, "x64", "leptonica-1.82.0.dll"));
         try
         {
             var fn = System.Runtime.InteropServices.Marshal.GetDelegateForFunctionPointer<Samples>(System.Runtime.InteropServices.NativeLibrary.GetExport(lib, "pixGetSpp"));
-            Assert.Equal(fn(((System.Runtime.InteropServices.HandleRef)field.GetValue(native)!).Handle), fn(((System.Runtime.InteropServices.HandleRef)field.GetValue(raw)!).Handle));
+            var handle = ((System.Runtime.InteropServices.HandleRef)field.GetValue(raw)!).Handle;
+            Assert.Equal(4, fn(handle));
+            var inputFormat = System.Runtime.InteropServices.Marshal.GetDelegateForFunctionPointer<Samples>(System.Runtime.InteropServices.NativeLibrary.GetExport(lib, "pixGetInputFormat"));
+            Assert.Equal(3, inputFormat(handle));
         }
         finally { System.Runtime.InteropServices.NativeLibrary.Free(lib); }
     }
     [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.Cdecl)]
     private delegate int Samples(nint pix);
+    [Fact]
+    public void NativeCompressedCodecsAreUnavailableAndRawConversionCancels()
+    {
+        var png = TextImage("ERROR: fixture", false);
+        Assert.ThrowsAny<Exception>(() => Tesseract.Pix.LoadFromMemory(png));
+        using var cancellation = new CancellationTokenSource(); cancellation.Cancel();
+        Assert.ThrowsAny<OperationCanceledException>(() => OcrService.DecodePixels(png, cancellation.Token));
+    }
     [Theory]
     [InlineData(OcrLayout.Auto)]
     [InlineData(OcrLayout.SparseText)]

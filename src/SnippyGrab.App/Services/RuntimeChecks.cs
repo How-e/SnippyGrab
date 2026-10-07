@@ -9,6 +9,32 @@ namespace SnippyGrab.App.Services;
 
 internal static class RuntimeChecks
 {
+    public static async Task CheckOcrCorpus(string destination)
+    {
+        var service = new OcrService();
+        var cases = new[] { ("Build failed\nError CS1002: semicolon expected", "CS1002"), ("Traceback (most recent call last):\nValueError: invalid literal", "ValueError"), ("Application error\nAccess denied. Please retry.", "denied") };
+        byte[]? last = null;
+        foreach (var (text, expected) in cases)
+        {
+            var visual = new DrawingVisual();
+            using (var dc = visual.RenderOpen())
+            {
+                dc.DrawRectangle(Brushes.White, null, new Rect(0, 0, 1200, 500));
+                dc.DrawText(new FormattedText(text, CultureInfo.InvariantCulture, FlowDirection.LeftToRight, new Typeface("Consolas"), 32, Brushes.Black, 1), new Point(30, 70));
+            }
+            var image = new RenderTargetBitmap(1200, 500, 96, 96, PixelFormats.Pbgra32); image.Render(visual); image.Freeze();
+            last = ImageService.Png(image);
+            Assert((await service.ReadAsync(last)).Contains(expected, StringComparison.OrdinalIgnoreCase), "Packaged full-image OCR corpus");
+            Assert((await service.ReadAsync(ImageService.Png(ImageService.Crop(image, new(20, 50, 1160, 250))))).Contains(expected, StringComparison.OrdinalIgnoreCase), "Packaged area OCR corpus");
+        }
+        var malformedRejected = false;
+        try { await service.ReadAsync(new byte[30]); } catch (InvalidDataException) { malformedRejected = true; }
+        Assert(malformedRejected, "Malformed OCR input rejected");
+        using var cancellation = new CancellationTokenSource(); cancellation.Cancel(); var cancelled = false;
+        try { await service.ReadAsync(last!, cancellation.Token); } catch (OperationCanceledException) { cancelled = true; }
+        Assert(cancelled, "OCR cancellation preserved");
+        AtomicFile.Write(destination, JsonSerializer.SerializeToUtf8Bytes(new { Result = "PASS", Corpus = 6, MalformedInputRejected = true, Cancellation = true, Scope = "Synthetic full/area native OCR corpus, malformed input and cancellation; no desktop capture or clipboard writes." }));
+    }
     private sealed class PendingOcr : IOcrService
     {
         public readonly TaskCompletionSource<string> Completion = new();

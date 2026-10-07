@@ -41,13 +41,14 @@ public partial class App : Application
             if (report is null) { Shutdown(1); return; }
             controller = InteractiveChecks.Open(report); return;
         }
-        if (e.Args.Contains("--check-reliability") || e.Args.Contains("--check-overlay-layout") || e.Args.Contains("--check-dock-layout") || e.Args.Contains("--check-editor-layout"))
+        if (e.Args.Contains("--check-reliability") || e.Args.Contains("--check-overlay-layout") || e.Args.Contains("--check-dock-layout") || e.Args.Contains("--check-editor-layout") || e.Args.Contains("--check-ocr-corpus"))
         {
-            var destination = e.Args.SkipWhile(a => a is not ("--check-reliability" or "--check-overlay-layout" or "--check-dock-layout" or "--check-editor-layout")).Skip(1).FirstOrDefault();
+            var destination = e.Args.SkipWhile(a => a is not ("--check-reliability" or "--check-overlay-layout" or "--check-dock-layout" or "--check-editor-layout" or "--check-ocr-corpus")).Skip(1).FirstOrDefault();
             if (destination is null) { Shutdown(1); return; }
             try
             {
-                if (e.Args.Contains("--check-reliability")) await RuntimeChecks.CheckReliability(destination);
+                if (e.Args.Contains("--check-ocr-corpus")) await RuntimeChecks.CheckOcrCorpus(destination);
+                else if (e.Args.Contains("--check-reliability")) await RuntimeChecks.CheckReliability(destination);
                 else if (e.Args.Contains("--check-dock-layout")) await RuntimeChecks.CheckDockLayout(destination);
                 else if (e.Args.Contains("--check-editor-layout")) await RuntimeChecks.CheckEditorLayout(destination);
                 else await RuntimeChecks.CheckOverlayLayout(destination);

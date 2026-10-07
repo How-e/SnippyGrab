@@ -2,6 +2,8 @@ param([string]$ComponentDirectory, [string]$ReportPath)
 $ErrorActionPreference = 'Stop'
 if (-not $ComponentDirectory) { $ComponentDirectory = Join-Path (Split-Path -Parent $PSScriptRoot) 'src/SnippyGrab.App/bin/Release/net10.0-windows' }
 $manifest = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'ocr-components.json') -Raw | ConvertFrom-Json
+. (Join-Path $PSScriptRoot 'native-ocr-policy.ps1')
+$null = Test-SnippyNativeBuild $ComponentDirectory
 foreach ($entry in $manifest.files.PSObject.Properties) {
     $component = Join-Path $ComponentDirectory $entry.Name
     if ((Get-FileHash -LiteralPath $component -Algorithm SHA256).Hash -ne $entry.Value) { throw 'Untrusted native/model input; inventory refused.' }
@@ -30,7 +32,8 @@ $inventory = [ordered]@{
     Codecs = [SnippyNativeInventory]::Read($leptonica, 'getImagelibVersions', $true)
 }
 foreach ($name in @('Tesseract', 'Leptonica', 'Codecs')) {
-    if ($inventory[$name] -ne $manifest.versions.$name) { throw "Native version inventory mismatch: $name" }
+    $matches = if ($name -eq 'Leptonica') { $inventory[$name].StartsWith($manifest.versions.$name + ' ') } else { [string]$inventory[$name] -eq [string]$manifest.versions.$name }
+    if (-not $matches) { throw "Native version inventory mismatch: $name" }
 }
 $json = $inventory | ConvertTo-Json
 if ($ReportPath) { $json | Set-Content -LiteralPath $ReportPath -Encoding utf8 }

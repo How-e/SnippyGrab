@@ -81,6 +81,8 @@ Windows clipboard history/sync and receiving applications have their own policie
 
 Pinned .NET SDK 10.0.400 on Windows:
 
+Source builds also require installed Visual Studio 2022 C++ x64 tools, Windows SDK, CMake, Git and PowerShell 7. The first build provisions the pinned native OCR sources and compiles them; later builds use the verified cache. Portable/installed users require no compiler. See [native OCR build](docs/NATIVE-OCR.md).
+
 ```powershell
 pwsh ./scripts/provision-ocr.ps1
 dotnet restore --locked-mode

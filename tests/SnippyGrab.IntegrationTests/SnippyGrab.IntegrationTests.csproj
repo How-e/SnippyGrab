@@ -24,4 +24,9 @@
     <ProjectReference Include="../../src/SnippyGrab.App/SnippyGrab.App.csproj" />
     <Content Include="../../src/SnippyGrab.App/tessdata/*.traineddata" Link="tessdata/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
+  <Target Name="CopyPinnedNativeOcrForTests" AfterTargets="CopyFilesToOutputDirectory">
+    <ItemGroup><SnippyNativeFiles Include="../../artifacts/native-ocr/current/x64/*.dll" /></ItemGroup>
+    <Copy SourceFiles="@(SnippyNativeFiles)" DestinationFolder="$(TargetDir)x64" />
+    <Copy SourceFiles="../../artifacts/native-ocr/current/NATIVE-OCR-PROVENANCE.json" DestinationFolder="$(TargetDir)" />
+  </Target>
 </Project>

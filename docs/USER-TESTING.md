@@ -142,7 +142,7 @@ Only if you already have a spare VM/account/machine: test portable launch and pe
 
 ### Normal-use performance observations
 
-Report noticeable startup/capture/editor lag, memory growth, sustained CPU when idle or freezes during rapid captures and large images. If convenient, note Task Manager CPU/memory after launch, one minute idle, 20 captures and closing editors. You do not need to run hours-long stress tests or the pointer-moving benchmark; instrumented latency/resource measurements belong to /.
+Report noticeable startup/capture/editor lag, memory growth, sustained CPU when idle or freezes during rapid captures and large images. If convenient, note Task Manager CPU/memory after launch, one minute idle, 20 captures and closing editors. You volunteered to run the two-hour  test manually: follow [RESOURCE-TESTING.md](RESOURCE-TESTING.md) for the exact packaged command, progress report, completion criteria and resource interpretation. The agent will not run that prolonged test automatically. The pointer-moving benchmark and broader  latency comparison remain separate.
 
 ## Reporting results
 

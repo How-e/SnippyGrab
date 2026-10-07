@@ -2,9 +2,15 @@
 
 ## Current remaining-work reconciliation
 
-See [REMAINING-WORK.md](REMAINING-WORK.md) for live hosted checks, publication and protection evidence. Q36 and Q35 are now closed; 35 required entries remain open. The completed manual two-hour report passes completion and trend/recovery review; see [resource acceptance](RESOURCE-REVIEW-20261007.md). No stress workload was rerun. Earlier dated results below retain their original test counts and gate counts. The read-only resource report reviewer and release-gate fixtures are verified in this reconciliation.
+See [REMAINING-WORK.md](REMAINING-WORK.md) for live hosted checks, publication and protection evidence. Q36, Q35 and Q06 are now closed; 34 required entries remain open. The completed manual two-hour report passes completion and trend/recovery review; see [resource acceptance](RESOURCE-REVIEW-20261007.md). No stress workload was rerun. Earlier dated results below retain their original test counts and gate counts. The read-only resource report reviewer and release-gate fixtures are verified in this reconciliation.
 
-## Current short verification
+## Current 15-gate verification
+
+The [current gate pass](AGENT-GATE-REVIEW-20261007.md) has one focused commit for each requested gate, with Q01 last. Locked restore, warnings-as-errors Release build (zero warnings/errors), **170 core + 61 Windows integration tests** (zero failures/skips), full formatting verification and Git whitespace checks pass. The actual milestone map and five malformed mapping/ownership/closure fixtures pass; all ten release-gate fixtures pass. Q06 closes on bounded history/orphan/compaction regressions plus the existing reviewed two-hour Q35 evidence. Q01 stays open with 34 required gates unresolved.
+
+Current offscreen failure/reliability, editor layout and dedicated child-process crash/restart probes pass. Dock Q49 initially failed final foreground preservation, then its full repeat passed 64 layouts and 768 anchor samples. Q18 runs failed final pointer-preservation checks while structural checkpoints retained passing layout/cache assertions; these are not overall PASS results. The later Q15 full dock probe passed. No pointer-moving desktop checks, OS clipboard writes, startup preference changes or real-cache damage occurred. No new package or published build is claimed; current probes use the development Release executable and synthetic isolated data.
+
+## Earlier short verification
 
 See [the latest acceptance record](TAKEOVER-ACCEPTANCE.md) for the environment, real computer-use observations, unavailable cases and exact release gates. Locked restore, zero-warning/error Release build, 152 core tests, 54 Windows integration tests on isolated rerun, formatting, dependency/native integrity, policy fixtures and package verification pass. The first Windows run had one foreground-window assertion failure during desktop focus activity; the rerun passed without concurrent UI actions. These checks do not close broad acceptance gates.
 
@@ -215,4 +221,7 @@ Portable/setup **0.1.0-alpha.queue.20261006.3**, clean source commit `212267c`, 
 The agent-owned two-hour attempt was stopped at the user's request after about 59 seconds; its report remains RUNNING and is not acceptance evidence. Q35 is user-owned pending the documented manual 7200-second run and trend/recovery review in RESOURCE-TESTING.md. No prolonged probe will restart automatically. No new desktop capture, OS clipboard write, input injection, login/startup change, signed artifact or remote publication was performed in this pass. Hardware/receiver/accessibility/OS lifecycle and hosted release gates remain as mapped in MILESTONES.md.
 
 Q42 independently cloned the clean tree with `git clone --no-hardlinks`, created a matching **local-only tag inside that isolated clone**, and ran provision/locked restore/package with RequireTag. Build 0.1.0-alpha.cleancheck.20261006 reports commit 212267c07fda2d31a97326889cb7e0926f359136 and Dirty=false. Native sources were compiled independently in that clone. Complete bundle, ZIP/setup SHA-256 and embedded payload verification pass. Two archives of the identical final folder produce SHA-256 **ADB8588427FACB1AD1676E05C59A5B6EF500F10D2C807C065A8D35ED4445CE44**. Reproducibility means deterministic archives from fixed inputs plus complete rebuild provenance; independent native/ReadyToRun binary byte identity is not claimed. Curated changelog is included in the .3 bundle. Hosted tag/workflow execution remains Q36. No tag was added to the primary checkout or published.
-`n## Current agent gate review — 2026-10-07`n`nSee [per-gate current checks and acceptance](AGENT-GATE-REVIEW-20261007.md). Historical results below retain their original scope; current evidence does not imply gesture or receiver acceptance.
+
+## Current agent gate review — 2026-10-07
+
+See [per-gate current checks and acceptance](AGENT-GATE-REVIEW-20261007.md). Historical results above retain their original scope; current evidence does not imply gesture or receiver acceptance.

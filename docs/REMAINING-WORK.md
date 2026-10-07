@@ -1,6 +1,6 @@
 # Remaining acceptance review — 2026-10-07
 
-Reviewed clean `main` at `ff0db0a` against the queue, implementation ledger and live GitHub APIs. **35 required gates remain open; 16 entries are checked.** Q36 and Q35 are now closed. The earlier 37-gate local acceptance snapshot remains historical. No new application defect was established by this review; the unchecked implementation descriptions should be read with their closure records.
+The earlier review inspected clean `main` at `ff0db0a` against the queue, implementation ledger and live GitHub APIs. The subsequent [15-gate agent pass](AGENT-GATE-REVIEW-20261007.md), starting at `5355aca`, now leaves **34 required gates open; 17 entries checked**. Q06 joins Q36/Q35 as closed. That pass fixed stale exports, private exception feedback and failed-edit orphan resurrection; the earlier no-new-defect finding applies only to its original review. The earlier 37-gate local acceptance snapshot remains historical.
 
 ## Work already completed
 
@@ -21,7 +21,8 @@ The completed user-run report has now been reviewed: **Q35 PASS**, 7,201.09 seco
 | Tasks | Remaining work and owner |
 |---|---|
 | Resource follow-up | Q35 two-hour acceptance is complete. All-day behavior and actual editor/idle usage remain unverified limits; no automatic prolonged rerun is scheduled. |
-| Q02–Q07, Q13–Q14, Q22, Q24, Q28–Q29 | Existing fixes and isolated regressions pass historically; failed-apply/multiple-editor Exit, recovery UI, pin/history/clipboard/OCR/storage failure and actual transfer/crash acceptance still need a coordinated isolated interactive pass. Agent/shared. |
+| Q02–Q05, Q07, Q13–Q14, Q22, Q24, Q28–Q29 | Current failure/recovery/lease/restore/format/privacy/revision checks pass; dedicated process termination and fake-clock delayed-read durability pass. Failed-apply/multiple-editor tray Exit, recovery confirmation/cancel, pin/history/settings/clipboard/OCR interaction and actual native transfer/receiver acceptance remain. Exact per-gate criteria and results are in the current agent pass. Agent/shared. |
+| Q06 | Closed: orphan/lazy dimensions, bounded pages, failed manifest/pin preservation and safe abandoned-page compaction pass current regressions. Existing Q35 two-hour retained-history evidence supplies resource coverage. Metadata remains proportional to retained history; all-day behavior is unverified. |
 | Q15–Q16, Q18–Q21, Q32, Q49 | Dock repeated cold/warm hover, selection leave/re-entry, symmetric Alt-reorder, full keyboard/selection traversal, editor/export failure/dialog and accessibility checks. Existing short UI passes are partial. Shared. |
 | Q08–Q11, Q25–Q27, Q31, Q41 | Available hardware/hotkey modes, reconnect/DPI/HDR, Explorer/sleep/login and clean Windows 10/11 installation/uninstall. Environment/user evidence required; no new OS/account/hardware changes in this review. |
 | Q12, Q30, Q50 | Exact build/receiver versions, nonadjacent selection, exact count/content/order after reorder and delayed receiver reads. User/shared. |

@@ -1,6 +1,6 @@
 # Agent gate review — 2026-10-07
 
-Windows x64, .NET SDK 10.0.400. Review starts from clean `ff0db0a` and reads CONTRIBUTING, TASK_QUEUE, MILESTONES, VALIDATION and REMAINING-WORK before edits. No repository or parent AGENTS.md was found. Historical implementation records are retained. Every fixture uses synthetic pixels and isolated temporary directories. Offscreen WPF probes use injected clipboard writes, disabled hotkeys and invisible tray icons; they do not move the pointer, capture the desktop or change OS preferences. They establish programmatic native-window behavior, not actual gestures or external receiver acceptance.
+Windows x64, .NET SDK 10.0.400. Review starts from clean `5355aca` and reads CONTRIBUTING, TASK_QUEUE, MILESTONES, VALIDATION and REMAINING-WORK before edits. No repository or parent AGENTS.md was found. Historical implementation records are retained. Every fixture uses synthetic pixels and isolated temporary directories. Offscreen WPF probes use injected clipboard writes, disabled hotkeys and invisible tray icons; they do not move the pointer, capture the desktop or change OS preferences. They establish programmatic native-window behavior, not actual gestures or external receiver acceptance.
 
 One focused commit per gate, in requested order; Q01 last. Commit identities are available from `git log -- docs/AGENT-GATE-REVIEW-20261007.md` and the final report. Open acceptance is explicit below. No gate is closed merely because its code exists.
 
@@ -143,3 +143,37 @@ Agent work: Reproduced failed metadata edit reappearing as a second orphan captu
 Checks: Cross-view/failed metadata/view lease/superseded restart focused tests 7/7 PASS (orphan regression failed before fix); zero-warning Release build; q22-reliability-final.json PASS for native offscreen history/pin pixel refresh and actual editor close/copy retry; scoped formatting and git diff --check PASS.
 
 Status / remaining acceptance: OPEN: actual Apply/copy across shelf/history/detached pin and one-editor focus behavior. If the OS refuses deletion of an unpublished revision it is retained conservatively; no data-loss claim is made. Native programmatic consistency passes.
+
+## Q01
+
+Inspected: Foundation-first history, M0-M10 ledger, current gate evidence and ownership, stable package admission and historical/source provenance separation.
+
+Agent work: Reconciled the 15 focused gate records with actual source/tests/commit identities; corrected review starting revision to 5355aca (ff0db0a was an older review). Q06 closes on current regression and existing Q35 evidence; 34 required gates remain open and 17 checked. Added executable milestone coverage/test-file/commit/closure-record verification.
+
+Checks: Locked restore PASS; warnings-as-errors Release build zero warnings/errors; full suite 170 core + 61 Windows PASS, zero failures/skips; full dotnet format verification PASS. Mapping and release-policy results are recorded in final verification below.
+
+Status / remaining acceptance: OPEN: required acceptance gates remain. Implementation and all available local regression work are complete for this pass; interactive, receiver and unavailable hardware/OS criteria retain their exact owners below and in MILESTONES. Stable remains blocked.
+
+## Final verification and commit map
+
+Locked restore, warnings-as-errors Release build, full **170 core + 61 Windows tests**, full formatting and Git whitespace verification PASS, zero warnings/errors/failures/skips. `scripts/test-milestone-map.ps1 -SelfTest` passes the actual 11-row map, referenced test files and implementation commits, 34 open required gates with owners and 15 current closure records; five malformed map/test/owner/premature-completion/record fixtures are rejected. `scripts/test-release-gates.ps1` passes all ten fixtures, with alpha admitted and stable blocked.
+
+| Gate | Focused commit | Current focused result | Acceptance |
+|---|---|---|---|
+| Q02 | `c439fbc` | 6 coordinator tests; native failed-close/retry probe PASS | Open: multi-editor tray Exit and real clipboard/retry/Discard interaction |
+| Q03 | `df63a47` | 11 recovery tests PASS | Open: actual recovery confirmation/cancel/failure/retry UI |
+| Q49 | `a2e5a08` | 15 layout tests; 64-layout/768-sample retry PASS | Open: visible cold/warm actual hover; initial foreground invariant failed |
+| Q18 | `8364748` | 4 cache tests; 64-layout structural/cache checkpoint PASS | Open: full run failed pointer invariant; visual/motion acceptance remains |
+| Q15 | `59b5172` | 5 selection tests; full native dock routing probe PASS | Open: native focus acquisition, actual keyboard/selection/composer workflow |
+| Q21 | `b688526` | 6 export tests; redaction decode; six editor layouts PASS | Open: dialogs/cancel/overwrite/folder and clipboard interaction |
+| Q07 | `758f7f4` | 13 storage/startup/path tests; production salvage probe PASS | Open: actual settings/storage/cache-fallback feedback and retry |
+| Q14 | `33fa43b` | 3 writer tests; 21 format/OCR tests; cancellation probe PASS | Open: real OS clipboard and OCR/editor interaction |
+| Q28 | `b3c5623` | 3 failure tests; notice/log privacy probe PASS | Open: visible event/dialog/tray feedback and retry readability |
+| Q04 | `7102dc4` | 2 multi-view lease tests; native pin refresh probe PASS | Open: detach/edit/return/close gestures and broader pin hardware acceptance |
+| Q05 | `0d37463` | 3 restore/lifetime tests PASS | Open: rendered history Restore and pin Return to shelf workflow |
+| Q06 | `53fd2f8` | 17 history/recovery tests; existing Q35 resources PASS | Closed for agent criteria; retained metadata scales with history, all-day use unverified |
+| Q13 | `c5afb6f` | 13 transfer/staging tests; child termination/restart/delayed read PASS | Open: native drag, OS clipboard/external delayed receiver, real transfer crash/normal exit |
+| Q22 | `cc65bf9` | 7 revision/lease/rollback tests; native preview/close probe PASS | Open: actual Apply/copy across views and one-editor focus workflow |
+| Q01 | This mapping commit | Full suite/map/release/format checks PASS | Open while required gates remain |
+
+Reports and synthetic images remain ignored under `artifacts/gate-review-20261007`. Failed dock reports are preserved alongside successful repeats and structural checkpoints. The isolated crash child used only a validated temporary root, then the runner removed that fixture. No stress rerun, new package, remote push or publication occurred. The real user cache and OS preferences were not modified.

@@ -33,6 +33,7 @@ internal sealed class AppController : IDisposable
     private readonly string dataDirectory;
     private bool dockWasVisible;
     private bool disposed;
+    private readonly LifecycleDispatch lifecycle;
     private readonly HotkeyPauseState hotkeyPause = new();
     private readonly LatestOperation ocr = new();
     private bool exitRequested;
@@ -41,6 +42,7 @@ internal sealed class AppController : IDisposable
     private DateTimeOffset lastNoticeUtc;
     public AppController(bool background, string? isolatedDataDirectory = null, bool diagnostic = false)
     {
+        lifecycle = new(action => Application.Current.Dispatcher.BeginInvoke(action));
         dataDirectory = isolatedDataDirectory ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SnippyGrab");
         ManagedPath.RejectRedirects(dataDirectory);
         Directory.CreateDirectory(dataDirectory);
@@ -62,7 +64,8 @@ internal sealed class AppController : IDisposable
         tray = new Forms.NotifyIcon { Icon = System.Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath!) ?? System.Drawing.SystemIcons.Application, Text = "SnippyGrab · Print Screen to capture", Visible = !diagnostic };
         Repository.PersistenceFailed += () => Notify("Capture pixels are safe in the cache and shelf, but history could not be saved. Cleanup is paused; retry via tray → Retry history save.");
         if (cacheWarning is not null) Notify(cacheWarning);
-        tray.DoubleClick += (_, _) => Run(() => Capture(CaptureMode.Region));
+        tray.DoubleClick += (_, _) => Run(() => Capture(Settings.DefaultCaptureMode));
+        Hotkeys.TaskbarRestored += () => lifecycle.Post(() => { if (!diagnostic) { tray.Visible = false; tray.Visible = true; } });
         Hotkeys.Capture += mode => Run(() => Capture(mode));
         Hotkeys.Configure(Settings, diagnostic); BuildTray();
         cleanup.Tick += (_, _) => Try(() => { Repository.Cleanup(DateTimeOffset.UtcNow, Settings.RetentionHours); Dock.Refresh(); });
@@ -246,9 +249,9 @@ internal sealed class AppController : IDisposable
         menu.Items.Add(new Forms.ToolStripSeparator()); Item("Exit", Exit);
         var old = tray.ContextMenuStrip; tray.ContextMenuStrip = menu; old?.Dispose();
     }
-    private void DisplayChanged(object? sender, EventArgs e) => Application.Current.Dispatcher.BeginInvoke(() => Dock.TopologyChanged());
-    private void PowerChanged(object sender, PowerModeChangedEventArgs e) { if (e.Mode == PowerModes.Resume) Application.Current.Dispatcher.BeginInvoke(() => Try(() => { Hotkeys.Configure(Settings, Hotkeys.Paused); Repository.Cleanup(DateTimeOffset.UtcNow, Settings.RetentionHours); Dock.Refresh(); })); }
-    private void PreferencesChanged(object sender, UserPreferenceChangedEventArgs e) => Application.Current.Dispatcher.BeginInvoke(() => Ui.Theme(Settings.Theme));
+    private void DisplayChanged(object? sender, EventArgs e) => lifecycle.Post(() => Try(Dock.TopologyChanged));
+    private void PowerChanged(object sender, PowerModeChangedEventArgs e) { if (e.Mode == PowerModes.Resume) lifecycle.Post(() => Try(() => { Hotkeys.Configure(Settings, Hotkeys.Paused); Repository.Cleanup(DateTimeOffset.UtcNow, Settings.RetentionHours); Dock.TopologyChanged(); BuildTray(); if (Hotkeys.Warnings.Count > 0) Notify(string.Join("\n", Hotkeys.Warnings)); })); }
+    private void PreferencesChanged(object sender, UserPreferenceChangedEventArgs e) => lifecycle.Post(() => Ui.Theme(Settings.Theme));
     public async void Run(Func<Task> action) { try { await action(); } catch (Exception ex) { Failure(ex); } }
     public void Try(Action action) { try { action(); } catch (Exception ex) { Failure(ex); } }
     public void Failure(Exception ex)
@@ -298,7 +301,7 @@ internal sealed class AppController : IDisposable
     public void Dispose()
     {
         if (disposed) return; disposed = true;
-        Exiting = true; cleanup.Stop(); expiry.Stop();
+        Exiting = true; lifecycle.Dispose(); cleanup.Stop(); expiry.Stop();
         SystemEvents.DisplaySettingsChanged -= DisplayChanged; SystemEvents.PowerModeChanged -= PowerChanged; SystemEvents.UserPreferenceChanged -= PreferencesChanged;
         Ui.FailureHandler = null; ocr.Dispose(); Clipboard.Invalidate(); Hotkeys.Dispose(); tray.Visible = false; tray.ContextMenuStrip?.Dispose(); tray.Icon?.Dispose(); tray.Dispose();
     }

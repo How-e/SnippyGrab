@@ -10,6 +10,10 @@ internal sealed class HotkeyService : IDisposable
     public List<string> Warnings { get; } = [];
     public bool Paused { get; private set; }
     public event Action<CaptureMode>? Capture;
+    public event Action? TaskbarRestored;
+    [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    private static extern uint RegisterWindowMessage(string name);
+    private readonly uint taskbarCreated = RegisterWindowMessage("TaskbarCreated");
     public HotkeyService() => source.AddHook(Hook);
     public void Configure(Settings settings, bool paused = false)
     {
@@ -25,6 +29,7 @@ internal sealed class HotkeyService : IDisposable
     }
     private nint Hook(nint hwnd, int message, nint wParam, nint lParam, ref bool handled)
     {
+        if (taskbarCreated != 0 && message == taskbarCreated) TaskbarRestored?.Invoke();
         if (message == 0x0312 && active.TryGetValue((int)wParam, out var mode)) { handled = true; Capture?.Invoke(mode); }
         return 0;
     }

@@ -95,7 +95,7 @@ internal sealed class SettingsWindow : Window
         var property = typeof(Settings).GetProperty(name)!; var value = property.GetValue(draft);
         if (property.PropertyType == typeof(bool))
         {
-            var check = new CheckBox { Content = label, IsChecked = (bool)value! }; body.Children.Add(check); values[name] = () => check.IsChecked == true; return;
+            var check = new CheckBox { Content = label, IsChecked = (bool)value!, IsEnabled = !(controller.Diagnostic && name == nameof(Settings.LaunchOnStartup)) }; body.Children.Add(check); values[name] = () => check.IsChecked == true; return;
         }
         body.Children.Add(Ui.Text(label));
         FrameworkElement input;
@@ -122,6 +122,7 @@ internal sealed class SettingsWindow : Window
             values[name] = () => property.PropertyType == typeof(string) ? field.Text : Convert.ChangeType(field.Text, property.PropertyType, System.Globalization.CultureInfo.InvariantCulture);
         }
         AutomationProperties.SetName(input, label); body.Children.Add(input);
+        if (controller.Diagnostic && name == nameof(Settings.CachePath)) input.IsEnabled = false;
     }
     private void Save()
     {

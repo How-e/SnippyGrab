@@ -48,6 +48,18 @@ internal static class RuntimeChecks
         try
         {
             using var controller = new AppController(true, root, diagnostic: true);
+            var startupCommand = StartupService.Command;
+            var diagnosticSettings = JsonSerializer.Deserialize<Settings>(JsonSerializer.Serialize(controller.Settings))!;
+            diagnosticSettings.LaunchOnStartup = true;
+            controller.ApplySettings(diagnosticSettings);
+            Assert(!controller.Settings.LaunchOnStartup && StartupService.Command == startupCommand, "Diagnostic settings cannot change Windows startup registration");
+            controller.ConfigureHotkeys(false);
+            Assert(controller.Hotkeys.Paused, "Diagnostic hotkeys remain paused after settings/pause restoration");
+            diagnosticSettings = JsonSerializer.Deserialize<Settings>(JsonSerializer.Serialize(controller.Settings))!;
+            diagnosticSettings.CachePath = Path.Combine(root, "other-cache");
+            var cacheRejected = false;
+            try { controller.ApplySettings(diagnosticSettings); } catch (InvalidDataException) { cacheRejected = true; }
+            Assert(cacheRejected && controller.Settings.CachePath.Length == 0 && !Directory.Exists(diagnosticSettings.CachePath), "Diagnostic cache changes cannot escape the isolated root");
             var image = SyntheticCode(320, 160); var png = ImageService.Png(image);
             var record = controller.Repository.Add(png, 320, 160);
             var history = new HistoryWindow(controller) { ShowActivated = false, WindowStartupLocation = WindowStartupLocation.Manual, Left = -30000, Top = -30000 };

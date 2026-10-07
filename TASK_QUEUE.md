@@ -1,5 +1,7 @@
 # Remaining work queue
 
+Latest [agent completion review](docs/AGENT-COMPLETION-20261007.md): diagnostic settings isolation fixed, numbered interaction fixtures and repeatable local verification added, fresh-process/native OCR distributions measured. All available local stages pass; 34 required acceptance gates remain. Follow its current-build dock retest before broader receiver/hardware work.
+
 Current implementation/acceptance status is in [MILESTONES.md](docs/MILESTONES.md). Most unchecked items have committed implementations and remain open for their recorded acceptance gates. Read the closure records before treating an original issue description as still-unfixed code. Q51 native remediation is verified locally; remaining unchecked entries retain their recorded acceptance gates.
 
 Commit hashes in older closure records identify pre-rewrite source and historical package provenance. The milestone ledger uses rewritten implementation references; the external recovery bundle and commit map preserve original evidence identities.

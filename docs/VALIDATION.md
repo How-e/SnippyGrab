@@ -1,5 +1,7 @@
 # Validation — updated 2026-10-07
 
+Latest local results and exact source/probe boundaries: [agent completion review](AGENT-COMPLETION-20261007.md). All 24 local stages pass, including 231 tests and isolated native probes; the initial dock pointer-invariant failure remains recorded. Fresh-process startup/native OCR distributions and the next actual dock retest are included.
+
 ## Current remaining-work reconciliation
 
 See [REMAINING-WORK.md](REMAINING-WORK.md) for live hosted checks, publication and protection evidence. Q36, Q35 and Q06 are now closed; 34 required entries remain open. The completed manual two-hour report passes completion and trend/recovery review; see [resource acceptance](RESOURCE-REVIEW-20261007.md). No stress workload was rerun. Earlier dated results below retain their original test counts and gate counts. The read-only resource report reviewer and release-gate fixtures are verified in this reconciliation.

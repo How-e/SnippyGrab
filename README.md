@@ -8,9 +8,9 @@ A native Windows screenshot shelf for AI and developer workflows.
 
 **0.1.0 alpha:** runnable implementation with unit, integration and interactive synthetic checks. Real Codex/ChatGPT receiver acceptance and the full hardware matrix remain release gates. [Verification](docs/VALIDATION.md) · [Architecture](docs/ARCHITECTURE.md) · [Desktop acceptance](docs/ACCEPTANCE.md)
 
-The [current remaining-work review](docs/REMAINING-WORK.md) verifies GitHub checks/protection and alpha publication. There are still 35 open acceptance gates; stable readiness is not established. The [earlier local acceptance record](docs/TAKEOVER-ACCEPTANCE.md) separates short automated checks and real isolated WPF interaction from unperformed receiver/hardware tests.
+The [current remaining-work review](docs/REMAINING-WORK.md) verifies GitHub checks/protection and alpha publication. There are still 34 open acceptance gates; stable readiness is not established. The [latest agent completion review](docs/AGENT-COMPLETION-20261007.md) records current verification, startup/OCR measurements and the exact next dock retest. The [earlier local acceptance record](docs/TAKEOVER-ACCEPTANCE.md) separates short automated checks and real isolated WPF interaction from unperformed receiver/hardware tests.
 
-[Remaining work queue](TASK_QUEUE.md) tracks incomplete requirements and review findings. [User testing checklist](docs/USER-TESTING.md) explains the interactive checks requested from contributors; start with immediate Codex paste and single/multiple-image drag.
+[Remaining work queue](TASK_QUEUE.md) tracks incomplete requirements and review findings. [User testing checklist](docs/USER-TESTING.md) explains the interactive checks requested from contributors; the current next step is the reported dock regression retest on the latest local build.
 
 ## Preview
 

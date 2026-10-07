@@ -1,5 +1,7 @@
 # Milestone implementation and acceptance ledger
 
+Latest [completion evidence](AGENT-COMPLETION-20261007.md) adds diagnostic isolation (`9f40b29`), distinct interaction images (`c2810a4`), fresh-process/native OCR timing (`85a0bc5`) and repeatable verification (`d4da19f`). Required gate ownership/counts below remain unchanged; the current next step is the dock regression retest on the new local candidate.
+
 Updated 2026-10-07. This ledger separates committed implementation from release acceptance. An unchecked queue entry is a release/acceptance gate; its original problem description can describe code already fixed in the closure records. This is a runnable alpha. The foundation-first source sequence is preserved through the authorized local privacy rewrite; commit identities change. Historical packaged provenance still describes the original build. The [current reconciliation](REMAINING-WORK.md) closes Q36/Q35/Q06 and leaves 34 required gates open; the earlier local acceptance snapshot retains its original 37-gate result.
 
 | Milestone | Implemented components / commit evidence | Automated evidence | Open required gates and owner |

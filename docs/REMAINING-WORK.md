@@ -1,5 +1,7 @@
 # Remaining acceptance review — 2026-10-07
 
+The subsequent [completion review](AGENT-COMPLETION-20261007.md) adds diagnostic settings isolation, distinct interaction fixtures, all-stage verification and fresh-process/native OCR measurements. It provides a current local self-contained build and exact next dock retest. Gate count remains 34 open/17 checked; original evidence below keeps its stated scope.
+
 The earlier review inspected clean `main` at `ff0db0a` against the queue, implementation ledger and live GitHub APIs. The subsequent [15-gate agent pass](AGENT-GATE-REVIEW-20261007.md), starting at `5355aca`, now leaves **34 required gates open; 17 entries checked**. Q06 joins Q36/Q35 as closed. That pass fixed stale exports, private exception feedback and failed-edit orphan resurrection; the earlier no-new-defect finding applies only to its original review. The earlier 37-gate local acceptance snapshot remains historical.
 
 ## Work already completed

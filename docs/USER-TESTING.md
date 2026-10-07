@@ -1,5 +1,7 @@
 # Desktop testing requested from you
 
+**Current next step:** use the new local acceptance candidate and follow the ten-minute [dock regression retest](AGENT-COMPLETION-20261007.md#most-important-next-step-retest-the-reported-dock-failures). It targets the reported hover/reachability/reorder/keyboard failures with distinct synthetic images. The published alpha predates the latest fixes; the launcher verifies current source and bundle hashes. Keep previous paste/drop passes below.
+
 The [2026-10-07 acceptance record](TAKEOVER-ACCEPTANCE.md) records fresh computer-use checks against the packaged native upgrade, including editor close/Discard, shelf keyboard selection and PNG export/overwrite. These use isolated synthetic data and intercepted clipboard writes. External receiver, recovery, hardware, accessibility and prolonged gates remain open. Earlier results below are historical observations of their stated builds.
 
 Start with **U01–U05**, about 20–30 minutes. These validate the actual AI workflow that automated checks cannot prove. Remaining tests depend on available hardware/apps and can be scheduled later. Mark unavailable environments **NOT AVAILABLE**; you do not need to acquire hardware or install every listed app.

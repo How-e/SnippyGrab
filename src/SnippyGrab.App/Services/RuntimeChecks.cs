@@ -343,12 +343,31 @@ internal static class RuntimeChecks
             Assert(text.Contains("CS1002", StringComparison.OrdinalIgnoreCase) && text.Contains("Build", StringComparison.OrdinalIgnoreCase), "Local OCR recognition");
             tests["ocr"] = new { RecognizedExpectedTokens = true, ElapsedMs = timer.ElapsedMilliseconds };
             var window = new Window { Title = "SnippyGrab synthetic runtime check", Width = 400, Height = 240, Background = Brushes.RoyalBlue, Content = new TextBlock { Text = "SYNTHETIC CHECK", Foreground = Brushes.White, FontSize = 22, Margin = new Thickness(30) }, WindowStartupLocation = WindowStartupLocation.CenterScreen, ShowInTaskbar = false };
-            window.Show(); window.UpdateLayout(); await Task.Delay(200); Native.DwmFlush();
-            Native.GetWindowRect(new WindowInteropHelper(window).Handle, out var rect);
+            window.Show(); window.Topmost = true; window.UpdateLayout();
+            var handle = new WindowInteropHelper(window).Handle;
+            // Command runners may give WinExe an initially hidden startup window.
+            Assert(Native.SetWindowPos(handle, -1, 0, 0, 0, 0, 0x53), "Expose synthetic test HWND without activating it");
+            // Check the actual exposed pixels rather than assuming a fixed startup delay
+            // guarantees that the compositor has rendered an unoccluded test window.
+            var ready = Stopwatch.StartNew();
+            Native.RECT rect = default;
+            var center = new byte[4];
+            var exposed = false;
+            while (true)
+            {
+                await Task.Delay(100); Native.DwmFlush();
+                Native.GetWindowRect(handle, out rect);
+                var point = new Native.POINT { X = (rect.Left + rect.Right) / 2, Y = (rect.Top + rect.Bottom) / 2 };
+                exposed = Native.GetAncestor(Native.WindowFromPoint(point), 2) == handle;
+                var sample = ImageService.Capture(rect.Pixels, false);
+                sample.CopyPixels(new Int32Rect(sample.PixelWidth / 2, sample.PixelHeight / 2, 1, 1), center, 4, 0);
+                if (exposed && center[0] > 140 && center[2] < 100) break;
+                Assert(ready.Elapsed < TimeSpan.FromSeconds(3), $"Exposed rendered blue test window within three seconds (exposed={exposed}, bounds={rect.Pixels}, BGR={center[0]},{center[1]},{center[2]}, style={Native.GetWindowLongPtr(handle, -16):X}, extended={Native.GetWindowLongPtr(handle, -20):X})");
+            }
             timer.Restart(); var captured = ImageService.Capture(rect.Pixels, false); var bytes = ImageService.Png(captured); var captureTime = timer.ElapsedMilliseconds;
             Assert(captured.PixelWidth == rect.Pixels.Width && bytes.Length > 0, "Native physical capture");
             // Confirm pixels rather than inferring rendering from a HWND alone.
-            var center = new byte[4]; captured.CopyPixels(new Int32Rect(captured.PixelWidth / 2, captured.PixelHeight / 2, 1, 1), center, 4, 0);
+            captured.CopyPixels(new Int32Rect(captured.PixelWidth / 2, captured.PixelHeight / 2, 1, 1), center, 4, 0);
             Assert(center[0] > 140 && center[2] < 100, "Rendered blue window pixels");
             window.Close(); tests["native_capture"] = new { Bounds = rect.Pixels, EncodeIncludedMs = captureTime, BluePixelsVerified = true };
             using (var hotkeys = new HotkeyService())

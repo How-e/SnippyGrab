@@ -2,6 +2,7 @@
 
 ## 0.1.0-alpha.queue.20261006.3 — 2026-10-06
 
+- Initial publication verification on 2026-10-07 fixed clean native builds under warnings-as-errors and made the synthetic desktop self-test wait for its own exposed pixels. Source pins and production capture behavior are preserved.
 - Added color sampling from flattened edits and point-centered magnification without changing undo history.
 - Detached pin position/size/opacity/topmost/click-through persist on explicit reopen, with disconnected-display clamping and continuous opacity adjustment.
 - Added editor input names, theme-aware contrast, stable focus borders, opaque high-contrast shelf and reachable narrow-shelf action menus.

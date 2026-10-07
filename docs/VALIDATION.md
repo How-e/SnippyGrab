@@ -1,5 +1,7 @@
 # Validation — updated 2026-10-07
 
+Latest [P0 acceptance](P0-ACCEPTANCE-20261007.md): Q02/Q03 CLOSED with native isolated storage/editor/recovery gestures, actual OS clipboard contention/retry, owner tray Exit/Discard and restart evidence. Zero-warning Release build, 170 core + 61 Windows tests and full formatting PASS. **32 required gates remain open; 19 entries checked.** Older counts and scope statements below are historical.
+
 Latest local results and exact source/probe boundaries: [agent completion review](AGENT-COMPLETION-20261007.md). All 24 local stages pass, including 231 tests and isolated native probes; the initial dock pointer-invariant failure remains recorded. Fresh-process startup/native OCR distributions and the next actual dock retest are included.
 
 ## Current remaining-work reconciliation

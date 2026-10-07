@@ -12,6 +12,10 @@ This is alpha acceptance. Implementations and agent checks are recorded in [TASK
 
 ## Recorded user results — 2026-10-07
 
+### P0 editor/recovery acceptance
+
+Q02 and Q03 are now PASS / CLOSED in [the P0 acceptance record](P0-ACCEPTANCE-20261007.md). Owner supplied the actual fixture tray Exit clicks for blocked and successful multi-editor shutdown, and clicked Discard on a pending synthetic edit. Independent report/file/clipboard inspection verified each outcome. Agent exercised real metadata/OS clipboard locks, native close/retry, recovery Cancel/failed promotion/confirmation and process restarts in isolated synthetic data. No further P0 user input is needed. The current next receiver check below remains separate.
+
 ### Current local dock retest
 
 Owner tested `0.1.0-alpha.acceptance.20261007.1+6849be66527cc69254addb551b2dcc6d75b4931f`; report `artifacts/acceptance-results/interactive-20261007-160916-061.json`. The isolated fixture uses intercepted clipboard writes. Reported monitor DPIs are 96/96/144 (100%/100%/150%). Windows build was not supplied in this feedback. The attached screenshot is not copied into Git.

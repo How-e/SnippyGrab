@@ -1,7 +1,8 @@
-param([string]$Version = '0.1.0-alpha', [switch]$RequireTag)
+param([string]$Version = '0.1.0-alpha', [switch]$RequireTag, [string]$SigningThumbprint, [string]$TimestampServer)
 $ErrorActionPreference = 'Stop'
 if ($Version -notmatch '^\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?$') { throw 'Invalid release version.' }
 $repoRoot = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot 'sign-artifact.ps1')
 $revision = git -C $repoRoot rev-parse HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Git provenance unavailable.' }
 $dirty = [bool](git -C $repoRoot status --porcelain)
@@ -29,6 +30,7 @@ Get-ChildItem (Join-Path $repoRoot 'src') -Recurse -Filter 'packages*.lock.json'
 Copy-Item -LiteralPath (Join-Path $repoRoot 'licenses') -Destination $stagingPath -Recurse
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'install.ps1') -Destination $stagingPath
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'install-files.ps1') -Destination $stagingPath
+Invoke-SnippySigning -Path (Join-Path $stagingPath 'SnippyGrab.exe') -Thumbprint $SigningThumbprint -TimestampServer $TimestampServer
 if (Test-Path -LiteralPath $bundlePath) {
     $oldPath = $bundlePath + '-previous-' + [Guid]::NewGuid().ToString('N')
     Move-Item -LiteralPath $bundlePath -Destination $oldPath
@@ -47,6 +49,7 @@ dotnet publish (Join-Path $repoRoot 'src/SnippyGrab.Installer') -c Release -r wi
 if ($LASTEXITCODE -ne 0) { throw 'Installer publish failed.' }
 $installerPath = Join-Path $artifactRoot "SnippyGrab-$Version-Setup.exe"
 Copy-Item -LiteralPath (Join-Path $installerStage 'SnippyGrab-Setup.exe') -Destination $installerPath -Force
+Invoke-SnippySigning -Path $installerPath -Thumbprint $SigningThumbprint -TimestampServer $TimestampServer
 '{0}  {1}' -f (Get-FileHash -LiteralPath $installerPath -Algorithm SHA256).Hash.ToLowerInvariant(), [IO.Path]::GetFileName($installerPath) | Set-Content -LiteralPath "$installerPath.sha256" -Encoding utf8
 Write-Output $installerPath
 . (Join-Path $PSScriptRoot 'artifact-retention.ps1')

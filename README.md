@@ -8,6 +8,10 @@ A native Windows screenshot shelf for AI and developer workflows.
 
 **0.1.0 alpha:** runnable implementation with unit, integration and interactive synthetic checks. Real Codex/ChatGPT receiver acceptance and the full hardware matrix remain release gates. [Verification](docs/VALIDATION.md) · [Architecture](docs/ARCHITECTURE.md) · [Desktop acceptance](docs/ACCEPTANCE.md)
 
+The [latest local acceptance record](docs/TAKEOVER-ACCEPTANCE.md) separates short automated checks and real isolated WPF interaction from unperformed receiver/hardware tests. There are still 37 open acceptance gates; stable readiness is not established.
+
+[Remaining work queue](TASK_QUEUE.md) tracks incomplete requirements and review findings. [User testing checklist](docs/USER-TESTING.md) explains the interactive checks requested from contributors; start with immediate Codex paste and single/multiple-image drag.
+
 ## Preview
 
 Synthetic content rendered by the actual WPF interface; no private captures.
@@ -139,7 +143,9 @@ The English OCR model is checked at runtime against its pinned SHA-256. Missing/
 
 Settings retention uses named 1-hour/24-hour/7-day/never choices and preserves saved custom durations. Animation fades new shelf arrivals only; it respects Windows motion/high-contrast preferences. Reset creates a draft of defaults; Cancel leaves saved settings unchanged. Updates remain manual/offline.
 
+
 An unsigned self-contained SnippyGrab-<version>-Setup.exe installer is generated alongside the portable ZIP. It verifies embedded payload hashes, installs for the current user, and makes login startup opt-in. Its packaged PowerShell installation runs with a process-local execution-policy override; organization policy can still block it. No system preference/policy is changed. SmartScreen and offline Visual C++ OCR prerequisites still apply.
+
 
 Editor inspection tools: select **Magnify** and click the image to double zoom around that point; Shift-click halves zoom. Existing Fit/100% and Ctrl+wheel remain available. **Pick image color** samples one pixel from the flattened current edits into the annotation HEX field, including crop/effect/redaction results. It leaves the document/undo history unchanged and performs no continuous background sampling.
 

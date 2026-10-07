@@ -1,10 +1,10 @@
-# Manual two-hour resource test — 
+# Manual two-hour resource test — Q35
 
-You will run this test manually.  stays open until the completed report and resource trends have been reviewed. The agent's interrupted two-hour attempt is not a pass and will not be resumed automatically.
+You will run this test manually. Q35 stays open until the completed report and resource trends have been reviewed. The agent's interrupted two-hour attempt is not a pass and will not be resumed automatically.
 
 Use the complete portable **0.1.0-alpha.queue.20261006.3** folder, including its x64 native libraries and tessdata. No compiler is required. Allow at least two hours plus startup/cleanup, enough free disk space for thousands of synthetic captures, and keep Windows awake. Avoid running another heavy benchmark at the same time.
 
-Run this in PowerShell; adjust only the executable path if you move the complete portable folder:
+Run this in PowerShell from the repository root. For a moved portable folder, set `$bundle` to that complete folder instead; keep its native libraries and model beside the executable:
 
 ```powershell
 $bundle = Resolve-Path '.\artifacts\SnippyGrab-0.1.0-alpha.queue.20261006.3-win-x64'
@@ -28,4 +28,4 @@ Review `WorkingBytes`, `PrivateBytes`, `ManagedBytes`, `Handles`, `GdiHandles`, 
 
 If you must stop, use `Stop-Process -Id <printed test process ID>` for this test process only. An interrupted report remains `RUNNING` and the isolated temporary cache may remain; do not delete your normal app cache. Preserve the report for diagnosis.
 
-Report the build, Windows version, duration/cycles/OCR count, completion status, early/middle/final and post-GC/disposal resource values, other heavy workloads, and any freeze/crash or rising trend. No screenshots or private captures are needed. A two-hour pass covers this workload on your environment; all-day use, real idle/startup and the broader  latency comparison remain separate evidence.
+Report the build, Windows version, duration/cycles/OCR count, completion status, early/middle/final and post-GC/disposal resource values, other heavy workloads, and any freeze/crash or rising trend. No screenshots or private captures are needed. A two-hour pass covers this workload on your environment; all-day use, real idle/startup and the broader Q34 latency comparison remain separate evidence.

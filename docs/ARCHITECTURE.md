@@ -21,3 +21,4 @@ Clipboard uses bounded asynchronous retries. Capture/save/OCR/cache failures sho
 
 ## Release
 Self-contained portable executable plus OCR resources; per-user executable setup plus script installer, no elevation. Stable packaging enforces the recorded P0/P1 queue gates; optional external Authenticode stays disabled by default. GitHub tag workflow builds/tests, bundles license notices and generates SHA-256. Native OCR sidecars remain beside the executable. Unsigned alpha until external desktop acceptance passes; no stable claim from unit tests alone.
+

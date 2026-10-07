@@ -17,7 +17,7 @@ Leptonica's external GIF/JPEG/PNG/TIFF/WebP/OpenJPEG/zlib options are all OFF. T
 
 The ignored cache is artifacts/native-ocr. Build outputs include NATIVE-OCR-PROVENANCE.json with source commits, recipe SHA-256, generator/configuration and the exact two DLL hashes. Policy verifies that receipt against the committed sources/recipe and file bytes before version inventory or packaging. This is a trusted build-machine receipt, not a signed external attestation. Same-user modification of source/build tools/receipts remains outside the application's isolation boundary. Rebuild sources are retained for inspection; no source cache is recursively deleted by provisioning. Old source-build directories can be archived deliberately after recipe changes.
 
-Upstream compilation currently emits MSVC warning C4849 for a SIMD OpenMP reduction pragma with OpenMP off; the compiler ignores that optimization. The managed warnings-as-errors build still has zero warnings/errors. Build timestamps/compiler/path differences can change native DLL hashes; each build records its own hashes. No independent native byte-reproducibility claim is made.  carries that separate release evidence.
+Upstream compilation currently emits MSVC warning C4849 for a SIMD OpenMP reduction pragma with OpenMP off; the compiler ignores that optimization. The managed warnings-as-errors build still has zero warnings/errors. Build timestamps/compiler/path differences can change native DLL hashes; each build records its own hashes. No independent native byte-reproducibility claim is made. Q42 carries that separate release evidence.
 
 ## Advisory mapping
 

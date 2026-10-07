@@ -14,12 +14,17 @@ After publication, enable private vulnerability reporting, secret scanning/push 
 
 Release metadata derives from assembly informational version, including commit identity. Bundles carry BUILD-PROVENANCE.json (version, commit, dirty status, SDK, lock hashes and native digests) plus the curated CHANGELOG. Hosted tag packaging requires a clean matching tag. Archive entries are sorted with fixed 1980 timestamps; identical inputs produce identical ZIPs under the same compression runtime. This is archive reproducibility, not proof that independent ReadyToRun/signing builds are byte-identical. Use scripts/archive.ps1 to compare fixed-input archives. Local development packages explicitly record a dirty source tree.
 
+
 Installation/upgrade stages and verifies the entire bundle before switching directories. An older application directory is moved to a SnippyGrab-backup-<id> sibling, keeping obsolete sidecars out of the active installation and preserving unknown files for rollback. Failed registration restores the previous files/shortcut/registry values. User captures/settings remain in their separate data directory. Successful upgrade backups are retained for deliberate review/removal. The isolated file lab covers fresh install, obsolete sidecars, rollback, checksum failure and user-data preservation; it does not prove Windows 10/11 clean-profile/login or Apps uninstall acceptance.
+
 
 Packaging retains the latest three registered build groups. Cleanup checks direct-child paths, rejects redirects, compares full file inventories/hashes and skips running or modified outputs. Run pwsh scripts/artifact-retention.ps1 to review a plan; -Apply executes it. Older unregistered bundles and failed staging directories are left for explicit review. The isolated fixture verifies dry-run behavior, three-build retention, modified/unowned preservation and path rejection. Cleanup never targets application cache/settings or installed backups.
 
-### Optional signing and language scope 
+
+### Optional signing and language scope (Q48)
 
 Packaging is unsigned by default. On a protected Windows signing machine, provision a code-signing certificate with its private key in CurrentUser/My outside this repository, then pass `-SigningThumbprint <40-hex-thumbprint>` to package.ps1. An optional `-TimestampServer https://...` enables the chosen timestamp service. No PFX path/password is accepted or stored by these scripts. The hook signs SnippyGrab.exe before bundle checksums/archive/installer embedding, then signs setup before its final checksum. Every signature must validate and match the supplied identity or packaging stops. Native dependency digests are preserved. Do not provision the certificate in PR jobs; use a protected release environment. The eight signing fixtures inject results, never access credentials/network, and do not establish actual signed/SmartScreen acceptance.
 
 English remains the only supported offline OCR language for this release. Additional languages are deferred: each future model needs immutable source/hash/license admission, explicit setup selection, resource measurement and corpus validation. No runtime language downloads are introduced.
+
+Stable packaging now enforces all 51 queue identities and refuses an unqualified stable version while any P0/P1 entry remains unchecked. Prerelease packaging reports the remaining count and preserves alpha evaluation. This prevents local or hosted stable artifacts bypassing recorded release gates. Checkboxes must still be backed by the closure records and milestone evidence; this parser does not invent acceptance. No gate-override flag is provided.

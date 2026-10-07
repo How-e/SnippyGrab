@@ -4,13 +4,13 @@
 2. Complete docs/ACCEPTANCE.md and update docs/VALIDATION.md. Keep incomplete builds prerelease.
 3. Update CHANGELOG.md; run `pwsh ./scripts/package.ps1 -Version 0.1.0-alpha`.
 4. Run the bundle executable with `--self-test` on an interactive desktop; test install/removal in a disposable user profile.
-5. Once a GitHub remote exists, push a reviewed version tag. The tag workflow builds/tests and publishes ZIP + SHA-256 using the ephemeral GitHub token. Ordinary PR builds need no secrets.
+5. For the configured How-e/SnippyGrab remote, push an authorized reviewed version tag. The tag workflow builds/tests and publishes ZIP/setup + SHA-256 using the ephemeral GitHub token. Ordinary PR builds need no signing credentials or application secrets. The initial alpha upload required manual recovery; verify the corrected upload end to end on the next authorized release.
 
 .NET is bundled. OCR native DLLs and English model must stay beside the executable. OCR may additionally require Microsoft VC++ 2015–2022 x64 redistributable. No binaries/models in Git; provisioning pins model commit and SHA-256. Full dependency licenses accompany releases.
 
 Initial builds are unsigned; SmartScreen can warn. SHA-256 verifies download integrity, not publisher identity. Add Authenticode through a protected environment/external signer, then regenerate checksums. Never put a PFX/private key in source. SDK 10.0.400 and separate build/publish lock files are pinned. Update these deliberately when servicing the runtime; compilation is deterministic for the same SDK/dependencies; fixed archive timestamps/order remove ZIP timestamp drift, while independent native/signing builds still need separate reproducibility evidence.
 
-After publication, enable private vulnerability reporting, secret scanning/push protection, required CI/CodeQL, protected main and restricted tags. These GitHub settings cannot be configured by source files alone.
+Private vulnerability reporting, secret scanning/push protection, required CI/CodeQL, protected main and restricted tags are enabled and verified in [the current review](REMAINING-WORK.md). Recheck these service settings before future releases; source files alone cannot enforce them.
 
 Release metadata derives from assembly informational version, including commit identity. Bundles carry BUILD-PROVENANCE.json (version, commit, dirty status, SDK, lock hashes and native digests) plus the curated CHANGELOG. Hosted tag packaging requires a clean matching tag. Archive entries are sorted with fixed 1980 timestamps; identical inputs produce identical ZIPs under the same compression runtime. This is archive reproducibility, not proof that independent ReadyToRun/signing builds are byte-identical. Use scripts/archive.ps1 to compare fixed-input archives. Local development packages explicitly record a dirty source tree.
 

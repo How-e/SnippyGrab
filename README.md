@@ -8,7 +8,7 @@ A native Windows screenshot shelf for AI and developer workflows.
 
 **0.1.0 alpha:** runnable implementation with unit, integration and interactive synthetic checks. Real Codex/ChatGPT receiver acceptance and the full hardware matrix remain release gates. [Verification](docs/VALIDATION.md) · [Architecture](docs/ARCHITECTURE.md) · [Desktop acceptance](docs/ACCEPTANCE.md)
 
-The [latest local acceptance record](docs/TAKEOVER-ACCEPTANCE.md) separates short automated checks and real isolated WPF interaction from unperformed receiver/hardware tests. There are still 37 open acceptance gates; stable readiness is not established.
+The [current remaining-work review](docs/REMAINING-WORK.md) verifies GitHub checks/protection and alpha publication. There are still 36 open acceptance gates; stable readiness is not established. The [earlier local acceptance record](docs/TAKEOVER-ACCEPTANCE.md) separates short automated checks and real isolated WPF interaction from unperformed receiver/hardware tests.
 
 [Remaining work queue](TASK_QUEUE.md) tracks incomplete requirements and review findings. [User testing checklist](docs/USER-TESTING.md) explains the interactive checks requested from contributors; start with immediate Codex paste and single/multiple-image drag.
 
@@ -102,11 +102,11 @@ OCR provisioning pins model commit and SHA-256; NuGet versions/hashes are locked
 
 On an idle interactive desktop, run the executable with `--self-test C:/absolute/checks.json` or `--benchmark C:/absolute/benchmarks.json`. These temporarily show synthetic windows and move the pointer; ordinary tests need no interactive desktop.
 
-CI builds/tests, verifies formatting and audits dependencies. CodeQL runs separately. Tags publish ZIP + SHA-256 once a remote exists. [Release guide](docs/RELEASING.md)
+CI builds/tests, verifies formatting and audits dependencies. CodeQL runs separately. The configured GitHub repository protects main and version tags. Tag workflows build and publish ZIP/setup + SHA-256; the initial upload required manual recovery and its correction is merged. [Release guide](docs/RELEASING.md)
 
 ## Known limitations
 
-- Alpha: actual Codex/ChatGPT/VS Code/browser drop and paste acceptance is pending; receiver support varies.
+- Alpha: the owner reported successful Codex/ChatGPT/VS Code/browser drop and paste. Exact-version, selection/order and delayed-read acceptance remains incomplete; receiver support varies.
 - GDI produces SDR; HDR colors can differ. Window capture uses visible pixels, without reconstructing occluded/minimized/protected windows.
 - Physical selections passed at 100% and 150% on the connected mixed-DPI layout. 125/175/200%, vertical/HDR screens, Explorer restart, sleep/resume, text scaling and prolonged stress need acceptance.
 - A short fresh-process sample measured about 128 MB tray working set. Long-term resources and startup latency need more benchmarking; .NET packaging is larger than a C++ utility. The user-run [two-hour resource test instructions](docs/RESOURCE-TESTING.md) provide the packaged command and reporting criteria.

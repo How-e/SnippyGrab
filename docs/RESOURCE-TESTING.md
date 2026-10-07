@@ -29,3 +29,11 @@ Review `WorkingBytes`, `PrivateBytes`, `ManagedBytes`, `Handles`, `GdiHandles`, 
 If you must stop, use `Stop-Process -Id <printed test process ID>` for this test process only. An interrupted report remains `RUNNING` and the isolated temporary cache may remain; do not delete your normal app cache. Preserve the report for diagnosis.
 
 Report the build, Windows version, duration/cycles/OCR count, completion status, early/middle/final and post-GC/disposal resource values, other heavy workloads, and any freeze/crash or rising trend. No screenshots or private captures are needed. A two-hour pass covers this workload on your environment; all-day use, real idle/startup and the broader Q34 latency comparison remain separate evidence.
+
+After completion, the read-only reviewer can summarize the report without rerunning the workload:
+
+```powershell
+pwsh ./scripts/review-resource-report.ps1 -Report $report
+```
+
+It reports `TwoHourWorkloadComplete`, all sample resources, workload changes and interval CPU as percent of one core (100% is one fully busy logical core). The existing harness's final two PASS samples are labeled post-GC and disposed; RUNNING samples are never labeled as recovery. Malformed, nonnumeric or nonmonotonic counters are rejected. Completion is separate from trend/recovery acceptance: no automatic leak verdict, resource cutoff or queue change is made. Full JSON output can remain local; private screenshots are unnecessary.

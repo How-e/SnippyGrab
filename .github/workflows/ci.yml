@@ -21,6 +21,7 @@ jobs:
         run: |
           ./scripts/test-native-ocr-policy.ps1
           ./scripts/test-release-gates.ps1
+          ./scripts/test-resource-review.ps1
           ./scripts/test-signing.ps1
           ./scripts/test-installer.ps1
           ./scripts/test-install-files.ps1

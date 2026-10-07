@@ -1,5 +1,9 @@
 # Validation — updated 2026-10-07
 
+## Current remaining-work reconciliation
+
+See [REMAINING-WORK.md](REMAINING-WORK.md) for live hosted checks, publication and protection evidence. Q36 is now closed; 36 required entries remain open. The user's manual two-hour resource run is ongoing pending completion/trend review; no new workload was started. Earlier dated results below retain their original test counts and gate counts. The read-only resource report reviewer and release-gate fixtures are verified in this reconciliation.
+
 ## Current short verification
 
 See [the latest acceptance record](TAKEOVER-ACCEPTANCE.md) for the environment, real computer-use observations, unavailable cases and exact release gates. Locked restore, zero-warning/error Release build, 152 core tests, 54 Windows integration tests on isolated rerun, formatting, dependency/native integrity, policy fixtures and package verification pass. The first Windows run had one foreground-window assertion failure during desktop focus activity; the rerun passed without concurrent UI actions. These checks do not close broad acceptance gates.

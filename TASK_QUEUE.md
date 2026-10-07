@@ -4,11 +4,11 @@ Current implementation/acceptance status is in [MILESTONES.md](docs/MILESTONES.m
 
 Commit hashes in older closure records identify pre-rewrite source and historical package provenance. The milestone ledger uses rewritten implementation references; the external recovery bundle and commit map preserve original evidence identities.
 
-Latest short automated and real isolated desktop retest: [2026-10-07 acceptance record](docs/TAKEOVER-ACCEPTANCE.md). Results are scoped to observed behavior; 37 entries remain unchecked and 14 checked. Stable packaging remains blocked. Current release documents are retained because packaging reads this queue; stale planning snapshots and commit messages are sanitized by the authorized local privacy rewrite.
+Current reconciliation: [remaining acceptance review](docs/REMAINING-WORK.md). Q36 hosted repository/checks/protection is closed; **36 entries remain unchecked and 15 checked**. The [earlier local acceptance record](docs/TAKEOVER-ACCEPTANCE.md) retains its historical 37/14 snapshot. Stable packaging remains blocked. The user-run two-hour test is ongoing pending report review. Current release documents are retained because packaging reads this queue.
 
 Audited 2026-10-06 against the original product brief, source at `28ae9dc`, and [recorded validation](docs/VALIDATION.md). Updated with [user-reported U01–U06 results](docs/USER-TESTING.md#recorded-user-results--2026-10-06) on 2026-10-06. These are user observations, not newly run agent checks; the tested build and receiver version were not supplied. The project is a runnable **0.1.0 alpha**, not a verified stable release.
 
-The foundation was committed before feature implementation. Native WPF capture, clipboard/file payloads, compact shelf, annotation tools, local OCR, tray, startup, settings, history, pins, tests and packaging are implemented. Recorded checks include 48 core tests, 10 Windows integration tests, synthetic desktop/OLE checks and local install/uninstall. Those checks do not establish external application compatibility or the complete hardware matrix. There is currently no configured Git remote or observed hosted CI/release run.
+The foundation was committed before feature implementation. Native WPF capture, clipboard/file payloads, compact shelf, annotation tools, local OCR, tray, startup, settings, history, pins, tests and packaging are implemented. Later validation records 152 core and 54 Windows integration tests, synthetic desktop/OLE checks and local install/uninstall. Hosted CI/CodeQL, protected main/tags and the published alpha are now verified in the current reconciliation; complete receiver/hardware acceptance remains open.
 
 ## How to work this queue
 
@@ -37,7 +37,7 @@ Use this order across milestone sections; Q numbers remain stable references, no
 | 10 | Q08, Q10, Q11, Q31, Q12 | Remaining capture modes, hardware matrix and external receivers; retain reported Codex successes. |
 | 11 | Q20, Q24, Q23, Q34, Q35 | Remaining editor/OCR cases and measured responsiveness/resource use. U04/U05 reported success reduces immediate retest urgency. |
 | 12 | Q25, Q26, Q27 | OS lifecycle and settings/startup verification; Q17 edge implementation complete. |
-| 13 | Q01, Q33, Q40, Q41, Q42, Q43, Q36, Q44 | Consolidate evidence, remaining automated boundaries, packaging and hosted release gates. Q36 needs a user-designated repository. |
+| 13 | Q01, Q33, Q40, Q41, Q42, Q43, Q36, Q44 | Consolidate remaining acceptance. Q36 is closed with hosted evidence; Q33/Q40/Q42/Q43 are already checked. Q41 clean-user acceptance and Q44 GIF/stable/next-release upload verification remain. |
 | 14 | Q47, Q46, Q45, Q48 | P2 enhancements after required reliability and acceptance work. |
 
 ## Testing findings driving the next fixes
@@ -52,7 +52,7 @@ Use this order across milestone sections; Q numbers remain stable references, no
 
 | Original requirement | Current state | Remaining entries |
 |---|---|---|
-| M0 foundation, architecture, privacy, repository files | Implemented locally; milestone closure and hosted checks incomplete | Q01, Q36–Q39 |
+| M0 foundation, architecture, privacy, repository files | Implemented; hosted checks/protection verified; final milestone acceptance incomplete | Q01 |
 | M1 capture, configurable hotkeys, monitor/DPI correctness | Implemented; partial hardware verification | Q08–Q11, Q31 |
 | M2 clipboard, safe temporary files and retention | Implemented; fault handling and lifecycle gaps | Q02–Q07, Q12–Q14, Q33 |
 | M3 transparent compact dock and configuration | Implemented; reported hover/collapse/reorder/keyboard failures, edge positions and accessibility incomplete | Q15–Q19, Q32, Q49 |
@@ -62,7 +62,7 @@ Use this order across milestone sections; Q numbers remain stable references, no
 | M7 tray/startup/settings/first run | Implemented; resilience and settings behavior verification pending | Q09, Q25–Q28, Q34 |
 | M8 history/pinning | Implemented; recovery, restoration and detached pin lifecycle gaps | Q03–Q07, Q22, Q29 |
 | M9 security/performance/accessibility hardening | Initial model/tests/short benchmarks exist; extended coverage pending | Q10–Q14, Q19, Q23, Q31–Q39 |
-| M10 distributable and reproducible GitHub release | Local self-contained ZIP and script installer work; public release absent | Q36, Q40–Q44 |
+| M10 distributable and reproducible GitHub release | Self-contained ZIP/setup and one public alpha; clean-profile/stable acceptance incomplete | Q41, Q44 |
 | Optional detached-pin refinements/editor extras | Basic detached pins and spotlight exist; further enhancements deferred | Q45–Q48 |
 
 ## M0 — process and verification
@@ -128,10 +128,10 @@ Use this order across milestone sections; Q numbers remain stable references, no
 - [x] **Q33 · P1 · Agent — Expand automated boundary tests.** Add meaningful coverage for storage fault/crash recovery, migrations/newer schemas, startup registration failures, selection payload construction, clipboard retries, DPI placement, actual editor document undo/redo/effects and OCR service boundaries. Inject OS/service boundaries where necessary instead of duplicating implementation in tests. Preserve headless PR tests; native desktop tests remain a separate lane.
 - [ ] **Q34 · P1 · Shared — Measure startup and end-to-end capture latency.** Instrument hotkey-to-overlay, mouse-release-to-file/dock/clipboard, cold/warm launch and first OCR. Existing encoding and small GDI timings exclude important workflow steps. Benchmark representative 1080p/4K/8K cases and compare the normal region workflow with Windows Snipping Tool on the same machine. Agree/report performance targets with distributions and hardware details, not an isolated best sample.
 - [ ] **Q35 · P1 · Agent — Run prolonged resource/stress testing.** Measure CPU, working/private memory, GDI/user handles and recovery over hours and hundreds of captures; include editors/effects, OCR, multiple pins and history=never. Short five-second idle samples do not establish all-day behavior. Verify disposal and bounded caches/undo; distinguish fresh-tray measurements from full-desktop self-test peaks.
-- [ ] **Q36 · P1 · Shared — Configure GitHub and observe hosted checks.** No remote is configured. With a user-designated repository, publish the reviewed repository and run PR CI, CodeQL and a prerelease workflow. Enable appropriate branch/tag protections, private vulnerability reporting, Dependabot and available secret scanning. Ordinary PR builds must require no secrets. Remote creation/publication needs user direction; do not invent a destination or transmit captures.
+- [x] **Q36 · P1 · Shared — Configure GitHub and observe hosted checks.** The designated How-e/SnippyGrab remote, successful hosted CI/CodeQL, main/tag protections, private reporting, Dependabot and available secret scanning/push protection are verified. Tagged build/test/security/package/checksum steps passed; upload failed and was manually recovered for the sole published alpha. Upload correction is merged; next-release end-to-end automated publication remains an explicit Q44 follow-up. See [current evidence](docs/REMAINING-WORK.md). Ordinary build jobs use no signing credentials or application secrets.
 - [x] **Q37 · P1 · Agent — Make dependency/security checks enforce policy.** All reported NuGet vulnerabilities fail, including transitive/unknown severity; no exceptions. Fourteen fixtures, restore warnings-as-errors and live audit pass. Native/model digests are checked by CI/package, Actions are pinned with Dependabot, and native advisory findings are documented. Q51 carries native inventory/upgrade; Q36 carries hosted execution.
 - [x] **Q38 · P1 · Agent — Finish import/storage security review.** Real supported-codec, disguised/truncated/oversized-image and isolated junction-substitution tests pass. Managed paths are rechecked before operations, including constructors. External drop is disabled; DLL search is constrained; source inspection found no runtime networking/IPC or metadata execution. Same-user races and native codec limits are explicit in the reviewed threat model.
-- [x] **Q39 · P1 · Agent — Close the threat model with evidence.** Local source/tracked-file/artifact review, compiler/analyzer results and residual mitigations are recorded in THREAT-MODEL.md and DEPENDENCY-REVIEW.md. No private captures/settings, credentials or build outputs are tracked. Stable approval still requires Q51 and hosted analysis Q36; local review does not close either.
+- [x] **Q39 · P1 · Agent — Close the threat model with evidence.** Local source/tracked-file/artifact review, compiler/analyzer results and residual mitigations are recorded in THREAT-MODEL.md and DEPENDENCY-REVIEW.md. No private captures/settings, credentials or build outputs are tracked. Q51 native remediation and Q36 hosted analysis are now separately closed; broader stable acceptance remains open.
 - [x] **Q51 · P1 · Agent — Resolve native OCR component security gate.** Inventory the exact embedded Tesseract/Leptonica and codec versions, map applicable upstream advisories, and produce a tested native upgrade or explicitly accepted narrower scope. Pinned trusted traineddata mitigates model admission; hashes and an empty NuGet report do not patch native vulnerabilities. Require real packaged OCR, corpus/cancellation/error regressions and licenses after any upgrade. Blocks broad stable security acceptance.
 
 ## M10 — packaging and release
@@ -150,6 +150,10 @@ Use this order across milestone sections; Q numbers remain stable references, no
 - [x] **Q48 · P2 · Agent — Prepare secure future signing and optional OCR languages.** Add a disabled, documented signing hook that accepts externally supplied credentials without committing keys/certificates. Decide whether language provisioning belongs in a later release; English-only local OCR is the initial scope. Neither task authorizes network OCR, telemetry or mandatory updates.
 
 ## Closure record
+
+Q36 closure | review at ff0db0a; published v0.1.0-alpha.queue.20261006.3; upload fix PR #8 | live GitHub API verifies CI/CodeQL passes at recorded PR/main revisions, branch/tag protections, reporting/scanning/Dependabot enabled and zero open alerts; tagged build/test/security/package verification passed | designated remote and alpha publication complete | upload required manual recovery; corrected full workflow publication not yet observed and remains Q44; no stable/hardware/resource acceptance claim | 2026-10-07
+
+Q35 review preparation | read-only resource-report reviewer | completion/incomplete/malformed-report and CPU/phase fixtures; no stress workload launched | user's manual two-hour run ongoing; final report pending | trend/recovery inspection still required; Q35 stays unchecked | 2026-10-07
 
 For each completed item append: `ID | commit/build | automated evidence | user test IDs/results | remaining limitation | date`. Keep private screenshots, OCR text, machine-specific settings and logs out of Git. A failed user test creates a linked fix/retest item; it does not close the original acceptance gate.
 

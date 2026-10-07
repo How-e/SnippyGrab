@@ -22,6 +22,13 @@ internal sealed class AppController : IDisposable
     public DockWindow Dock { get; }
     public bool Exiting { get; private set; }
     internal bool Diagnostic { get; }
+    internal IReadOnlyCollection<EditorWindow> AcceptanceEditors => editors.Values.ToArray();
+    internal void ShowAcceptanceTray()
+    {
+        if (!Diagnostic) throw new InvalidOperationException("Acceptance tray requires diagnostic isolation.");
+        tray.Text = "SnippyGrab P0 acceptance";
+        tray.Visible = true;
+    }
     private readonly SettingsService settingsService;
     private readonly CaptureService capture = new();
     private readonly Forms.NotifyIcon tray;

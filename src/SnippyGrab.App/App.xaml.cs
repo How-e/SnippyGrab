@@ -57,6 +57,12 @@ public partial class App : Application
             catch (Exception ex) { File.WriteAllText(report, "FAILED: " + ex); Shutdown(1); }
             return;
         }
+        if (e.Args.Contains("--p0-acceptance"))
+        {
+            var args = e.Args.SkipWhile(a => a != "--p0-acceptance").Skip(1).ToArray();
+            if (args.Length is < 1 or > 2) { Shutdown(1); return; }
+            controller = P0AcceptanceChecks.Open(args[0], args.Length == 2 ? args[1] : null); return;
+        }
         if (e.Args.Contains("--interactive-check"))
         {
             var report = e.Args.SkipWhile(a => a != "--interactive-check").Skip(1).FirstOrDefault();

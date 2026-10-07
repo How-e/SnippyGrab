@@ -25,7 +25,7 @@ jobs:
         shell: pwsh
         run: |
           $version = $env:GITHUB_REF_NAME.TrimStart('v')
-          ./scripts/package.ps1 -Version $version
+          ./scripts/package.ps1 -Version $version -RequireTag
       # Add protected external signing BEFORE generating final checksums.
       # Never expose signing credentials to pull-request builds.
       - name: Publish GitHub release
@@ -36,4 +36,4 @@ jobs:
           $version = $env:GITHUB_REF_NAME.TrimStart('v')
           $bundle = "artifacts/SnippyGrab-$version-win-x64.zip"
           $prerelease = if ($version.Contains('-')) { @('--prerelease') } else { @() }
-          gh release create $env:GITHUB_REF_NAME $bundle "$bundle.sha256" --verify-tag --generate-notes @prerelease
+          gh release create $env:GITHUB_REF_NAME $bundle "$bundle.sha256" --verify-tag --notes-file CHANGELOG.md @prerelease

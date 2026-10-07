@@ -55,7 +55,7 @@ internal sealed class SettingsWindow : Window
         body.Children.Add(Ui.Button("Clear temporary captures", "Clear unpinned captures, excluding transfers and editors", controller.ClearTemporary));
         Section("Editor"); Add(nameof(Settings.AnnotationColor), "Default color (#RRGGBB)"); Add(nameof(Settings.StrokeSize), "Stroke thickness"); Add(nameof(Settings.TextSize), "Text size");
         Section("Application"); Add(nameof(Settings.LaunchOnStartup), "Launch at Windows login"); Add(nameof(Settings.StartMinimized), "Start silently in tray after setup"); Add(nameof(Settings.Theme), "Theme");
-        body.Children.Add(Ui.Text("Updates are manual through GitHub Releases. No automatic network requests, accounts or analytics. SnippyGrab 0.1.0 alpha · MIT", 12, true));
+        body.Children.Add(Ui.Text("Updates are manual through release downloads. No automatic network requests, accounts or analytics. SnippyGrab " + BuildVersion.Display + " · MIT", 12, true));
         foreach (var text in body.Children.OfType<TextBlock>()) text.TextWrapping = TextWrapping.Wrap;
     }
     private void Section(string title) => body.Children.Add(new TextBlock { Text = title, FontSize = 16, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 20, 0, 8) });

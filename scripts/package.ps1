@@ -1,7 +1,14 @@
-param([string]$Version = '0.1.0-alpha')
+param([string]$Version = '0.1.0-alpha', [switch]$RequireTag)
 $ErrorActionPreference = 'Stop'
 if ($Version -notmatch '^\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?$') { throw 'Invalid release version.' }
 $repoRoot = Split-Path -Parent $PSScriptRoot
+$revision = git -C $repoRoot rev-parse HEAD
+if ($LASTEXITCODE -ne 0) { throw 'Git provenance unavailable.' }
+$dirty = [bool](git -C $repoRoot status --porcelain)
+if ($RequireTag) {
+    $tag = git -C $repoRoot describe --tags --exact-match HEAD
+    if ($LASTEXITCODE -ne 0 -or $tag -ne "v$Version" -or $dirty) { throw 'Release requires a clean checkout of the matching version tag.' }
+}
 $artifactRoot = Join-Path $repoRoot 'artifacts'
 $bundlePath = [IO.Path]::GetFullPath((Join-Path $artifactRoot "SnippyGrab-$Version-win-x64"))
 if (-not $bundlePath.StartsWith([IO.Path]::GetFullPath($artifactRoot) + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'Unexpected output path.' }
@@ -15,7 +22,10 @@ $unusedPath = [IO.Path]::GetFullPath((Join-Path $stagingPath 'x86'))
 if ($unusedPath.StartsWith([IO.Path]::GetFullPath($stagingPath) + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -and (Test-Path -LiteralPath $unusedPath)) { Remove-Item -LiteralPath $unusedPath -Recurse -Force }
 Get-ChildItem -LiteralPath $stagingPath -Filter '*.pdb' | Remove-Item -Force
 & (Join-Path $PSScriptRoot 'audit-dependencies.ps1') -ComponentDirectory $stagingPath
-foreach ($name in @('README.md', 'LICENSE', 'THIRD-PARTY-NOTICES.md')) { Copy-Item -LiteralPath (Join-Path $repoRoot $name) -Destination $stagingPath }
+foreach ($name in @('README.md', 'CHANGELOG.md', 'LICENSE', 'THIRD-PARTY-NOTICES.md')) { Copy-Item -LiteralPath (Join-Path $repoRoot $name) -Destination $stagingPath }
+$locks = [ordered]@{}
+Get-ChildItem (Join-Path $repoRoot 'src') -Recurse -Filter 'packages*.lock.json' | Sort-Object FullName | ForEach-Object { $locks[[IO.Path]::GetRelativePath($repoRoot, $_.FullName)] = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash }
+[ordered]@{ Version = $Version; Commit = $revision; Dirty = $dirty; Sdk = (dotnet --version); Runtime = 'win-x64 self-contained'; DependencyLocks = $locks; NativeComponents = (Get-Content (Join-Path $PSScriptRoot 'ocr-components.json') -Raw | ConvertFrom-Json) } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $stagingPath 'BUILD-PROVENANCE.json') -Encoding utf8
 Copy-Item -LiteralPath (Join-Path $repoRoot 'licenses') -Destination $stagingPath -Recurse
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'install.ps1') -Destination $stagingPath
 if (Test-Path -LiteralPath $bundlePath) {
@@ -28,6 +38,6 @@ $checks = Get-ChildItem -LiteralPath $bundlePath -Recurse -File | Sort-Object Fu
 }
 $checks | Set-Content -LiteralPath (Join-Path $bundlePath 'SHA256SUMS.txt') -Encoding utf8
 $zipPath = "$bundlePath.zip"
-Compress-Archive -Path "$bundlePath/*" -DestinationPath $zipPath -Force
+& (Join-Path $PSScriptRoot 'archive.ps1') -Source $bundlePath -Destination $zipPath
 '{0}  {1}' -f (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLowerInvariant(), [IO.Path]::GetFileName($zipPath) | Set-Content -LiteralPath "$zipPath.sha256" -Encoding utf8
 Write-Output $bundlePath

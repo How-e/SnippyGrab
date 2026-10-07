@@ -91,6 +91,7 @@ internal static class RuntimeChecks
                 var work = editor.StartDocumentEdit(new(EditTool.Blur, new Point(20, 20), new Point(300, 140), Colors.Red, 3, 24, "", []));
                 var close = editor.RequestCloseAsync();
                 await work; Assert(await close && editedRecord.Edited && writes.Count == 2, "Close during worker effect waits and applies/copies final document");
+                await CheckFailedEditorClose(controller, png);
                 Assert(Native.GetForegroundWindow() == foreground, "Reliability probe preserves foreground");
             }
             finally { pin.Close(); history.Close(); controller.Dock.Close(); }
@@ -101,6 +102,37 @@ internal static class RuntimeChecks
             var absolute = Path.GetFullPath(root);
             if (!absolute.StartsWith(Path.GetFullPath(Path.GetTempPath()), StringComparison.OrdinalIgnoreCase) || !Path.GetFileName(absolute).StartsWith("SnippyGrab-reliability-", StringComparison.Ordinal)) throw new InvalidOperationException("Unexpected reliability probe path.");
             Directory.Delete(absolute, true);
+        }
+    }
+    private static async Task CheckFailedEditorClose(AppController controller, byte[] png)
+    {
+        var record = controller.Repository.Add(png, 320, 160);
+        var otherRecord = controller.Repository.Add(png, 320, 160);
+        var editor = new EditorWindow(controller, record) { ShowActivated = false, Left = -30000, Top = -30000 };
+        var other = new EditorWindow(controller, otherRecord) { ShowActivated = false, Left = -30000, Top = -30000 };
+        var writes = 0;
+        controller.Clipboard = new ClipboardService(_ => writes++, _ => Task.CompletedTask);
+        editor.Show(); other.Show();
+        try
+        {
+            var original = record.FileName;
+            await editor.StartDocumentEdit(new(EditTool.Redact, new Point(20, 20), new Point(100, 100), Colors.Black, 3, 24, "", []));
+            using (var locked = new FileStream(Path.Combine(controller.Repository.Root, "history.json"), FileMode.Open, FileAccess.Read, FileShare.Read))
+            {
+                Assert(!await editor.RequestCloseAsync() && editor.IsVisible, "Failed metadata apply retains actual WPF editor");
+                Assert(record.FileName == original && !record.Edited && writes == 0, "Failed close preserves original revision and does not announce a copy");
+                Assert(await other.RequestCloseAsync(), "Separate clean editor can close during failed apply");
+            }
+            controller.Clipboard = new ClipboardService(_ => throw new COMException("Injected clipboard contention"), _ => Task.CompletedTask);
+            Assert(!await editor.RequestCloseAsync() && editor.IsVisible && record.Edited, "Exhausted clipboard retries retain saved edits and the editor");
+            var applied = record.FileName;
+            controller.Clipboard = new ClipboardService(_ => writes++, _ => Task.CompletedTask);
+            Assert(await editor.RequestCloseAsync() && record.FileName == applied && writes == 1, "Retry closes without duplicating the applied revision");
+        }
+        finally
+        {
+            foreach (var window in new[] { editor, other }.Where(w => w.IsVisible))
+                ((DockPanel)window.Content).Children.OfType<WrapPanel>().First().Children.OfType<Button>().Single(b => Equals(b.Content, "Discard")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         }
     }
     public static async Task CheckEditorLayout(string destination)

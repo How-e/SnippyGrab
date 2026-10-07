@@ -5,6 +5,36 @@ namespace SnippyGrab.Tests;
 public sealed class EditorCommitTests
 {
     [Fact]
+    public async Task ReentrantCloseJoinsApplyBeforeItsFirstAwait()
+    {
+        var gate = new EditorCommitCoordinator();
+        Task<bool>? close = null;
+        var calls = 0;
+        var apply = gate.RunAsync(() =>
+        {
+            calls++;
+            close = gate.RunAsync(() => throw new InvalidOperationException("Duplicate apply"));
+            return Task.FromResult(true);
+        });
+        Assert.True(await apply);
+        Assert.Same(apply, close);
+        Assert.Equal(1, calls);
+    }
+
+    [Fact]
+    public async Task CancelledApplyDoesNotPoisonRetryOrAnotherEditor()
+    {
+        var first = new EditorCommitCoordinator();
+        var second = new EditorCommitCoordinator();
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => first.RunAsync(() => Task.FromCanceled<bool>(cancellation.Token)));
+        Assert.False(first.Busy);
+        Assert.True(await second.RunAsync(() => Task.FromResult(true)));
+        Assert.True(await first.RunAsync(() => Task.FromResult(true)));
+    }
+
+    [Fact]
     public async Task CloseAndExitWaitForTheSamePendingClipboardWork()
     {
         var gate = new EditorCommitCoordinator();

@@ -2,7 +2,7 @@
 
 ## Current remaining-work reconciliation
 
-See [REMAINING-WORK.md](REMAINING-WORK.md) for live hosted checks, publication and protection evidence. Q36 is now closed; 36 required entries remain open. The user's manual two-hour resource run is ongoing pending completion/trend review; no new workload was started. Earlier dated results below retain their original test counts and gate counts. The read-only resource report reviewer and release-gate fixtures are verified in this reconciliation.
+See [REMAINING-WORK.md](REMAINING-WORK.md) for live hosted checks, publication and protection evidence. Q36 and Q35 are now closed; 35 required entries remain open. The completed manual two-hour report passes completion and trend/recovery review; see [resource acceptance](RESOURCE-REVIEW-20261007.md). No stress workload was rerun. Earlier dated results below retain their original test counts and gate counts. The read-only resource report reviewer and release-gate fixtures are verified in this reconciliation.
 
 ## Current short verification
 

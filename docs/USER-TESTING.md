@@ -152,7 +152,7 @@ Only if you already have a spare VM/account/machine: test portable launch and pe
 
 ### U12 — Normal-use performance observations
 
-Report noticeable startup/capture/editor lag, memory growth, sustained CPU when idle or freezes during rapid captures and large images. If convenient, note Task Manager CPU/memory after launch, one minute idle, 20 captures and closing editors. You volunteered to run the two-hour Q35 test manually: follow [RESOURCE-TESTING.md](RESOURCE-TESTING.md) for the exact packaged command, progress report, completion criteria and resource interpretation. The agent will not run that prolonged test automatically. The pointer-moving benchmark and broader Q34 latency comparison remain separate.
+Report noticeable startup/capture/editor lag, memory growth, sustained CPU when idle or freezes during rapid captures and large images. If convenient, note Task Manager CPU/memory after launch, one minute idle, 20 captures and closing editors. Your completed two-hour Q35 test passes the [resource acceptance review](RESOURCE-REVIEW-20261007.md). [RESOURCE-TESTING.md](RESOURCE-TESTING.md) retains the command and interpretation for future manual regressions. The agent will not run that prolonged test automatically. The pointer-moving benchmark and broader Q34 latency comparison remain separate.
 
 ## Reporting results
 

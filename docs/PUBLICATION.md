@@ -1,6 +1,6 @@
 # Initial GitHub publication
 
-Published prerelease: **0.1.0-alpha.queue.20261006.3**. Repository: [How-e/SnippyGrab](https://github.com/How-e/SnippyGrab). This remains an unsigned alpha: 36 acceptance gates remain open after Q36 closure, including full receiver/hardware coverage and prolonged resource tests. See [current reconciliation](REMAINING-WORK.md) for live protection/security/check evidence and the upload recovery limitation. No stable readiness claim is made.
+Published prerelease: **0.1.0-alpha.queue.20261006.3**. Repository: [How-e/SnippyGrab](https://github.com/How-e/SnippyGrab). This remains an unsigned alpha: 35 acceptance gates remain open after Q36/Q35 closure, including full receiver/hardware coverage. The [two-hour synthetic resource review](RESOURCE-REVIEW-20261007.md) passes; all-day use remains unverified. See [current reconciliation](REMAINING-WORK.md) for live protection/security/check evidence and the upload recovery limitation. No stable readiness claim is made.
 
 The repository was empty when inspected on 2026-10-07. Initial publication preserves the sanitized local commit history and publishes one version tag and one release. Earlier ignored local packages retain their original provenance and are not uploaded. The candidate is rebuilt from the clean matching tag so its provenance identifies the published source, rather than the superseded pre-rewrite source identity.
 

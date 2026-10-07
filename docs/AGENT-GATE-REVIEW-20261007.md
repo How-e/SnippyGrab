@@ -73,3 +73,13 @@ Agent work: Extracted the existing post-capture persistence path for synthetic e
 Checks: StorageFailure/StartupRegistration/ManagedPath tests 13/13 PASS; zero-warning Release build; q07-reliability.json PASS through production persistence/fallback helper using isolated injected writes.
 
 Status / remaining acceptance: OPEN: actual settings/setup failure and retry feedback, custom-cache fallback visibility and real disk/permission failure interaction. No real cache, registry or OS preference was altered.
+
+## Q14
+
+Inspected: ClipboardWriter generation/retry/cancellation, ClipboardService image/PNG/files/text, controller CopyPath/OcrText and editor OCR lifetime.
+
+Agent work: Added independent exhaustion and recovery tests for image, PNG, single/multiple files, path, filename and text; cancellation during retry-delay prevents late publication and permits fresh copy.
+
+Checks: ClipboardWriterTests 3/3 PASS; seven new format-contention cases plus OCR boundaries 21/21 Windows PASS; q14-reliability.json PASS including newer-copy and closed-lifetime stale OCR prevention, actual editor retry with injected clipboard.
+
+Status / remaining acceptance: OPEN: real OS clipboard lock and native OCR/editor close/new-capture interaction; delayed external consumers remain Q13. No OS clipboard writes occurred.

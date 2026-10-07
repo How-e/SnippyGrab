@@ -21,4 +21,14 @@ public sealed class ClipboardWriterTests
         var old = latest.Begin(); var fresh = latest.Begin(editor.Token); Assert.True(old.IsCancellationRequested);
         editor.Cancel(); Assert.False(await writer.WriteAsync(() => writes.Add("stale OCR"), cancellation: fresh)); Assert.Single(writes);
     }
+    [Fact]
+    public async Task CancellationDuringRetryDelayPreventsLatePublication()
+    {
+        var writer = new ClipboardWriter(); var attempts = 0;
+        using var lifetime = new CancellationTokenSource();
+        Assert.False(await writer.WriteAsync(() => { attempts++; throw new ExternalException(); }, _ => { lifetime.Cancel(); return Task.CompletedTask; }, lifetime.Token));
+        Assert.Equal(1, attempts);
+        Assert.True(await writer.WriteAsync(() => attempts++));
+        Assert.Equal(2, attempts);
+    }
 }

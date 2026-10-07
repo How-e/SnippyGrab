@@ -12,6 +12,50 @@ namespace SnippyGrab.IntegrationTests;
 
 public sealed class ImageIntegrationTests
 {
+    [Theory]
+    [InlineData("image")]
+    [InlineData("png")]
+    [InlineData("file")]
+    [InlineData("files")]
+    [InlineData("path")]
+    [InlineData("filename")]
+    [InlineData("text")]
+    public void EachClipboardFormatReportsContentionAndCanRetry(string operation)
+    {
+        Sta(() =>
+        {
+            var attempts = 0;
+            var unavailable = new ClipboardService(data => { CheckPayload(data); attempts++; throw new System.Runtime.InteropServices.ExternalException("injected clipboard lock"); }, _ => Task.CompletedTask);
+            Assert.False(Copy(unavailable).GetAwaiter().GetResult());
+            Assert.Equal(6, attempts);
+            var writes = 0;
+            var available = new ClipboardService(data => { CheckPayload(data); writes++; }, _ => Task.CompletedTask);
+            Assert.True(Copy(available).GetAwaiter().GetResult()); Assert.Equal(1, writes);
+            return true;
+
+            Task<bool> Copy(ClipboardService service) => operation switch
+            {
+                "image" or "png" => service.ImageAsync(Synthetic(), operation == "png"),
+                "file" => service.FilesAsync([@"C:\synthetic\one.png"]),
+                "files" => service.FilesAsync([@"C:\synthetic\one.png", @"C:\synthetic\two.png"]),
+                "path" => service.TextAsync(@"C:\synthetic\one.png"),
+                "filename" => service.TextAsync("one.png"),
+                _ => service.TextAsync("synthetic OCR text")
+            };
+            void CheckPayload(DataObject data)
+            {
+                if (operation is "image" or "png")
+                {
+                    Assert.True(data.GetDataPresent(DataFormats.Bitmap));
+                    Assert.Equal(operation == "png", data.GetDataPresent("PNG"));
+                }
+                else if (operation is "file" or "files")
+                    Assert.Equal(operation == "file" ? 1 : 2, Assert.IsType<string[]>(data.GetData(DataFormats.FileDrop)).Length);
+                else Assert.False(string.IsNullOrWhiteSpace(Assert.IsType<string>(data.GetData(DataFormats.UnicodeText))));
+            }
+        });
+    }
+
     [Fact]
     public void EveryClipboardRepresentationReportsItsOwnOutcomeWithoutWritingOsClipboard()
     {

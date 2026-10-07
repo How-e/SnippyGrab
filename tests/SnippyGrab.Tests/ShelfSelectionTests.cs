@@ -43,4 +43,20 @@ public sealed class ShelfSelectionTests
         Assert.Empty(selection.Selected); Assert.Equal(items[5], Assert.Single(selection.Targets(ShelfAction.Dismiss)));
         selection.Update([]); Assert.Empty(selection.Targets(ShelfAction.Copy)); Assert.Null(selection.Focused);
     }
+
+    [Fact]
+    public void RemovingOneSelectedCapturePreservesOtherSelectionAcrossRefresh()
+    {
+        var items = Items(); var selection = new ShelfSelection(); selection.Update(items);
+        selection.Toggle(items[2].Id); selection.Toggle(items[17].Id);
+        var remaining = items.Where(c => c != items[17]).ToList();
+        selection.Update(remaining, items[0].Id);
+        Assert.Equal(items[0].Id, selection.Focused);
+        Assert.Equal(items[2], Assert.Single(selection.Targets(ShelfAction.Dismiss)));
+        Assert.Equal(items[2], Assert.Single(selection.Targets(ShelfAction.Copy)));
+        Assert.Equal(items[0], Assert.Single(selection.Targets(ShelfAction.Edit)));
+        selection.Reset(); selection.Update(items);
+        Assert.Empty(selection.Selected);
+        Assert.Equal(items[0], Assert.Single(selection.Targets(ShelfAction.Copy)));
+    }
 }

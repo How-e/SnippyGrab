@@ -43,3 +43,13 @@ Agent work: Added unrelated-thumbnail preservation during revision invalidation 
 Checks: BoundedCacheTests 4/4 PASS; zero-warning Release build. q18-dock-checkpoint.json.layout.json: all 64 layouts/cache/revision/20-item scroll assertions PASS, 5 cards/12 thumbnails maximum. Full probe FAIL at final pointer-preservation invariant; first run likewise, retained reports, no overall PASS claimed.
 
 Status / remaining acceptance: OPEN: actual visible transitions, clipping/contrast and repeated hover/re-entry; animation/reduced-motion/high-contrast behavior with real settings. Desktop pointer changed during offscreen checks; structural evidence is separate from full probe acceptance.
+
+## Q15
+
+Inspected: ShelfSelection Targets/Update, DockWindow HandleKey/OnKey/Execute, numbered badge/tray focus entry and composer-preserving ShowActivated=false.
+
+Agent work: Added removal/refresh selection regression, unassigned-modifier command rejection and raised-hover no-focus assertions. Current explicit focus and selected-set routing retained.
+
+Checks: ShelfSelectionTests 5/5 PASS; zero-warning Release build; q15-dock.json full 64-layout offscreen command/focus/cache/geometry probe PASS.
+
+Status / remaining acceptance: OPEN: acquire visible native focus through tray or badge, Enter/Delete/Ctrl+C/Export on nonprimary and nonadjacent/scrolled captures, toolbar Tab/Enter behavior and capture preserves composer focus. Hover alone is not keyboard focus.

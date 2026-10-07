@@ -299,6 +299,11 @@ internal static class RuntimeChecks
             dock.HandleKey(Key.Space, ModifierKeys.None); Assert(dock.SelectionCount == 3, "Keyboard multiple selection survives scrolling");
             dock.HandleKey(Key.Escape, ModifierKeys.None); Assert(dock.SelectionCount == 0 && !dock.Expanded, "Escape clears selection and collapses");
             dock.HandleKey(Key.Home, ModifierKeys.None);
+            actions.Clear();
+            Assert(!dock.HandleKey(Key.Delete, ModifierKeys.Control) && !dock.HandleKey(Key.Enter, ModifierKeys.Alt) && !dock.HandleKey(Key.C, ModifierKeys.None) && actions.Count == 0, "Unassigned key modifiers cannot invoke unrelated actions");
+            var focusedBeforeHover = dock.FocusedCapture;
+            dock.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = Mouse.MouseEnterEvent });
+            Assert(dock.FocusedCapture == focusedBeforeHover && !dock.IsKeyboardFocusWithin, "Raised hover does not acquire keyboard focus");
             dock.CommandSinkOverride = null;
             foreach (var thumbnailSize in new[] { 120, 180, 224 })
             {

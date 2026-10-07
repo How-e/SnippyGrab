@@ -1,8 +1,10 @@
+Latest actual dock settings PASS closes Q49; Q18 fade/clipping/contrast and Q19/Q32 accessibility remain. See [current owner results](USER-TESTING.md).
+
 Latest owner dock edge checks PASS; Q16 CLOSED. Alternate dock settings/visual acceptance remain Q49/Q18/Q32; see [current results](USER-TESTING.md).
 
 Latest owner acceptance: Q50/Q30 CLOSED, Codex 0.160.1 steps 2–4 PASS; see [recorded receiver results](USER-TESTING.md#codex-selected-transfer-acceptance--pass).
 
-Latest [targeted keyboard acceptance](NEXT-GATE-ACCEPTANCE-20261007.md) closes Q15/Q21; **27 required gates remain open, 24 entries checked**. Earlier dated counts below are historical.
+Latest [targeted keyboard acceptance](NEXT-GATE-ACCEPTANCE-20261007.md) closes Q15/Q21; **26 required gates remain open, 25 entries checked**. Earlier dated counts below are historical.
 
 # Remaining acceptance review — 2026-10-07
 

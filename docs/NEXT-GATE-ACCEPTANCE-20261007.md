@@ -78,3 +78,11 @@ Owner reports the next **steps 1–3 PASS** on the same tested `.2` build: Escap
 **PASS / CLOSED for Q16.** Combine these with recorded actual click/edit behavior, adjacent/nonadjacent reorder both ways, hover reachability and selection-collapse passes, Q15 native keyboard acceptance and independent production pointer-capture/drag-threshold/64-layout/selection/cache regressions. The formerly listed settings matrix is retained under Q18/Q19/Q32/Q49 rather than expanding Q16's stated interaction criteria into a new all-settings requirement. This closes no broader motion/accessibility/hardware gate.
 
 Current queue: **27 required gates open; 24 entries checked**. Next owner check is the previously unverified alternate orientation/corner, thumbnail sizes and application animation settings under Q49/Q18, recorded in USER-TESTING. No application source changed for this acceptance update.
+
+## Q49 — actual dock settings and hover closure
+
+**PASS / CLOSED.** Owner reports all prescribed settings checks PASS on local `.3`, clean source `9103b9d`: alternate orientation/opposite corner, every visible card/control reachable, scrolling, five leave/re-entry cycles with/without selection, smallest/largest thumbnails with animation setting off/on, and original settings restored. No jump/freeze/premature collapse/lost selection was reported. Numeric settings and named corner were not separately supplied; the report is a PASS against the prescribed relative configurations.
+
+This completes the earlier 1/3/5/20 cold/warm owner hover evidence, Q16 native selection/reorder/cancellation passes and independent 64-layout/768-sample anchor/cache/routing checks. Historic failed pointer/foreground-preservation probes remain failed records; later structural/full probe passes and actual owner observations supply complementary evidence. No broader hardware/accessibility or actual new-capture fade claim is inferred from toggling animations during hover.
+
+Current queue: **26 required gates open; 25 entries checked**. Q18 new-capture fade/clipping/contrast and reduced-motion/high-contrast acceptance remain separate.

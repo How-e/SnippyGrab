@@ -40,9 +40,13 @@ Completed edge-case procedure, in the same running build with synthetic captures
 
 **Q16 PASS / CLOSED** for its stated interaction criteria. Combined owner results now cover adjacent/nonadjacent insertion both ways, reachability, selection transitions, scrolling, cancellation/outside release and no editor on drag. Previous actual click-to-edit and Q15 focus/keyboard evidence cover click/drag and keyboard-use distinctions; existing independent pointer-capture/routing/layout/cache checks remain complementary. The full settings/visual/hardware matrix belongs to Q18/Q19/Q32/Q49, which remain open. No all-settings or all-hardware pass is claimed.
 
-### Next dock settings check — Q49/Q18
+### Completed dock settings check — Q49/Q18
 
 Use the current local **0.1.0-alpha.acceptance.20261007.3** app and existing disposable captures. Start with `pwsh ./scripts/start-acceptance.ps1 -RealApp`. The completed `.2` results above retain their original source provenance. Record current corner, orientation, thumbnail size, animation and collapse/hide settings before changing them. First switch orientation (vertical ↔ horizontal) and place the dock at the opposite corner. Enter, reach every visible card/control, leave and re-enter five times, with and without two selected images; scroll through the shelf. Expect an anchored primary card, inward expansion, no visible jump/freeze or unreachable controls, and stable selection. Then test the smallest and largest thumbnail sizes offered in Settings, with animations off and on, repeating those hover checks. Report each configuration separately; restore original settings afterward. Do not change Windows accessibility/animation preferences for this test. Existing current-configuration passes do not need immediate repetition.
+
+Owner subsequently reports **PASS for all steps** on `.3`, clean source `9103b9d` verified in the bundle provenance. This covers the alternate orientation/opposite corner, reachability/scrolling, five leave/re-entry cycles with/without selection, smallest/largest thumbnails with animations off/on, and restoring original settings. Exact corner names, numeric sizes and original setting values were requested but not supplied; record PASS for the prescribed relative configurations without inventing those values.
+
+**Q49 PASS / CLOSED** with this actual owner report, earlier 1/3/5/20 cold/repeated-hover acceptance, Q16 selection/reorder/cancellation results and the independent 64-layout/768-anchor-sample evidence. It establishes the stated jitter/reachability/collapse criteria, not every monitor/topology/accessibility setting.
 
 ### Codex selected-transfer acceptance — PASS
 

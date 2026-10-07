@@ -33,3 +33,13 @@ Agent work: Cold-cache reset for diagnostic runs; 12 temporal primary-anchor sam
 Checks: DockLayoutTests 15/15 PASS; zero-warning Release build; 64-layout native offscreen dock retry PASS with 768 stable anchor samples. Initial run failed foreground preservation; retained q49-dock.json, successful q49-dock-retry.json.
 
 Status / remaining acceptance: OPEN: visible cold/warm first-hover and re-entry with 1/3/5/20 captures using actual pointer, no jump/freeze, all displayed captures reachable, collapse with/without selections. Desktop idle was not confirmed; no pointer gestures run.
+
+## Q18
+
+Inspected: DockWindow bounded card/thumbnail caches, warm card reuse, rounded clip, arrival-only fade with OS/reduced-motion/high-contrast gates. Expansion animation remains deferred pending actual hover acceptance.
+
+Agent work: Added unrelated-thumbnail preservation during revision invalidation and asserted zero card construction/decoding on warm hover/selection cycles. Added durable structural checkpoint before environmental invariants.
+
+Checks: BoundedCacheTests 4/4 PASS; zero-warning Release build. q18-dock-checkpoint.json.layout.json: all 64 layouts/cache/revision/20-item scroll assertions PASS, 5 cards/12 thumbnails maximum. Full probe FAIL at final pointer-preservation invariant; first run likewise, retained reports, no overall PASS claimed.
+
+Status / remaining acceptance: OPEN: actual visible transitions, clipping/contrast and repeated hover/re-entry; animation/reduced-motion/high-contrast behavior with real settings. Desktop pointer changed during offscreen checks; structural evidence is separate from full probe acceptance.

@@ -258,6 +258,7 @@ internal static class RuntimeChecks
                             Assert(dock.InputHitTest(local) is not null, "Card is reachable through the hover surface");
                         }
                         var rebuilds = dock.RebuildCount;
+                        var warmBuilds = dock.CardBuildCount; var warmDecodes = dock.ThumbnailDecodeCount;
                         for (var i = 0; i < 5; i++) dock.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = Mouse.MouseEnterEvent });
                         Assert(dock.RebuildCount == rebuilds, "Repeated enter does not rebuild expanded cards");
                         dock.ToggleSelection(id);
@@ -266,6 +267,7 @@ internal static class RuntimeChecks
                         Assert(!dock.Expanded && dock.SelectionCount == 1, "Pointer leave collapses without losing selection");
                         dock.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = Mouse.MouseEnterEvent });
                         Assert(dock.Expanded && dock.SelectionCount == 1, "Re-entry preserves expansion and selection");
+                        Assert(dock.CardBuildCount == warmBuilds && dock.ThumbnailDecodeCount == warmDecodes, "Warm hover and selection reuse cards and decoded thumbnails");
                         Assert(dock.CachedCardCount <= 5 && dock.CachedThumbnailCount <= 12, "Bounded dock caches");
                         dock.ToggleSelection(id);
                         results.Add(new { count, corner, orientation, Animate = controller.Settings.Animate, controller.Settings.DockOpacity, ColdCachesReset = true, AnchorSamples = samples, PrimaryAnchorStable = true, WarmCycleCardBuilds = dock.CardBuildCount - buildsBefore, ThumbnailDecodes = dock.ThumbnailDecodeCount - decodesBefore });
@@ -309,6 +311,7 @@ internal static class RuntimeChecks
                 }
             }
             Snapshot(dock, Path.Combine(Path.GetDirectoryName(Path.GetFullPath(destination))!, "dock-layout-synthetic.png"));
+            AtomicFile.Write(destination + ".layout.json", JsonSerializer.SerializeToUtf8Bytes(new { Result = "LAYOUT_PASS_ENVIRONMENT_PENDING", Layouts = hoverBuilds, ScrolledItems = 20, RevisionInvalidation = true, KeyboardCommandRouting = true, CachedCards = dock.CachedCardCount, CachedThumbnails = dock.CachedThumbnailCount, Scope = "All structural assertions passed; final foreground/pointer preservation has not yet been checked. This checkpoint is not an overall probe PASS." }, new JsonSerializerOptions { WriteIndented = true }));
             Assert(Native.GetForegroundWindow() == foreground, "Dock probe preserves foreground");
             Native.GetCursorPos(out var afterPointer); Assert(afterPointer.X == pointer.X && afterPointer.Y == pointer.Y, "Dock probe never moves pointer");
             controller.Dispose(); dock.Close();

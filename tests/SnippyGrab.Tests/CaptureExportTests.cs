@@ -44,5 +44,35 @@ public sealed class CaptureExportTests : IDisposable
         Assert.False(result.MetadataSaved); Assert.True(capture.Saved); Assert.Equal(path, result.Path);
         Assert.Equal(new byte[] { 1, 2, 3 }, File.ReadAllBytes(path));
     }
+
+    [Fact]
+    public void StaleRecordCannotOverwriteAnExistingExport()
+    {
+        var capture = repository.Add([1], 1, 1);
+        var stale = new CaptureRecord { Id = capture.Id, FileName = capture.FileName, Width = 1, Height = 1 };
+        repository.Replace(capture, [2], 1, 1);
+        var path = Path.Combine(root, "output.png"); File.WriteAllBytes(path, [9]);
+        Assert.Throws<InvalidOperationException>(() => CaptureExport.Write(repository, stale, path));
+        Assert.Equal(new byte[] { 9 }, File.ReadAllBytes(path));
+        Assert.False(stale.Saved); Assert.False(capture.Saved);
+        CaptureExport.Write(repository, capture, path);
+        Assert.Equal(new byte[] { 2 }, File.ReadAllBytes(path));
+    }
+
+    [Fact]
+    public void FailedRepeatExportPreservesPreviousDestinationAndPixels()
+    {
+        var capture = repository.Add([1], 1, 1); var path = Path.Combine(root, "output.png");
+        CaptureExport.Write(repository, capture, path); repository.Replace(capture, [2], 1, 1);
+        using (var locked = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            var failure = Record.Exception(() => CaptureExport.Write(repository, capture, path));
+            Assert.True(failure is IOException or UnauthorizedAccessException);
+        }
+        Assert.Equal(new byte[] { 1 }, File.ReadAllBytes(path));
+        Assert.True(capture.Saved); Assert.Equal(path, capture.ExportPath);
+        CaptureExport.Write(repository, capture, path);
+        Assert.Equal(new byte[] { 2 }, File.ReadAllBytes(path));
+    }
     public void Dispose() { if (Directory.Exists(root)) Directory.Delete(root, true); }
 }

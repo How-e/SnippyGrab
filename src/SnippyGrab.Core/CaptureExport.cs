@@ -15,6 +15,7 @@ public static class CaptureExport
         for (var directory = new DirectoryInfo(Path.GetDirectoryName(path)!); directory is not null; directory = directory.Parent)
             if (directory.Exists && (directory.Attributes & FileAttributes.ReparsePoint) != 0) throw new InvalidDataException("Export cannot use redirected directories.");
         if (File.Exists(path) && (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0) throw new InvalidDataException("Export cannot replace a redirected file.");
+        if (!repository.Captures.Contains(capture)) throw new InvalidOperationException("Capture is no longer current. Select it again before exporting.");
         using var lease = repository.Lease([capture]);
         AtomicFile.Write(path, File.ReadAllBytes(repository.PathFor(capture)));
         capture.Saved = true; capture.ExportPath = path;

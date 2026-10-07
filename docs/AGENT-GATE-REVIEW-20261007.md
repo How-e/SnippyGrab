@@ -53,3 +53,13 @@ Agent work: Added removal/refresh selection regression, unassigned-modifier comm
 Checks: ShelfSelectionTests 5/5 PASS; zero-warning Release build; q15-dock.json full 64-layout offscreen command/focus/cache/geometry probe PASS.
 
 Status / remaining acceptance: OPEN: acquire visible native focus through tray or badge, Enter/Delete/Ctrl+C/Export on nonprimary and nonadjacent/scrolled captures, toolbar Tab/Enter behavior and capture preserves composer focus. Hover alone is not keyboard focus.
+
+## Q21
+
+Inspected: EditorWindow ApplyCopy/ExportPng labels/status, AppController Save dialog and CaptureExport guarded atomic write/persistence warning.
+
+Agent work: Reject noncurrent capture objects before export writes, with stale-revision overwrite regression. Added failed repeat-export preservation/retry regression. Path validation precedes identity validation so cache destinations retain actionable input errors.
+
+Checks: CaptureExportTests 6/6 PASS after correcting guard ordering and Windows lock exception expectation; exported redaction integration 1/1 PASS; six-width/text-scale editor layout final PASS; Release build zero warnings/errors.
+
+Status / remaining acceptance: OPEN: configured/remembered destination, actual dialog cancel/overwrite, folder opening and Apply/copy versus export interaction with OS clipboard. Current labels and file/metadata outcomes pass automated checks.

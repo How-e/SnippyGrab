@@ -11,6 +11,14 @@ public partial class App : Application
     {
         base.OnStartup(e);
         Native.SetDefaultDllDirectories(0x1000); // Default safe locations; never the working directory.
+        if (e.Args.Contains("--check-startup-latency"))
+        {
+            var report = e.Args.SkipWhile(a => a != "--check-startup-latency").Skip(1).FirstOrDefault();
+            if (report is null) { Shutdown(1); return; }
+            try { await StartupLatencyChecks.Run(report); Shutdown(0); }
+            catch (Exception ex) { File.WriteAllText(report, "FAILED: " + ex); Shutdown(1); }
+            return;
+        }
         if (e.Args.Contains("--check-transfer-crash"))
         {
             var args = e.Args.SkipWhile(a => a != "--check-transfer-crash").Skip(1).ToArray();

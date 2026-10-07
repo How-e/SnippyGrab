@@ -1,5 +1,7 @@
 # Changelog
 
+## 0.1.0-alpha.queue.20261006.3 — 2026-10-06
+
 ## 0.1.0-alpha.qualityfix.20261006 — 2026-10-06
 
 - Fixed Setup's hidden AppData ancestor check under Windows PowerShell; kept redirect rejection and staged-install integrity checks.

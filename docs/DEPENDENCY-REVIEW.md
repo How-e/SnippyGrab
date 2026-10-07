@@ -1,10 +1,10 @@
 # Dependency policy and native OCR review
 
-Reviewed 2026-10-06. `scripts/audit-dependencies.ps1` parses .NET JSON output version 1, requires all five projects and a feed, and fails for any direct/transitive vulnerability, unsupported report, query error or failed command. All severities fail; no NuGet exceptions exist. Sixteen isolated policy fixtures cover clean, all severities, transitive findings and invalid reports. Restore also promotes NU1900–NU1905 to errors. This uses the [documented JSON audit interface](https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-package-list).
+Updated 2026-10-07. Current native build and packaged closure are in the final section and [NATIVE-OCR.md](NATIVE-OCR.md); the original NuGet inventory below is historical. `scripts/audit-dependencies.ps1` parses .NET JSON output version 1, requires all five projects and a feed, and fails for any direct/transitive vulnerability, unsupported report, query error or failed command. All severities fail; no NuGet exceptions exist. Sixteen isolated policy fixtures cover clean, all severities, transitive findings and invalid reports. Restore also promotes NU1900–NU1905 to errors. This uses the [documented JSON audit interface](https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-package-list).
 
 CI and release run the policy after compilation. GitHub Actions references are pinned to upstream commit IDs resolved from their v4/v3 tags; Dependabot remains enabled. Hosted execution is still pending .
 
-## Components outside the NuGet advisory feed
+## Historical NuGet native components before the source-built upgrade
 
 `scripts/ocr-components.json` pins SHA-256 for the exact native x64 Tesseract/Leptonica binaries distributed by Tesseract wrapper 5.2.0 and the English model provisioned from immutable tessdata_fast commit `87416418657359cb625c412a48b6e1d6d41c29bd`. Build/package auditing checks these files; runtime OCR additionally rejects a modified, oversized or redirected model before creating the native engine. Provisioning is build-time only. Runtime has no downloads or alternate language/model selection.
 

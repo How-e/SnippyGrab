@@ -40,7 +40,7 @@ internal sealed class SettingsWindow : Window
         Section("Capture");
         Add(nameof(Settings.PrimaryHotkey), "Primary hotkey"); Add(nameof(Settings.DefaultCaptureMode), "Primary capture mode");
         Add(nameof(Settings.DesktopHotkey), "Entire desktop hotkey"); Add(nameof(Settings.WindowHotkey), "Window picker hotkey"); Add(nameof(Settings.ActiveWindowHotkey), "Active window hotkey"); Add(nameof(Settings.FallbackHotkey), "Fallback region hotkey");
-        body.Children.Add(Ui.Text("Click a hotkey field, then press the desired combination. Escape disables it. Windows may intercept Print Screen: Settings → Accessibility → Keyboard → ‘Use the Print Screen key to open screen capture’. Disable it and restart if necessary.", 12, true));
+        body.Children.Add(Ui.Text("Click a hotkey field, then press the desired combination. Tab and Shift+Tab move between controls. Escape disables the hotkey. Windows may intercept Print Screen: Settings → Accessibility → Keyboard → ‘Use the Print Screen key to open screen capture’. Disable it and restart if necessary.", 12, true));
         Add(nameof(Settings.IncludeCursor), "Include cursor"); Add(nameof(Settings.Animate), "Fade new captures into the shelf");
         body.Children.Add(Ui.Text("Animation affects arrival only, respects Windows reduced motion/high contrast, and does not animate selection or shelf expansion.", 12, true));
         Section("Screenshot shelf");
@@ -110,6 +110,7 @@ internal sealed class SettingsWindow : Window
             field.PreviewKeyDown += (_, e) =>
             {
                 var pressed = e.Key == Key.System ? e.SystemKey : e.Key;
+                if (pressed == Key.Tab && (Keyboard.Modifiers == ModifierKeys.None || Keyboard.Modifiers == ModifierKeys.Shift)) return;
                 if (pressed is Key.LeftCtrl or Key.RightCtrl or Key.LeftAlt or Key.RightAlt or Key.LeftShift or Key.RightShift or Key.LWin or Key.RWin) return;
                 uint modifiers = 0; if ((Keyboard.Modifiers & ModifierKeys.Alt) != 0) modifiers |= 1; if ((Keyboard.Modifiers & ModifierKeys.Control) != 0) modifiers |= 2; if ((Keyboard.Modifiers & ModifierKeys.Shift) != 0) modifiers |= 4; if ((Keyboard.Modifiers & ModifierKeys.Windows) != 0) modifiers |= 8;
                 key = pressed == Key.Escape ? new(0, 0) : new((uint)KeyInterop.VirtualKeyFromKey(pressed), modifiers); field.Text = key.ToString(); e.Handled = true;

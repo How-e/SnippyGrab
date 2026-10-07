@@ -271,3 +271,14 @@ Q27 login retest: enable login startup from the intended installed executable; c
 
 
 Third-pass retest focus: U09 Explorer restart, sleep/resume (including paused hotkeys), hidden shelf after monitor changes and configured tray double-click capture mode; U11 executable setup/startup opt-in, upgrade, fresh-login silent tray and Apps uninstall. Settings now uses named retention choices. Captures/settings are retained on uninstall; upgrade backups are kept outside the active application directory. These cases were not marked passed from file-only or offscreen fixtures. No immediate repetition of previously successful Codex/OCR cases is requested solely because of these packaging changes.
+
+## Next owner gate — Q19 keyboard navigation (2026-10-07)
+
+Use the fresh acceptance .5 package: exit older SnippyGrab instances through their tray, then run `pwsh ./scripts/start-acceptance.ps1 -RealApp` from the repository. This package contains the hotkey-field Tab correction; .3/.4 do not. Use synthetic captures. Keep existing Windows accessibility preferences.
+
+1. Focus the shelf through its numbered badge/tray action, press Ctrl+, for Settings. Use Tab and Shift+Tab across all five hotkey fields and the rest of the controls. Existing bindings must stay unchanged; focus must advance/reverse and bring offscreen controls into view. Change Include cursor with Space twice to restore it, then Tab to Cancel and press Enter. Do not activate Reset or Clear temporary captures.
+2. Focus the shelf and press Ctrl+H for Recent captures. Tab to the capture list, select a synthetic capture with arrow keys, and confirm the preview matches. Tab/Shift+Tab to Edit and press Enter. Selection and focus must remain understandable and controls reachable.
+3. In the editor, Tab/Shift+Tab across tool choices, text/color/stroke fields, zoom/fit and action buttons. From a toolbar button (outside a text field), press Ctrl+S, then Cancel the export dialog with Escape. Close the unchanged editor with Escape. Expect visible focus, no trap, no accidental annotation/export and the original capture retained.
+4. At your current Windows text scale, repeat a brief focus/readability check in Light and Dark application themes for Settings, History and Editor. Labels, values and action buttons must stay readable and unclipped. Restore your theme. Report any existing high-contrast/screen-reader coverage separately; if unavailable report NOT AVAILABLE. No OS changes or software installation are required.
+
+Report PASS/FAIL for steps 1–4 and any confusing focus position. These are a keyboard/theme subset of Q19; unavailable high-contrast, screen-reader and other text-scale/hardware cases remain open under Q19/Q32.

@@ -314,3 +314,5 @@ Q02/Q03 native acceptance | instrumentation 751ce75; native input and owner tray
 Q19 canvas shortcut follow-up | actual color-field → arrow → Ctrl+S reproduction; canvas now explicitly acquires focus on allowed mouse gestures | native Ctrl+Z/Ctrl+Y/Ctrl+S PASS after fix; 170 core + 61 Windows tests PASS; zero-warning Release build and formatting PASS | full Q19 accessibility remains open | docs/NEXT-GATE-ACCEPTANCE-20261007.md | 2026-10-07
 
 Q21 native export closure | configured/remembered native destination; Cancel, overwrite No/Yes, folder action and managed-copy distinction PASS | edited output hashes match managed revisions; export leaves clipboard untouched; Apply/copy leaves export unchanged; six export regressions PASS | Q21 CLOSED; other editor/receiver gates remain | docs/NEXT-GATE-ACCEPTANCE-20261007.md | 2026-10-07
+
+Q19 keyboard correction | fix: reserve Tab and Shift+Tab for Settings navigation | native before/after reproduction and shortcut assignment PASS; 231 tests; zero-warning Release build; formatting PASS | owner keyboard/theme subset next; broader accessibility OPEN | docs/NEXT-GATE-ACCEPTANCE-20261007.md | 2026-10-07

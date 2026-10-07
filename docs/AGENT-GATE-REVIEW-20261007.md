@@ -103,3 +103,13 @@ Agent work: Added two-view/multiple-revision regression proving one close cannot
 Checks: CaptureViewLeaseTests 2/2 PASS; q04-reliability.json PASS for actual offscreen pin/history revision refresh, preview-quality/resize refresh, unpin/clear preservation and close release.
 
 Status / remaining acceptance: OPEN: actual detach, edit, Return to shelf and close gestures; visibility/topmost/click-through and mixed-DPI hardware remain broader pin acceptance. Native programmatic refresh and storage lease invariants pass.
+
+## Q05
+
+Inspected: CaptureRepository Restore rollback, CaptureLifetime visibility, retention age and HistoryWindow/PinWindow restore-to-dock calls.
+
+Agent work: Added isolated fake-clock batch-restore failure/restart/retry and repeated-restore regressions, preserving original timestamps and capture-time history order.
+
+Checks: CaptureRestoreTests plus existing expired-restore test 3/3 PASS: immediate visibility, exact 30-minute expiry, storage-age reset, full batch rollback and persistence across restart.
+
+Status / remaining acceptance: OPEN: actual Recent captures Restore and detached Return to shelf interaction shows expired image immediately; verify configured shelf lifetime in the rendered workflow. Data/lifetime behavior passes.

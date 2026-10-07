@@ -103,6 +103,9 @@ internal static class RuntimeChecks
                         var buttons = toolbar.Children.OfType<Button>().ToArray();
                         Assert(buttons.Any(b => Equals(b.Content, "Apply + copy")) && buttons.Any(b => Equals(b.Content, "Export PNG…")) && !buttons.Any(b => Equals(b.Content, "Save")), "Explicit apply/export labels");
                         Assert(buttons.Single(b => Equals(b.Content, "Open export folder")).IsEnabled, "Successful export exposes folder action");
+                        foreach (var input in rootPanel.Children.OfType<WrapPanel>().SelectMany(p => p.Children.OfType<Control>()).Where(c => c is TextBox or ComboBox))
+                            Assert(!string.IsNullOrWhiteSpace(System.Windows.Automation.AutomationProperties.GetName(input)), "Editor input exposes an accessible name");
+                        Assert(buttons.All(b => b.ActualWidth >= 30 && b.ActualHeight >= 30), "Editor actions have minimum 30 DIP targets");
                         foreach (var control in rootPanel.Children.OfType<WrapPanel>().SelectMany(p => p.Children.OfType<FrameworkElement>()))
                         {
                             var bounds = control.TransformToAncestor(rootPanel).TransformBounds(new Rect(control.RenderSize));

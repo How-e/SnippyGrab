@@ -63,6 +63,8 @@ internal sealed class EditorWindow : Window
         stroke = new TextBox { Text = controller.Settings.StrokeSize.ToString(CultureInfo.InvariantCulture), Width = 44, ToolTip = "Stroke thickness" }; toolbar.Children.Add(stroke);
         textSize = new TextBox { Text = controller.Settings.TextSize.ToString(CultureInfo.InvariantCulture), Width = 48, ToolTip = "Text size" }; toolbar.Children.Add(textSize);
         caption = new TextBox { Text = "Look here", MaxLength = 2000, Width = 220, ToolTip = "Text annotation content" }; toolbar.Children.Add(caption);
+        foreach (var input in new FrameworkElement[] { tools, color, stroke, textSize, caption })
+            System.Windows.Automation.AutomationProperties.SetName(input, (string)input.ToolTip);
         toolbar.Children.Add(Ui.Text("  Draw on the image · Ctrl+wheel to zoom", 12, true));
         DockPanel.SetDock(toolbar, Dock.Top); root.Children.Add(toolbar);
         status = Ui.Text(string.IsNullOrWhiteSpace(record.ExportPath) ? "Apply + copy updates the managed shelf image. Export PNG writes a separate file. Closing applies edits; Discard leaves pending edits unapplied." : "Last PNG export: " + record.ExportPath, 12, true);
@@ -70,6 +72,7 @@ internal sealed class EditorWindow : Window
         DockPanel.SetDock(status, Dock.Bottom); root.Children.Add(status);
         surface = new EditorSurface(journal.Current) { LayoutTransform = scale, Cursor = Cursors.Cross, Focusable = true };
         viewport = new ScrollViewer { Content = surface, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Background = new SolidColorBrush(Color.FromRgb(12, 15, 19)) };
+        viewport.SetResourceReference(BackgroundProperty, "Surface");
         root.Children.Add(viewport);
         surface.MouseLeftButtonDown += (_, e) =>
         {

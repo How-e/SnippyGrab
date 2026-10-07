@@ -143,7 +143,7 @@ internal sealed class DockWindow : Window
         var restoreFocus = IsKeyboardFocusWithin;
         Topmost = controller.Settings.AlwaysOnTop;
         var children = new List<UIElement>();
-        BeginAnimation(OpacityProperty, null); Opacity = controller.Settings.DockOpacity;
+        BeginAnimation(OpacityProperty, null); Opacity = SystemParameters.HighContrast ? 1 : controller.Settings.DockOpacity;
         shelf.Orientation = LayoutOrientation == DockOrientation.Horizontal ? Orientation.Horizontal : Orientation.Vertical;
         if (visible.Count == 0) { shelf.Children.Clear(); return; }
         var count = expanded ? controller.Settings.ExpandedItems : 1;

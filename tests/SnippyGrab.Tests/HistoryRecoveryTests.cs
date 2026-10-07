@@ -126,5 +126,32 @@ public sealed class HistoryRecoveryTests : IDisposable
         Assert.True(File.Exists(final.PathFor(capture)));
     }
 
+    [Fact]
+    public void PromotionWriteFailurePreservesReviewedSidecarAcrossRestart()
+    {
+        var original = new CaptureRepository(root); var capture = original.Add(Pixels, 10, 10);
+        var metadata = Path.Combine(root, "history.json"); File.WriteAllText(metadata, "unreadable original");
+        var recovery = new CaptureRepository(root, (path, bytes) =>
+        {
+            if (path == metadata) throw new IOException("injected promotion failure");
+            AtomicFile.Write(path, bytes);
+        });
+        recovery.Load();
+        var reviewed = Assert.Single(recovery.Captures); recovery.SetPinned(reviewed, false);
+        Assert.Throws<IOException>(recovery.ConfirmHistoryRecovery);
+        Assert.True(recovery.CleanupBlocked);
+        Assert.Equal("unreadable original", File.ReadAllText(metadata));
+        Assert.Equal(0, recovery.Cleanup(DateTimeOffset.UtcNow.AddYears(1), 1, true));
+        var reopened = new CaptureRepository(root); reopened.Load();
+        Assert.True(reopened.CleanupBlocked);
+        Assert.False(Assert.Single(reopened.Captures).Pinned);
+        reopened.ConfirmHistoryRecovery(); reopened.ConfirmHistoryRecovery();
+        var final = new CaptureRepository(root); final.Load();
+        Assert.False(final.CleanupBlocked);
+        Assert.False(Assert.Single(final.Captures).Pinned);
+        Assert.True(File.Exists(final.PathFor(capture)));
+        Assert.All(Directory.GetFiles(root, "history.invalid-*.json"), path => Assert.Equal("unreadable original", File.ReadAllText(path)));
+    }
+
     public void Dispose() { if (Directory.Exists(root)) Directory.Delete(root, true); }
 }

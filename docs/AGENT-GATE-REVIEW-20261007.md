@@ -13,3 +13,13 @@ Agent work: Added reentrant/cancelled coordinator regressions and actual offscre
 Checks: EditorCommitTests 6/6 PASS; Release solution build zero warnings/errors; --check-reliability q02-reliability.json PASS.
 
 Status / remaining acceptance: OPEN: actual tray Exit with multiple dirty editors, concurrent apply, retry/Discard UI and real OS clipboard lock; isolated injected failures pass.
+
+## Q03
+
+Inspected: CaptureRepository Load/ReadState/ConfirmHistoryRecovery and HistoryWindow explicit OK/Cancel confirmation.
+
+Agent work: Added promotion-write failure after successful sidecar persistence, reviewed unpin survival across restart, retry and idempotent confirmation coverage. Existing conservative recovery retained.
+
+Checks: HistoryRecoveryTests 11/11 PASS, corrupt/truncated/oversized/newer schema across launches and injected promotion failure; git diff --check PASS.
+
+Status / remaining acceptance: OPEN: actual recovery confirmation/cancel dialog, failed promotion feedback and retry interaction using isolated data. Durable recovery and cleanup blocking pass.

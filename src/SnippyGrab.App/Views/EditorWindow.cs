@@ -3,7 +3,7 @@ using SnippyGrab.App.Services;
 
 namespace SnippyGrab.App.Views;
 
-internal enum EditTool { Arrow, Rectangle, Ellipse, Pen, Line, Text, Highlight, Number, Blur, Pixelate, Redact, Crop, Spotlight, OcrArea }
+internal enum EditTool { Arrow, Rectangle, Ellipse, Pen, Line, Text, Highlight, Number, Blur, Pixelate, Redact, Crop, Spotlight, OcrArea, ColorPicker, Magnify }
 internal sealed record Annotation(EditTool Tool, Point Start, Point End, Color Color, double Stroke, double TextSize, string Text, IReadOnlyList<Point> Points, BitmapSource? Patch = null);
 internal sealed record EditorState(BitmapSource Base, Annotation[] Marks);
 internal sealed class EditorWindow : Window
@@ -71,7 +71,22 @@ internal sealed class EditorWindow : Window
         surface = new EditorSurface(journal.Current) { LayoutTransform = scale, Cursor = Cursors.Cross, Focusable = true };
         viewport = new ScrollViewer { Content = surface, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Background = new SolidColorBrush(Color.FromRgb(12, 15, 19)) };
         root.Children.Add(viewport);
-        surface.MouseLeftButtonDown += (_, e) => { if (commits.Busy || documentWork is not null) return; if (journal.Current.Marks.Length >= 500) { status.Text = "500 annotations reached. Apply and reopen to continue."; return; } start = Clamp(e.GetPosition(surface)); points.Clear(); points.Add(start); drawing = true; surface.CaptureMouse(); e.Handled = true; };
+        surface.MouseLeftButtonDown += (_, e) =>
+        {
+            if (commits.Busy || documentWork is not null) return;
+            var point = Clamp(e.GetPosition(surface));
+            if (Tool == EditTool.ColorPicker) { controller.Run(() => PickColorAsync(point)); e.Handled = true; return; }
+            if (Tool == EditTool.Magnify)
+            {
+                Zoom((Keyboard.Modifiers & ModifierKeys.Shift) != 0 ? scale.ScaleX / 2 : scale.ScaleX * 2);
+                UpdateLayout();
+                viewport.ScrollToHorizontalOffset(point.X * scale.ScaleX - viewport.ViewportWidth / 2);
+                viewport.ScrollToVerticalOffset(point.Y * scale.ScaleY - viewport.ViewportHeight / 2);
+                e.Handled = true; return;
+            }
+            if (journal.Current.Marks.Length >= 500) { status.Text = "500 annotations reached. Apply and reopen to continue."; return; }
+            start = point; points.Clear(); points.Add(start); drawing = true; surface.CaptureMouse(); e.Handled = true;
+        };
         surface.MouseMove += (_, e) =>
         {
             if (!drawing) return;
@@ -105,7 +120,28 @@ internal sealed class EditorWindow : Window
         Closed += (_, _) => { ocrLifetime.Cancel(); ocrLifetime.Dispose(); lease.Dispose(); surface.Preview = null; surface.State = null; viewport.Content = null; points.Clear(); journal.Clear(); };
     }
     private sealed record ToolChoice(EditTool Tool, string Label) { public override string ToString() => Label; }
-    internal static string ToolLabel(EditTool tool) => tool switch { EditTool.Pen => "Freehand", EditTool.Highlight => "Highlighter", EditTool.Number => "Numbered marker", EditTool.Redact => "Solid redaction", EditTool.OcrArea => "OCR selected area", _ => tool.ToString() };
+    internal static string ToolLabel(EditTool tool) => tool switch { EditTool.Pen => "Freehand", EditTool.Highlight => "Highlighter", EditTool.Number => "Numbered marker", EditTool.Redact => "Solid redaction", EditTool.OcrArea => "OCR selected area", EditTool.ColorPicker => "Pick image color", EditTool.Magnify => "Magnify (Shift: out)", _ => tool.ToString() };
+    private async Task PickColorAsync(Point point)
+    {
+        var content = (UIElement)Content; content.IsEnabled = false;
+        try { documentWork = PickCoreAsync(point); await documentWork; }
+        finally { documentWork = null; content.IsEnabled = true; }
+    }
+    private async Task PickCoreAsync(Point point)
+    {
+        var image = await RenderAsync(journal.Current);
+        var picked = SampleColor(image, point);
+        color.Text = $"#{picked.R:X2}{picked.G:X2}{picked.B:X2}";
+        status.Text = "Annotation color: " + color.Text + ". Sampled from the edited image; select a drawing tool to use it.";
+    }
+    internal static Color SampleColor(BitmapSource image, Point point)
+    {
+        if (!double.IsFinite(point.X) || !double.IsFinite(point.Y)) throw new ArgumentOutOfRangeException(nameof(point));
+        var converted = new FormatConvertedBitmap(image, PixelFormats.Bgra32, null, 0);
+        var pixel = new byte[4];
+        converted.CopyPixels(new Int32Rect(Math.Clamp((int)point.X, 0, image.PixelWidth - 1), Math.Clamp((int)point.Y, 0, image.PixelHeight - 1), 1, 1), pixel, 4, 0);
+        return Color.FromRgb(pixel[2], pixel[1], pixel[0]);
+    }
     private EditTool Tool => (EditTool)(tools.SelectedValue ?? EditTool.Arrow);
     private Point Clamp(Point p) => new(Math.Clamp(p.X, 0, journal.Current.Base.PixelWidth), Math.Clamp(p.Y, 0, journal.Current.Base.PixelHeight));
     private Annotation Make(Point end, bool preview = false)

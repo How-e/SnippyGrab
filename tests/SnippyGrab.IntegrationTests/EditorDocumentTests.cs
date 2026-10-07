@@ -10,6 +10,21 @@ namespace SnippyGrab.IntegrationTests;
 
 public sealed class EditorDocumentTests
 {
+    [Fact]
+    public void ColorPickerSamplesFlattenedEditsAndClampsEdges()
+    {
+        ImageIntegrationTests.Sta(() =>
+        {
+            var source = Fixture();
+            var edited = EditorWindow.Render(new(source, [Mark(EditTool.Redact)]));
+            Assert.Equal(Colors.Black, EditorWindow.SampleColor(edited, new(50, 40)));
+            Assert.Equal(Colors.RoyalBlue, EditorWindow.SampleColor(source, new(-5, -5)));
+            Assert.Equal(Colors.White, EditorWindow.SampleColor(source, new(160, 100)));
+            Assert.Throws<ArgumentOutOfRangeException>(() => EditorWindow.SampleColor(source, new(double.NaN, 0)));
+            Assert.NotEqual(Colors.Black, EditorWindow.SampleColor(source, new(50, 40)));
+            return true;
+        });
+    }
     internal static BitmapSource Fixture(int width = 160, int height = 100)
     {
         var visual = new DrawingVisual();

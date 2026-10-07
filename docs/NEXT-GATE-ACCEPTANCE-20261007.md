@@ -30,3 +30,23 @@ The handler now focuses the canvas when an allowed gesture begins. Text fields r
 Windows native verification on the rebuilt Release executable, `4753123` plus this one-line focus change: click the color field, draw an arrow, Ctrl+Z visibly removes it, Ctrl+Y visibly restores it, Ctrl+S opens the actual native export dialog. Its saved PNG contains the annotation. This establishes executed pointer/keyboard behavior, not merely raised routed events. UI Automation continued to report a stale color-field focus string, so the actual shortcut outcomes and rendered pixels are the acceptance evidence.
 
 Local fixture report: `artifacts/acceptance-results/editor-focus-20261007.json`. Broader keyboard-only flows, screen-reader/high-contrast/text-scale/theme acceptance stay under Q19/Q32.
+
+## Q21 — explicit export and managed-copy behavior
+
+PASS / CLOSED for Q21. Windows native gestures/dialogs on the same isolated fixture supplement six passing CaptureExport tests, flattened redaction/export tests and existing real clipboard evidence under Q02. Broader editor tools, receiver and accessibility matrices remain separate.
+
+- Initial Export PNG opens the configured isolated output directory. Native Cancel reports cancellation, leaves Exported false and keeps Open export folder disabled. No PNG is created.
+- A drawn arrow exports successfully; full destination is visible, the folder button becomes enabled, and Explorer opens that exact directory containing the PNG. The export hash equals the current managed PNG hash.
+- Add a second arrow and export again: the dialog remembers the earlier filename/directory. Native overwrite No preserves the original SHA-256 `20AF908F1B86C8BBD86CDB08175856F2E51D863677BE2D15C4D46A77847305D8`. Native overwrite Yes writes the updated revision, hash `48A762B675E87724C9A1E99CFAEBC75E25FD0C8DA8488F326946A73397D344CD`, exactly matching the managed PNG. Only disposable fixture output is overwritten.
+- Both exports leave the intercepted clipboard untouched (zero operations). Native Apply + copy then records exactly one image publication and displays the managed-copy explanation; export hash remains unchanged. Actual OS clipboard publication/retry already passed Q02; this fixture proves action routing and file semantics, not receiver delivery.
+- Six current core export tests cover repeat/stale revision rejection, destination conflict/cache restrictions, failure preservation/retry and metadata-warning behavior. Native Cancel, decline/accept overwrite and folder opening complete the previously missing dialog acceptance.
+
+Local ignored evidence: `export-final-20261007.json` SHA-256 `52115D5DC090D629AFEADE8B433B8660636A81B4C7E9917404C722EC93258396`; `export-verification-20261007.json` SHA-256 `485DD133872195D6B3121BF752342344C85A4839CFE6D09A570E128DC4766E04`, both under `artifacts/acceptance-results/`. No private pixels or raw user exception payloads are tracked.
+
+Validation after the focus fix: zero-warning warnings-as-errors Release build, full **170 core + 61 Windows tests**, no failures/skips, full formatting PASS. Queue and milestone/release policy checks retain stable blocking with **30 required gates open; 21 entries checked**.
+
+## Next owner acceptance
+
+Q30/Q50: exact nonadjacent receiver membership/order and one-minute delayed file paste, using the new local `0.1.0-alpha.acceptance.20261007.2` candidate. The launcher verifies committed source and matching bundle hashes/revision. Exit all installed/fixture SnippyGrab instances normally first, then run `pwsh ./scripts/start-acceptance.ps1 -RealApp`. Follow USER-TESTING's targeted receiver instructions; use only synthetic A/B/C content and unsent drafts. Record candidate and Codex version, count/content/displayed order and supported/unsupported separately for each case. Earlier ordinary paste/drop successes stand.
+
+Q16/Q49 remaining gesture/settings coverage, Q18 motion/contrast, Q19 accessibility and later storage/history/OS/hardware gates stay open. This continuation closes only evidenced Q15/Q21 and fixes the independently reproduced canvas shortcut issue; it does not waive the other required acceptance criteria.

@@ -1,4 +1,4 @@
-Latest [targeted keyboard acceptance](NEXT-GATE-ACCEPTANCE-20261007.md) closes Q15; **31 required gates remain open, 20 entries checked**. Earlier dated counts below are historical.
+Latest [targeted keyboard acceptance](NEXT-GATE-ACCEPTANCE-20261007.md) closes Q15/Q21; **30 required gates remain open, 21 entries checked**. Earlier dated counts below are historical.
 
 # Remaining acceptance review — 2026-10-07
 

@@ -32,6 +32,8 @@ These reports improve the recorded native interaction evidence without automatic
 
 ### Next targeted real-receiver check
 
+Use the newly prepared local **0.1.0-alpha.acceptance.20261007.2** candidate, which includes the verified canvas-shortcut fix. Q15 and Q21 are closed in [targeted native acceptance](NEXT-GATE-ACCEPTANCE-20261007.md); full accessibility and receiver gates remain open. The default launcher now selects this candidate and checks its source revision/hashes.
+
 Exit the fixture with **Exit checks** and exit other SnippyGrab instances through their trays. Run `pwsh ./scripts/start-acceptance.ps1 -RealApp`. This mode uses normal capture history, hotkeys and the OS clipboard. Use synthetic content and an unsent Codex draft; no message needs sending.
 
 1. Capture distinct A, then B, then C images. Shelf numbers should be 1=C, 2=B, 3=A. Record SnippyGrab and Codex versions.

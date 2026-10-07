@@ -113,3 +113,13 @@ Agent work: Added isolated fake-clock batch-restore failure/restart/retry and re
 Checks: CaptureRestoreTests plus existing expired-restore test 3/3 PASS: immediate visibility, exact 30-minute expiry, storage-age reset, full batch rollback and persistence across restart.
 
 Status / remaining acceptance: OPEN: actual Recent captures Restore and detached Return to shelf interaction shows expired image immediately; verify configured shelf lifetime in the rendered workflow. Data/lifetime behavior passes.
+
+## Q06
+
+Inspected: CaptureRepository full orphan enumeration, lazy bounded PNG dimensions, 512-record content-addressed pages, manifest admission and 24-hour unreferenced-page compaction; HistoryPage bounded UI paging; existing Q35 resource review.
+
+Agent work: Added failed-manifest-replacement test with 1,025 records, retained durable pin state, abandoned-page cleanup and referenced-page preservation across restart. Existing 2,100-orphan/over-4-MB/never-retention and lazy-dimension tests retained.
+
+Checks: HistoryPaging/Recovery/Behavior tests 17/17 PASS with zero warnings after analyzer correction. Existing reviewed Q35 evidence: 7,279 retained captures over 7,201 seconds with bounded handles and managed recovery; not rerun.
+
+Status / remaining acceptance: CLOSED for stated agent criteria: orphan dimensions, bounded pages, failed-write/crash metadata safety, safe compaction and never-retention resource evidence. Repository metadata still scales with retained history in memory; all-day use and history/pin gestures remain broader gates, not claimed verified.

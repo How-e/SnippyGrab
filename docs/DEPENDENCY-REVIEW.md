@@ -1,6 +1,6 @@
 # Dependency policy and native OCR review
 
-Reviewed 2026-10-06. `scripts/audit-dependencies.ps1` parses .NET JSON output version 1, requires all four projects and a feed, and fails for any direct/transitive vulnerability, unsupported report, query error or failed command. All severities fail; no NuGet exceptions exist. Fourteen isolated policy fixtures cover clean, all severities, transitive findings and invalid reports. Restore also promotes NU1900–NU1905 to errors. This uses the [documented JSON audit interface](https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-package-list).
+Reviewed 2026-10-06. `scripts/audit-dependencies.ps1` parses .NET JSON output version 1, requires all five projects and a feed, and fails for any direct/transitive vulnerability, unsupported report, query error or failed command. All severities fail; no NuGet exceptions exist. Sixteen isolated policy fixtures cover clean, all severities, transitive findings and invalid reports. Restore also promotes NU1900–NU1905 to errors. This uses the [documented JSON audit interface](https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-package-list).
 
 CI and release run the policy after compilation. GitHub Actions references are pinned to upstream commit IDs resolved from their v4/v3 tags; Dependabot remains enabled. Hosted execution is still pending .
 
@@ -15,6 +15,8 @@ Upstream Tesseract has model-deserialization advisories affecting versions throu
 Leptonica 1.82.0 is older than the [current upstream releases](https://github.com/DanBloomberg/leptonica/releases). Only app-encoded bounded PNGs enter OCR from ordinary capture/import; malformed external imports first go through Windows codecs. Native codec dependencies still require an inventory, applicable-advisory review and a tested upgrade before broad stable security acceptance.  tracks this concrete follow-up after the / policy/review closure. No approval of vulnerable native components is implied by a passing NuGet/integrity check.
 
 Packaged unsigned alpha builds remain suitable for local evaluation under the documented trust boundary, not a claim of stable security acceptance.
+
+The original NuGet inventory and initial open-gate statements below are historical. The current source-built replacement and packaged closure are documented at the end of this review and in [NATIVE-OCR.md](NATIVE-OCR.md).
 
 ## Exact native inventory and parser boundary —  follow-up
 
@@ -41,3 +43,5 @@ The old-byte inventory above is historical evidence. The current development/tes
 [Native build/review](NATIVE-OCR.md) maps all ten reviewed Tesseract advisories to included source fixes, describes source admission, build-receipt hash policy, unchanged managed/model licenses and newly copied native licenses. Native SHA-256 now comes from the verified source-build receipt, tied to committed source pins/recipe, instead of old NuGet binary hashes. A receipt is trusted build provenance, not a signature or byte-reproducibility proof. Same-user races, OS decoder admission, unknown future native issues and prolonged resources remain residual boundaries.
 
 206 development tests pass against the replaced DLLs. Known raw colors/alpha/resolution/metadata, unavailable native PNG codec, full/area corpus, exact CS1002, malformed input, queued cancellation and model/loader failures pass. Eight isolated native-policy fixtures reject stale/missing/tampered build receipts. The development executable's six-case OCR corpus/error/cancellation probe passes. Final packaged validation is recorded in VALIDATION.md before  closure. No claim of vulnerability-free native code or completed stable release is implied.
+
+Packaged closure, 2026-10-07: build 0.1.0-alpha.queue.20261006.3 passes the six-case OCR corpus/malformed-input/cancellation probe, reliability probe and short 300-capture/three-OCR resource smoke against the upgraded DLLs. Bundle inventory, ZIP/setup digests, embedded payload, source receipt and all five license files pass verification.  is closed as the requested native upgrade/review deliverable;  prolonged resources and other stable acceptance gates remain open.

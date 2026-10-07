@@ -135,7 +135,7 @@ Shelf positions include four corners and centered Top, Bottom, Left and Right ed
 
 Editor crop/effect/flattening/PNG work runs on workers with frozen image inputs. Undo retains up to 20 states and approximately 256 MiB of distinct decoded images and stroke data; large image operations may evict old undo steps. One required current image can exceed this budget under the 80-megapixel input limit, and rendering/encoding has additional transient memory. Blur/pixelation are visual effects; use Solid redaction for opaque removal from a newly flattened image. Earlier clipboard, export and transferred revisions are not retracted.
 
-The English OCR model is checked at runtime against its pinned SHA-256. Missing/modified models and native loader failures leave capture available. OCR can confuse similar glyphs such as zero and `@`; review copied error codes. No model is downloaded at runtime. See [dependency review](docs/DEPENDENCY-REVIEW.md) for native library advisories and the remaining stable release gate.
+The English OCR model is checked at runtime against its pinned SHA-256. Missing/modified models and native loader failures leave capture available. OCR can confuse similar glyphs such as zero and `@`; review copied error codes. No model is downloaded at runtime. See [dependency review](docs/DEPENDENCY-REVIEW.md) for the source-pinned native upgrade, reviewed advisory fixes and residual risks.
 
 Settings retention uses named 1-hour/24-hour/7-day/never choices and preserves saved custom durations. Animation fades new shelf arrivals only; it respects Windows motion/high-contrast preferences. Reset creates a draft of defaults; Cancel leaves saved settings unchanged. Updates remain manual/offline.
 

@@ -20,6 +20,7 @@ public sealed class CaptureRecord
     public bool Saved { get; set; }
     public string ExportPath { get; set; } = "";
     public bool Dismissed { get; set; }
+    public PinLayout? PinLayout { get; set; }
 }
 public sealed class RepositoryState
 {
@@ -153,6 +154,12 @@ public sealed partial class CaptureRepository
     {
         var previous = record.Pinned; record.Pinned = pinned;
         try { Persist(); } catch { record.Pinned = previous; throw; }
+    }
+    public void SetPinLayout(CaptureRecord record, PinLayout layout)
+    {
+        if (!state.Captures.Contains(record)) throw new InvalidOperationException("Capture is no longer available.");
+        var previous = record.PinLayout; record.PinLayout = layout.Normalize();
+        try { Persist(); } catch { record.PinLayout = previous; throw; }
     }
     public void Dismiss(IEnumerable<CaptureRecord> records)
     {

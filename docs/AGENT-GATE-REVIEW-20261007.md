@@ -133,3 +133,13 @@ Agent work: Added dedicated temporary child-process crash fixture and bounded ru
 Checks: TransferLifecycle/Order/stale staging focused tests 13/13 PASS; zero-warning Release build after correcting helper visibility; scripts/test-transfer-crash.ps1 PASS (q13-crash.json). Only its returned child process was terminated, fixture root validated and removed.
 
 Status / remaining acceptance: OPEN: actual native drag with clear/expiry, OS file clipboard delayed external receiver reads, normal session-only tray exit and process termination during real transfer. Fake-clock/process durability and documented 24-hour tradeoff pass; external receivers must read within grace.
+
+## Q22
+
+Inspected: Optimistic editor revision guard, one-editor-per-capture routing, immutable transferred files, history/pin preview refresh and failed revision rollback.
+
+Agent work: Reproduced failed metadata edit reappearing as a second orphan capture after restart. Rollback now removes only the never-published new revision, preserving original pixels. Separated durable persistence from view notifications so observer failure cannot roll back/delete a committed revision; revision leases refresh before general history notification. Added stale/failed/observer-error regressions.
+
+Checks: Cross-view/failed metadata/view lease/superseded restart focused tests 7/7 PASS (orphan regression failed before fix); zero-warning Release build; q22-reliability-final.json PASS for native offscreen history/pin pixel refresh and actual editor close/copy retry; scoped formatting and git diff --check PASS.
+
+Status / remaining acceptance: OPEN: actual Apply/copy across shelf/history/detached pin and one-editor focus behavior. If the OS refuses deletion of an unpublished revision it is retained conservatively; no data-loss claim is made. Native programmatic consistency passes.

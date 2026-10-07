@@ -28,6 +28,7 @@ Get-ChildItem (Join-Path $repoRoot 'src') -Recurse -Filter 'packages*.lock.json'
 [ordered]@{ Version = $Version; Commit = $revision; Dirty = $dirty; Sdk = (dotnet --version); Runtime = 'win-x64 self-contained'; DependencyLocks = $locks; NativeComponents = (Get-Content (Join-Path $PSScriptRoot 'ocr-components.json') -Raw | ConvertFrom-Json) } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $stagingPath 'BUILD-PROVENANCE.json') -Encoding utf8
 Copy-Item -LiteralPath (Join-Path $repoRoot 'licenses') -Destination $stagingPath -Recurse
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'install.ps1') -Destination $stagingPath
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'install-files.ps1') -Destination $stagingPath
 if (Test-Path -LiteralPath $bundlePath) {
     $oldPath = $bundlePath + '-previous-' + [Guid]::NewGuid().ToString('N')
     Move-Item -LiteralPath $bundlePath -Destination $oldPath

@@ -226,6 +226,16 @@ internal static class RuntimeChecks
             dock.HandleKey(Key.Escape, ModifierKeys.None); Assert(dock.SelectionCount == 0 && !dock.Expanded, "Escape clears selection and collapses");
             dock.HandleKey(Key.Home, ModifierKeys.None);
             dock.CommandSinkOverride = null;
+            foreach (var thumbnailSize in new[] { 120, 180, 224 })
+            {
+                controller.Settings.ThumbnailSize = thumbnailSize; dock.Refresh(); dock.SetExpanded(true); dock.UpdateLayout();
+                foreach (var card in ((StackPanel)((Border)dock.Content).Child).Children.OfType<Border>().Where(b => b.Tag is Guid))
+                {
+                    var grid = (Grid)card.Child; var toolbar = grid.Children.OfType<StackPanel>().Single();
+                    Assert(toolbar.ActualWidth <= grid.ActualWidth, "Compact action toolbar fits screenshot width");
+                    Assert(toolbar.Children.Count == (thumbnailSize < 200 ? 3 : 6), "Compact shelf keeps edit/copy and full action menu");
+                }
+            }
             Snapshot(dock, Path.Combine(Path.GetDirectoryName(Path.GetFullPath(destination))!, "dock-layout-synthetic.png"));
             Assert(Native.GetForegroundWindow() == foreground, "Dock probe preserves foreground");
             Native.GetCursorPos(out var afterPointer); Assert(afterPointer.X == pointer.X && afterPointer.Y == pointer.Y, "Dock probe never moves pointer");

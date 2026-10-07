@@ -211,7 +211,7 @@ internal sealed class DockWindow : Window
         state.Background = (Brush)FindResource("Surface"); state.IsHitTestVisible = false; grid.Children.Add(state);
         state.MaxWidth = size * 0.55;
         var controls = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom, Background = (Brush)FindResource("Surface") };
-        foreach (var (label, hint, action) in new (string, string, Action)[]
+        var actions = new (string, string, Action)[]
         {
                 ("✎", "Edit (Enter)", () => controller.Edit(capture)),
                 ("⧉", "Copy image (Ctrl+C)", () => controller.Run(() => controller.Copy(capture))),
@@ -219,8 +219,14 @@ internal sealed class DockWindow : Window
                 ("↓", "Save as (Ctrl+S)", () => controller.Save(capture)),
                 ("T", "OCR and copy text", () => controller.Run(() => controller.Ocr(capture))),
                 ("×", "Dismiss (Delete)", () => controller.Dismiss([capture]))
-        })
+        };
+        foreach (var (label, hint, action) in actions.Take(size < 200 ? 2 : actions.Length))
         { var b = Ui.Button(label, hint, action); b.Padding = new Thickness(size < 180 ? 2 : 6, 3, size < 180 ? 2 : 6, 3); b.Margin = new Thickness(1); b.FontSize = 13; controls.Children.Add(b); }
+        if (size < 200)
+        {
+            var more = Ui.Button("…", "All screenshot actions", () => { border.ContextMenu.PlacementTarget = border; border.ContextMenu.IsOpen = true; });
+            more.Padding = new Thickness(2, 3, 2, 3); more.Margin = new Thickness(1); more.FontSize = 13; controls.Children.Add(more);
+        }
         grid.Children.Add(controls);
         border.ContextMenu = Menu(capture);
         border.PreviewMouseLeftButtonDown += (_, e) =>

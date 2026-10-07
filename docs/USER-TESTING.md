@@ -48,9 +48,13 @@ Owner subsequently reports **PASS for all steps** on `.3`, clean source `9103b9d
 
 **Q49 PASS / CLOSED** with this actual owner report, earlier 1/3/5/20 cold/repeated-hover acceptance, Q16 selection/reorder/cancellation results and the independent 64-layout/768-anchor-sample evidence. It establishes the stated jitter/reachability/collapse criteria, not every monitor/topology/accessibility setting.
 
-### Next visual check — Q18
+### Completed visual check — Q18
 
 The completed hover tests used existing captures. **Fade new captures into the shelf** affects new arrivals, so its actual fade remains untested. In the current running build, turn that setting off and capture one synthetic image: expect immediate stable appearance. Turn it on and capture another: expect a brief stable fade if Windows animations are enabled, otherwise immediate appearance. Inspect Light and Dark application themes at smallest/largest thumbnail sizes: screenshot edges stay inside rounded cards, badges/selection/focus/buttons remain readable, and controls are not clipped or obscured. Restore original settings. Report PASS/FAIL for arrivals off/on and both themes, including whether fade was visible. If you already use Windows reduced motion/high contrast, mention that existing configuration; no OS preference change is requested. Q18 remains open for this visual/motion acceptance; bounded thumbnail work and hover stability have evidence.
+
+Owner subsequently reports **PASS for all**. The actual supplied chat procedure specified immediate stable arrivals with application fade off/on because a read-only WPF OS query showed **ClientAreaAnimation=false, HighContrast=false**. Both arrival cases and Light/Dark themes at minimum/maximum thumbnail sizes pass, including rounded clipping, readable badges/selection/focus/buttons, and restoring settings. The handoff allowed the running `.3` or matching rebuilt `.4`; owner did not specify which was used. Both have identical application source; retain that exact-version limitation rather than inventing a version.
+
+**Q18 PASS / CLOSED for its stated bounded-work, presentation and reduced-motion criteria**, combining this visual report, earlier hover/settings/scrolling reports, Q49/Q16 closure and independent cache/revision/layout tests. No normal-animation-enabled fade or actual high-contrast/screen-reader result is claimed; those configurations remain unverified in the broader Q19/Q32 accessibility matrix. Existing arrival-only animation design and deferred expansion animation are unchanged.
 
 ### Codex selected-transfer acceptance — PASS
 

@@ -1,4 +1,4 @@
-param([string]$Bundle = (Join-Path $PSScriptRoot '../artifacts/SnippyGrab-0.1.0-alpha.acceptance.20261007.3-win-x64'), [switch]$RealApp, [switch]$ValidateOnly)
+param([string]$Bundle = (Join-Path $PSScriptRoot '../artifacts/SnippyGrab-0.1.0-alpha.acceptance.20261007.4-win-x64'), [switch]$RealApp, [switch]$ValidateOnly)
 $ErrorActionPreference = 'Stop'
 $bundlePath = (Resolve-Path -LiteralPath $Bundle).Path
 $provenance = Get-Content -LiteralPath (Join-Path $bundlePath 'BUILD-PROVENANCE.json') -Raw | ConvertFrom-Json

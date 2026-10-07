@@ -529,7 +529,7 @@ internal static class RuntimeChecks
         var thumb = ImageService.Load(repository.PathFor(record), 448);
         return new { Width = width, Height = height, PngBytes = png.Length, EncodeMs = encoded, EncodeAndStorageMs = stored, EncodeStorageThumbnailMs = watch.ElapsedMilliseconds, ThumbnailWidth = thumb.PixelWidth };
     }
-    private static BitmapSource SyntheticCode(int width, int height)
+    internal static BitmapSource SyntheticCode(int width, int height)
     {
         var visual = new DrawingVisual();
         using (var dc = visual.RenderOpen())

@@ -123,3 +123,13 @@ Agent work: Added failed-manifest-replacement test with 1,025 records, retained 
 Checks: HistoryPaging/Recovery/Behavior tests 17/17 PASS with zero warnings after analyzer correction. Existing reviewed Q35 evidence: 7,279 retained captures over 7,201 seconds with bounded handles and managed recovery; not rerun.
 
 Status / remaining acceptance: CLOSED for stated agent criteria: orphan dimensions, bounded pages, failed-write/crash metadata safety, safe compaction and never-retention resource evidence. Repository metadata still scales with retained history in memory; all-day use and history/pin gestures remain broader gates, not claimed verified.
+
+## Q13
+
+Inspected: Lease acquire/release durability, grace after immutable edits, cleanup/session cohorts/staging and README retention/24-hour crash contract.
+
+Agent work: Added dedicated temporary child-process crash fixture and bounded runner: durable transfer is held, revision edited, child terminated without release, restart reads identical old PNG at fake 23h and expires it at 24h while preserving pin. Added nested lease failed-release persistence/retry regression.
+
+Checks: TransferLifecycle/Order/stale staging focused tests 13/13 PASS; zero-warning Release build after correcting helper visibility; scripts/test-transfer-crash.ps1 PASS (q13-crash.json). Only its returned child process was terminated, fixture root validated and removed.
+
+Status / remaining acceptance: OPEN: actual native drag with clear/expiry, OS file clipboard delayed external receiver reads, normal session-only tray exit and process termination during real transfer. Fake-clock/process durability and documented 24-hour tradeoff pass; external receivers must read within grace.

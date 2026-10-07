@@ -11,6 +11,20 @@ public partial class App : Application
     {
         base.OnStartup(e);
         Native.SetDefaultDllDirectories(0x1000); // Default safe locations; never the working directory.
+        if (e.Args.Contains("--check-transfer-crash"))
+        {
+            var args = e.Args.SkipWhile(a => a != "--check-transfer-crash").Skip(1).ToArray();
+            if (args.Length < 2) { Shutdown(1); return; }
+            try
+            {
+                if (args[0] == "hold") await TransferCrashChecks.Hold(args[1]);
+                else if (args[0] == "verify" && args.Length == 3) TransferCrashChecks.Verify(args[1], args[2]);
+                else throw new ArgumentException("Expected hold root or verify root report.");
+                Shutdown(0);
+            }
+            catch (Exception ex) { if (args.Length == 3) File.WriteAllText(args[2], "FAILED: " + ex); Shutdown(1); }
+            return;
+        }
         if (e.Args.Contains("--check-resource-stress"))
         {
             var args = e.Args.SkipWhile(a => a != "--check-resource-stress").Skip(1).ToArray();

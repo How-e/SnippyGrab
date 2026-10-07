@@ -38,6 +38,22 @@ public sealed class TransferLifecycleTests : IDisposable
         Assert.Throws<IOException>(() => repository.Lease([record], true)); fail = false; repository.Persist();
         Assert.Equal(1, repository.Cleanup(DateTimeOffset.UtcNow, 1, true));
     }
+    [Fact]
+    public void FailedReleasePersistenceBlocksCleanupUntilExtendedGraceIsDurable()
+    {
+        var now = DateTimeOffset.Parse("2026-01-01T00:00:00Z"); var fail = false;
+        var repository = new CaptureRepository(root, (path, bytes) => { if (fail) throw new IOException(); AtomicFile.Write(path, bytes); }, () => now);
+        var capture = repository.Add([1, 2, 3], 2, 3);
+        var first = repository.Lease([capture], true); var second = repository.Lease([capture], true);
+        now = now.AddHours(30); first.Dispose(); fail = true; second.Dispose(); second.Dispose();
+        Assert.True(repository.PersistencePending);
+        Assert.Equal(0, repository.Cleanup(now.AddHours(25), 1, true));
+        fail = false; repository.Persist();
+        var reopened = new CaptureRepository(root, utcNow: () => now); reopened.Load();
+        Assert.Equal(0, reopened.Cleanup(now.AddHours(23), 1, true));
+        Assert.Equal(new byte[] { 1, 2, 3 }, File.ReadAllBytes(reopened.PathFor(capture)));
+        Assert.Equal(1, reopened.Cleanup(now.AddHours(24), 1, true));
+    }
     [Theory]
     [InlineData(1)]
     [InlineData(24)]

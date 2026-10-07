@@ -1,7 +1,7 @@
 param([string]$ReportPath, [string]$ComponentDirectory, [switch]$SelfTest)
 $ErrorActionPreference = 'Stop'
 function Assert-DependencyPolicy($report) {
-    if ($report.version -ne 1 -or @($report.projects).Count -ne 4 -or @($report.sources).Count -eq 0) { throw 'Incomplete or unsupported dependency audit report.' }
+    if ($report.version -ne 1 -or @($report.projects).Count -ne 5 -or @($report.sources).Count -eq 0) { throw 'Incomplete or unsupported dependency audit report.' }
     if (@($report.PSObject.Properties.Name) -contains 'errors' -and $report.errors) { throw 'Dependency audit reported errors.' }
     if (@($report.PSObject.Properties.Name) -contains 'logs' -and @($report.logs | Where-Object { $_.level -eq 'error' }).Count) { throw 'Dependency audit feed/query error.' }
     foreach ($project in $report.projects) {
@@ -17,7 +17,7 @@ function Assert-DependencyPolicy($report) {
     }
 }
 if ($SelfTest) {
-    $clean = '{"version":1,"sources":["fixture"],"projects":[{"path":"a"},{"path":"b"},{"path":"c"},{"path":"d"}]}'
+    $clean = '{"version":1,"sources":["fixture"],"projects":[{"path":"a"},{"path":"b"},{"path":"c"},{"path":"d"},{"path":"e"}]}'
     Assert-DependencyPolicy ($clean | ConvertFrom-Json)
     foreach ($kind in @('topLevelPackages', 'transitivePackages')) {
         foreach ($severity in @('Low', 'Moderate', 'High', 'Critical', 'Unknown')) {
@@ -42,7 +42,7 @@ else {
     if ($LASTEXITCODE -ne 0) { throw 'Dependency audit command failed.' }
 }
 Assert-DependencyPolicy ($json | ConvertFrom-Json)
-Write-Output 'Dependency policy passed: no reported vulnerabilities in four projects, including transitive packages.'
+Write-Output 'Dependency policy passed: no reported vulnerabilities in five projects, including transitive packages.'
 $manifest = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'ocr-components.json') -Raw | ConvertFrom-Json
 if (-not $ComponentDirectory) { $ComponentDirectory = Join-Path (Split-Path -Parent $PSScriptRoot) 'src/SnippyGrab.App/bin/Release/net10.0-windows' }
 foreach ($entry in $manifest.files.PSObject.Properties) {

@@ -41,3 +41,10 @@ $zipPath = "$bundlePath.zip"
 & (Join-Path $PSScriptRoot 'archive.ps1') -Source $bundlePath -Destination $zipPath
 '{0}  {1}' -f (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLowerInvariant(), [IO.Path]::GetFileName($zipPath) | Set-Content -LiteralPath "$zipPath.sha256" -Encoding utf8
 Write-Output $bundlePath
+$installerStage = Join-Path $artifactRoot ('installer-staging-' + [Guid]::NewGuid().ToString('N'))
+dotnet publish (Join-Path $repoRoot 'src/SnippyGrab.Installer') -c Release -r win-x64 --self-contained true -p:ReleasePackaging=true -p:RestoreLockedMode=true -p:PublishSingleFile=true -p:Version=$Version "-p:BundleArchive=$zipPath" -o $installerStage
+if ($LASTEXITCODE -ne 0) { throw 'Installer publish failed.' }
+$installerPath = Join-Path $artifactRoot "SnippyGrab-$Version-Setup.exe"
+Copy-Item -LiteralPath (Join-Path $installerStage 'SnippyGrab-Setup.exe') -Destination $installerPath -Force
+'{0}  {1}' -f (Get-FileHash -LiteralPath $installerPath -Algorithm SHA256).Hash.ToLowerInvariant(), [IO.Path]::GetFileName($installerPath) | Set-Content -LiteralPath "$installerPath.sha256" -Encoding utf8
+Write-Output $installerPath

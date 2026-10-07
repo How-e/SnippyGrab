@@ -54,6 +54,7 @@ internal sealed class AppController : IDisposable
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException) { cacheWarning = "Monitor identity could not be saved. Review and retry Settings before changing the display layout."; }
         }
         Ui.FailureHandler = Failure;
+        capture.Timing += Log;
         Ui.Theme(Settings.Theme);
         Settings.LaunchOnStartup = StartupService.Enabled;
         if (!diagnostic && StartupService.Stale) cacheWarning = "Windows startup points to another or older SnippyGrab path. Enable Launch at Windows login in Settings to register this executable, or disable it to remove the old entry.";
@@ -90,7 +91,7 @@ internal sealed class AppController : IDisposable
             () => { if (dockWasVisible) Dock.Reveal(); foreach (var pin in pins.Values) pin.Show(); });
         if (result is null || exitRequested || Exiting) return;
         var ready = Stopwatch.StartNew();
-        var png = ImageService.Png(result.Image);
+        var png = await Task.Run(() => ImageService.Png(result.Image));
         try { Repository.Add(png, result.Image.PixelWidth, result.Image.PixelHeight, string.Join(",", Forms.Screen.AllScreens.Where(screen => !result.Bounds.Intersect(new PixelRect(screen.Bounds.X, screen.Bounds.Y, screen.Bounds.Width, screen.Bounds.Height)).IsEmpty).Select(screen => screen.DeviceName))); Dock.Refresh(newCapture: true); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
         {

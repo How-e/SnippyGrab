@@ -11,6 +11,14 @@ public partial class App : Application
     {
         base.OnStartup(e);
         Native.SetDefaultDllDirectories(0x1000); // Default safe locations; never the working directory.
+        if (e.Args.Contains("--check-pipeline-latency"))
+        {
+            var report = e.Args.SkipWhile(a => a != "--check-pipeline-latency").Skip(1).FirstOrDefault();
+            if (report is null) { Shutdown(1); return; }
+            try { await PipelineLatencyChecks.Run(report); Shutdown(0); }
+            catch (Exception ex) { File.WriteAllText(report, "FAILED: " + ex); Shutdown(1); }
+            return;
+        }
         if (e.Args.Contains("--check-editor-performance"))
         {
             var report = e.Args.SkipWhile(a => a != "--check-editor-performance").Skip(1).FirstOrDefault();

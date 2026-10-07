@@ -8,6 +8,7 @@ internal sealed record CaptureResult(BitmapSource Image, PixelRect Bounds, long 
 internal sealed class CaptureService
 {
     public bool Busy { get; private set; }
+    public event Action<string>? Timing;
     public async Task<CaptureResult?> CaptureAsync(CaptureMode mode, bool cursor, Action hide, Action restore)
     {
         if (Busy) return null;
@@ -26,7 +27,9 @@ internal sealed class CaptureService
             var overlay = new CaptureOverlay(frozen, desktop, mode == CaptureMode.Window);
             var completion = new TaskCompletionSource();
             overlay.Closed += (_, _) => completion.TrySetResult();
-            overlay.Show(); await completion.Task;
+            overlay.Show(); Timing?.Invoke($"request_to_overlay_ms={stopwatch.ElapsedMilliseconds}");
+            await completion.Task;
+            var selectionWork = Stopwatch.StartNew();
             if (overlay.WindowPoint is { } point)
             {
                 Native.DwmFlush();
@@ -37,7 +40,9 @@ internal sealed class CaptureService
                 return new(ImageService.Crop(frozen, bounds.RelativeTo(desktop)), bounds, stopwatch.ElapsedMilliseconds);
             }
             if (overlay.Selection is not { } selection) return null;
-            return new(ImageService.Crop(frozen, selection.RelativeTo(desktop)), selection, stopwatch.ElapsedMilliseconds);
+            var cropped = ImageService.Crop(frozen, selection.RelativeTo(desktop));
+            Timing?.Invoke($"selection_to_crop_ms={selectionWork.ElapsedMilliseconds}");
+            return new(cropped, selection, stopwatch.ElapsedMilliseconds);
         }
         finally
         {

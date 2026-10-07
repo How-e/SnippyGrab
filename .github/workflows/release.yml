@@ -19,6 +19,13 @@ jobs:
       - run: dotnet restore --locked-mode
       - run: dotnet build --no-restore -c Release -warnaserror
       - run: dotnet test --no-build -c Release
+      - name: Isolated release boundary fixtures
+        shell: pwsh
+        run: |
+          ./scripts/test-installer.ps1
+          ./scripts/test-install-files.ps1
+          ./scripts/test-artifact-retention.ps1
+          ./scripts/audit-dependencies.ps1 -SelfTest
       - run: ./scripts/audit-dependencies.ps1
         shell: pwsh
       - name: Package unsigned portable and per-user installer
@@ -26,6 +33,7 @@ jobs:
         run: |
           $version = $env:GITHUB_REF_NAME.TrimStart('v')
           ./scripts/package.ps1 -Version $version -RequireTag
+          ./scripts/verify-package.ps1 -Bundle "artifacts/SnippyGrab-$version-win-x64" -Installer "artifacts/SnippyGrab-$version-Setup.exe"
       # Add protected external signing BEFORE generating final checksums.
       # Never expose signing credentials to pull-request builds.
       - name: Publish GitHub release

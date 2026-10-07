@@ -16,5 +16,12 @@ jobs:
       - run: dotnet build --no-restore -c Release -warnaserror
       - run: dotnet test --no-build -c Release --logger trx
       - run: dotnet format --no-restore --verify-no-changes
+      - name: Isolated installer, upgrade and packaging boundary fixtures
+        shell: pwsh
+        run: |
+          ./scripts/test-installer.ps1
+          ./scripts/test-install-files.ps1
+          ./scripts/test-artifact-retention.ps1
+          ./scripts/audit-dependencies.ps1 -SelfTest
       - run: ./scripts/audit-dependencies.ps1
         shell: pwsh

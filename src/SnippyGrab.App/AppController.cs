@@ -227,7 +227,7 @@ internal sealed class AppController : IDisposable
         if (settings.DockMonitor < 0) settings.DockMonitorIdentity = "";
         else if (settings.DockMonitorIdentity.Length == 0 || (settings.DockMonitor != Settings.DockMonitor && settings.DockMonitorIdentity == Settings.DockMonitorIdentity))
             settings.DockMonitorIdentity = MonitorService.All().ElementAtOrDefault(settings.DockMonitor)?.Identity ?? "";
-        SettingsTransaction.Apply(settings, StartupService.Enabled, StartupService.Set, settingsService.Save); Settings = settings;
+        StartupService.Apply(settings, settingsService.Save); Settings = settings;
         Repository.HistoryEnabled = settings.HistoryEnabled; Try(Repository.Persist);
         Ui.Theme(settings.Theme); Hotkeys.Configure(settings, Hotkeys.Paused); cleanup.Interval = TimeSpan.FromMinutes(settings.CleanupMinutes); Dock.Refresh(); BuildTray();
         if (Hotkeys.Warnings.Count > 0) Notify(string.Join("\n", Hotkeys.Warnings));

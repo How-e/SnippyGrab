@@ -17,6 +17,11 @@ internal static class Program
             try { using var archive = OpenArchive(); Validate(archive); File.WriteAllText(report, "PASS: embedded payload paths and SHA256SUMS verified."); return 0; }
             catch (Exception ex) { File.WriteAllText(report, "FAILED: " + ex); return 1; }
         }
+        if (args is ["--verify-archive", var path, var result])
+        {
+            try { using var archive = ZipFile.OpenRead(path); Validate(archive); File.WriteAllText(result, "PASS"); return 0; }
+            catch (Exception ex) { File.WriteAllText(result, "FAILED: " + ex.GetType().Name); return 1; }
+        }
         var form = CreateForm();
         if (args is ["--check-layout", var image])
         {
@@ -29,7 +34,7 @@ internal static class Program
     private static ZipArchive OpenArchive() => new(Assembly.GetExecutingAssembly().GetManifestResourceStream("SnippyGrab.Bundle.zip") ?? throw new InvalidOperationException("Installer payload unavailable. Build using scripts/package.ps1."), ZipArchiveMode.Read);
     private static void Validate(ZipArchive archive)
     {
-        if (archive.Entries.Count is < 5 or > 200) throw new InvalidDataException("Invalid bundle count.");
+        if (archive.Entries.Count is < 5 or > 200 || archive.Entries.Sum(e => e.Length) > 512L * 1024 * 1024) throw new InvalidDataException("Invalid bundle count or total size.");
         var files = new Dictionary<string, ZipArchiveEntry>(StringComparer.OrdinalIgnoreCase);
         foreach (var entry in archive.Entries)
         {
@@ -51,6 +56,8 @@ internal static class Program
     private static Form CreateForm()
     {
         var version = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "development";
+        var identity = version.Split('+', 2);
+        version = identity[0] + (identity.Length == 2 ? " · " + identity[1][..Math.Min(8, identity[1].Length)] : "");
         var form = new SetupForm { Text = "SnippyGrab Setup", ClientSize = new Size(560, 390), FormBorderStyle = FormBorderStyle.FixedDialog, MaximizeBox = false, StartPosition = FormStartPosition.CenterScreen, Font = new Font("Segoe UI", 10), Icon = Icon.ExtractAssociatedIcon(Environment.ProcessPath!) };
         var title = new Label { Text = "Install SnippyGrab", Font = new Font("Segoe UI", 22), AutoSize = true, Location = new Point(24, 22) };
         var details = new Label { Text = $"{version}\n\nA local screenshot shelf. No account or uploads.\n\nInstalls for this Windows user without administrator access.\nCaptures and settings stay separate from application files.\nUninstall through Windows Apps; user data is retained.\n\nUnsigned build: Windows may show a SmartScreen prompt.\nOCR may require the Microsoft Visual C++ x64 runtime.", Location = new Point(24, 78), Size = new Size(515, 220) };
@@ -58,6 +65,7 @@ internal static class Program
         var status = new Label { Text = "", Location = new Point(24, 337), Size = new Size(345, 42) };
         var install = new Button { Text = "Install", Location = new Point(399, 333), Size = new Size(135, 34) };
         var completed = false;
+        form.FormClosing += (_, e) => { if (!install.Enabled && !completed) { e.Cancel = true; status.Text = "Installation is in progress; wait for the result."; } };
         install.Click += async (_, _) =>
         {
             if (completed) { form.Close(); return; }

@@ -1,6 +1,7 @@
 using SnippyGrab.Core;
 
 namespace SnippyGrab.Tests;
+
 public sealed class TimingSummaryTests
 {
     [Fact]

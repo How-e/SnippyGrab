@@ -17,3 +17,10 @@ Initial native Windows implementation. Desktop acceptance remains a release gate
 - Reversed/clipped region geometry, persistent monitor identity, four edge placements and explicit cursor/SDR contracts.
 - Worker editor rendering/effects/crops, efficient freehand geometry, bounded undo retention, readable tools and enlarged-text toolbar checks.
 - Real editor document/OCR boundary regressions and isolated computer-use diagnostics; 174 tests pass. Shared hardware/receiver acceptance remains open.
+
+- Guarded OS callbacks, tray recreation/resume handling, and configured double-click capture mode.
+- Named retention settings, explicit arrival animation, complete settings round trips and exact startup registration repair/rollback.
+- Worker capture encoding, stage timings, latency distributions and repeatable resource stress checkpoints.
+- Self-contained per-user setup, embedded checksum admission, verified staged upgrades and rollback backups.
+- Derived release version, SDK/source/dependency provenance, fixed-order/timestamp ZIPs and conservative three-build artifact retention.
+- 187 automated tests plus isolated installer/upgrade/retention and packaged runtime checks pass. Real login/clean-machine/performance-duration and existing hardware/receiver gates remain open.

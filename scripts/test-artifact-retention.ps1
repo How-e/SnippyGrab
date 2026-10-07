@@ -11,11 +11,13 @@ try {
     $plan = @(Remove-OldSnippyArtifacts $root 3 $true)
     if ($plan[0].Action -ne 'KeepModifiedOrRunning') { throw 'Modified artifact selected.' }
     Set-Content (Join-Path $root 'SnippyGrab-0.0.1-win-x64/synthetic.txt') 'generated'
+    $plan = @(Remove-OldSnippyArtifacts $root 3 $true @((Join-Path $root 'SnippyGrab-0.0.1-win-x64/SnippyGrab.exe')))
+    if ($plan[0].Action -ne 'KeepModifiedOrRunning' -or -not (Test-Path (Join-Path $root 'SnippyGrab-0.0.1-win-x64'))) { throw 'Running build selected.' }
     Remove-OldSnippyArtifacts $root 3 $true | Out-Null
     if ((Test-Path (Join-Path $root 'SnippyGrab-0.0.1-win-x64')) -or -not (Test-Path (Join-Path $root 'unowned.txt'))) { throw 'Retention containment failed.' }
     $rejected = $false; try { Assert-ArtifactChild $root '../escape' } catch { $rejected = $true }
     if (-not $rejected) { throw 'Escaped artifact accepted.' }
-    Write-Output 'PASS: three-build retention, dry run, modified/unowned preservation and escaped-path rejection.'
+    Write-Output 'PASS: three-build retention, dry run, running/modified/unowned preservation and escaped-path rejection.'
 } finally {
     if ([IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($root)) -ne [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\') -or -not [IO.Path]::GetFileName($root).StartsWith('SnippyGrab-artifact-lab-')) { throw 'Unexpected fixture cleanup path.' }
     Remove-Item -LiteralPath $root -Recurse -Force

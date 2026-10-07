@@ -23,12 +23,13 @@ function Register-SnippyArtifacts([string]$Root, [string[]]$Names) {
     $paths = @($Names | ForEach-Object { $path = Assert-ArtifactChild $Root $_; [ordered]@{ Name = $_; Inventory = @(Get-ArtifactInventory $path) } })
     [ordered]@{ Schema = 1; CreatedUtc = [DateTimeOffset]::UtcNow.ToString('O'); Paths = $paths } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $records ([Guid]::NewGuid().ToString('N') + '.json'))
 }
-function Remove-OldSnippyArtifacts([string]$Root, [int]$Keep = 3, [bool]$Apply = $false) {
+function Remove-OldSnippyArtifacts([string]$Root, [int]$Keep = 3, [bool]$Apply = $false, [string[]]$RunningExecutables = $null) {
     if ($Keep -lt 1) { throw 'At least one generated build must be kept.' }
     $records = Join-Path $Root '.build-records'
     if (-not (Test-Path -LiteralPath $records)) { return }
     if ((Get-Item -LiteralPath $records).Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Redirected artifact registry.' }
     $items = @(Get-ChildItem -LiteralPath $records -Filter '*.json' | Sort-Object LastWriteTimeUtc -Descending)
+    if ($null -eq $RunningExecutables) { $RunningExecutables = @(Get-Process -Name 'SnippyGrab*' -ErrorAction SilentlyContinue | ForEach-Object { $_.Path } | Where-Object { $_ }) }
     foreach ($recordFile in $items | Select-Object -Skip $Keep) {
         if ($recordFile.Attributes -band [IO.FileAttributes]::ReparsePoint -or $recordFile.Length -gt 1MB) { throw 'Invalid artifact record.' }
         $record = Get-Content -LiteralPath $recordFile.FullName -Raw | ConvertFrom-Json
@@ -39,7 +40,7 @@ function Remove-OldSnippyArtifacts([string]$Root, [int]$Keep = 3, [bool]$Apply =
             if (-not (Test-Path -LiteralPath $path)) { continue }
             $inventory = @(Get-ArtifactInventory $path)
             if ((ConvertTo-Json -InputObject $inventory -Depth 5 -Compress) -ne (ConvertTo-Json -InputObject @($entry.Inventory) -Depth 5 -Compress)) { $safe = $false }
-            $running = Get-Process -Name 'SnippyGrab*' -ErrorAction SilentlyContinue | Where-Object { $_.Path -and ($_.Path.Equals($path, [StringComparison]::OrdinalIgnoreCase) -or $_.Path.StartsWith($path + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) }
+            $running = $RunningExecutables | Where-Object { $_.Equals($path, [StringComparison]::OrdinalIgnoreCase) -or $_.StartsWith($path + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) }
             if ($running) { $safe = $false }
             $targets += $path
         }

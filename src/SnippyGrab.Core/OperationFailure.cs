@@ -6,7 +6,10 @@ public sealed record OperationFailure(FailureKind Kind, string Message)
 {
     public static OperationFailure From(Exception error)
     {
-        if (error is AggregateException aggregate) error = aggregate.Flatten().InnerExceptions[0];
+        if (error is AggregateException aggregate)
+            error = aggregate.Flatten().InnerExceptions.FirstOrDefault(e => e is not OperationCanceledException)
+                ?? aggregate.Flatten().InnerExceptions.FirstOrDefault() ?? error;
+        while (error is System.Reflection.TargetInvocationException { InnerException: { } inner }) error = inner;
         var kind = error switch
         {
             OperationCanceledException => FailureKind.Cancelled,

@@ -68,7 +68,7 @@ public partial class App : Application
         if (!created) { Shutdown(); return; }
         DispatcherUnhandledException += OnUnhandled;
         try { controller = new(e.Args.Contains("--background")); }
-        catch (Exception ex) { MessageBox.Show("SnippyGrab could not start: " + ex.Message, "SnippyGrab"); Shutdown(1); }
+        catch (Exception ex) { MessageBox.Show("SnippyGrab could not start. " + OperationFailure.From(ex).Message, "SnippyGrab"); Shutdown(1); }
     }
     private void OnUnhandled(object sender, DispatcherUnhandledExceptionEventArgs e)
     {

@@ -139,6 +139,6 @@ internal sealed class SettingsWindow : Window
             controller.ApplySettings(draft); controller.FinishSetup(); Close();
         }
         catch (Exception ex) when (ex is FormatException or InvalidDataException or ArgumentException or IOException or System.Security.SecurityException or TargetInvocationException or UnauthorizedAccessException or AggregateException)
-        { status.Text = "Settings could not be applied: " + ex.Message; }
+        { status.Text = "Settings could not be applied. " + OperationFailure.From(ex).Message; }
     }
 }

@@ -92,6 +92,12 @@ internal static class RuntimeChecks
                 var close = editor.RequestCloseAsync();
                 await work; Assert(await close && editedRecord.Edited && writes.Count == 2, "Close during worker effect waits and applies/copies final document");
                 await CheckFailedEditorClose(controller, png);
+                controller.Failure(new IOException("private-path-and-OCR-sentinel"));
+                Assert(!controller.LastOperationDetails.Contains("sentinel", StringComparison.Ordinal) && controller.LastOperationDetails.Contains("retry", StringComparison.OrdinalIgnoreCase), "Failure details are actionable without private exception payload");
+                Assert(!File.ReadAllText(Path.Combine(root, "diagnostics.log")).Contains("sentinel", StringComparison.Ordinal), "Diagnostics contain category/type instead of private exception payload");
+                var previousNotice = controller.LastOperationDetails;
+                controller.Failure(new OperationCanceledException("private-path-and-OCR-sentinel"));
+                Assert(controller.LastOperationDetails == previousNotice, "Cancellation does not replace the useful failure notice");
                 await CheckCapturePersistenceFailures(root, image, png);
                 Assert(Native.GetForegroundWindow() == foreground, "Reliability probe preserves foreground");
             }

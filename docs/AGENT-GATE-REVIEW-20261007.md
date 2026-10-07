@@ -83,3 +83,13 @@ Agent work: Added independent exhaustion and recovery tests for image, PNG, sing
 Checks: ClipboardWriterTests 3/3 PASS; seven new format-contention cases plus OCR boundaries 21/21 Windows PASS; q14-reliability.json PASS including newer-copy and closed-lifetime stale OCR prevention, actual editor retry with injected clipboard.
 
 Status / remaining acceptance: OPEN: real OS clipboard lock and native OCR/editor close/new-capture interaction; delayed external consumers remain Q13. No OS clipboard writes occurred.
+
+## Q28
+
+Inspected: OperationFailure mapping, controller notice/details/diagnostic log and startup/editor/drag/settings/export failure surfaces.
+
+Agent work: Removed raw exception payloads from five production UI surfaces. Wrapped reflection failures are categorized; aggregate rollback failures cannot be hidden by an initial cancellation, and empty aggregates are handled safely. Added notice/log sentinel privacy and cancellation preservation checks.
+
+Checks: OperationFailureTests 3/3 PASS; zero-warning Release build; q28-reliability.json PASS for category-only diagnostics, useful retry notice, cancellation preservation and actual failed-close feedback; source search finds no remaining ex.Message/error.Message UI publication in App.
+
+Status / remaining acceptance: OPEN: visible dialog/event/tray-details failure UX, truncation/readability and retry guidance in actual settings/export/drag/editor interaction. Automated payload privacy passes.

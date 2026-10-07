@@ -265,7 +265,7 @@ internal sealed class DockWindow : Window
                     controller.DragDrop.Drag(border, visible.Where(c => selected.Contains(c.Id)).ToList());
                 }
             }
-            catch (Exception ex) { controller.Notify("Drag could not complete: " + ex.Message); }
+            catch (Exception ex) { controller.Failure(ex); }
             finally { pressed = null; dragging = false; Rebuild(); collapseTimer.Start(); }
         };
         border.MouseLeftButtonUp += (_, e) =>

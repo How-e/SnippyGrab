@@ -17,4 +17,16 @@ public sealed class OperationFailureTests
         Assert.Equal(FailureKind.Storage, OperationFailure.From(new IOException()).Kind);
         Assert.Equal(FailureKind.Clipboard, OperationFailure.From(new System.Runtime.InteropServices.ExternalException()).Kind);
     }
+    [Fact]
+    public void WrappedAndMixedFailuresRemainActionableWithoutPrivatePayloads()
+    {
+        var wrapped = new System.Reflection.TargetInvocationException(new FormatException("private input"));
+        Assert.Equal(FailureKind.InvalidInput, OperationFailure.From(wrapped).Kind);
+        var mixed = new AggregateException(new OperationCanceledException("private cancellation"), new AggregateException(new UnauthorizedAccessException("private path")));
+        var failure = OperationFailure.From(mixed);
+        Assert.Equal(FailureKind.Permission, failure.Kind);
+        Assert.DoesNotContain("private", failure.Message);
+        Assert.Contains("retry", failure.Message);
+        Assert.Equal(FailureKind.Unexpected, OperationFailure.From(new AggregateException()).Kind);
+    }
 }

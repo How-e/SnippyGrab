@@ -40,6 +40,7 @@ internal sealed class AppController : IDisposable
     private bool exitRequested;
     private string? cacheWarning;
     private string lastNotice = "No recent notification.";
+    internal string LastOperationDetails => lastNotice;
     private DateTimeOffset lastNoticeUtc;
     public AppController(bool background, string? isolatedDataDirectory = null, bool diagnostic = false, Action<string, byte[]>? storageWriter = null)
     {
@@ -179,7 +180,7 @@ internal sealed class AppController : IDisposable
         }
         catch (Exception ex)
         {
-            Failure(ex); return new(ExportStatus.Failed, Message: ex.Message);
+            Failure(ex); return new(ExportStatus.Failed, Message: OperationFailure.From(ex).Message);
         }
     }
     public void OpenExportFolder(string path) => Try(() =>

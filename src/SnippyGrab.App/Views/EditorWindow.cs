@@ -268,7 +268,8 @@ internal sealed class EditorWindow : Window
         }
         catch (Exception ex)
         {
-            controller.Notify("Editor remains open: " + ex.Message + " Retry close/Copy or choose Discard.");
+            status.Text = "Editor remains open. " + OperationFailure.From(ex).Message + " Retry close/Apply + copy or choose Discard.";
+            controller.Failure(ex);
             return false;
         }
     }

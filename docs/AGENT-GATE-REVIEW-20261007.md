@@ -93,3 +93,13 @@ Agent work: Removed raw exception payloads from five production UI surfaces. Wra
 Checks: OperationFailureTests 3/3 PASS; zero-warning Release build; q28-reliability.json PASS for category-only diagnostics, useful retry notice, cancellation preservation and actual failed-close feedback; source search finds no remaining ex.Message/error.Message UI publication in App.
 
 Status / remaining acceptance: OPEN: visible dialog/event/tray-details failure UX, truncation/readability and retry guidance in actual settings/export/drag/editor interaction. Automated payload privacy passes.
+
+## Q04
+
+Inspected: PinWindow lifetime/revision subscriptions/Return to shelf and CaptureViewLease acquire-before-release behavior.
+
+Agent work: Added two-view/multiple-revision regression proving one close cannot release the remaining view source and disposed views cannot lease later unrelated revisions. Existing detached pin lease/refresh retained.
+
+Checks: CaptureViewLeaseTests 2/2 PASS; q04-reliability.json PASS for actual offscreen pin/history revision refresh, preview-quality/resize refresh, unpin/clear preservation and close release.
+
+Status / remaining acceptance: OPEN: actual detach, edit, Return to shelf and close gestures; visibility/topmost/click-through and mixed-DPI hardware remain broader pin acceptance. Native programmatic refresh and storage lease invariants pass.

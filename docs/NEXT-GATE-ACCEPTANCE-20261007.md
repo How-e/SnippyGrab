@@ -70,3 +70,11 @@ Use the currently running tested `.2` application; no receiver repetition or reb
 This resolves the specifically unreported reverse-nonadjacent gesture. Q16's broader release-outside-card, drag-threshold/scrolling/settings coverage and Q49's full cold/warm placement matrix are not automatically closed by this short check.
 
 Owner subsequently reports **steps 1–3 PASS**: both C insertion directions, no accidental editor, selection preservation/reachability and three jitter-free leave/re-entry cycles. This closes that acceptance subset. Q16 remains OPEN for the remaining native cancellation/release/threshold/scrolling/settings edge cases. No source changed and the current count remains **28 required gates open; 23 entries checked**. Next test procedure is recorded in USER-TESTING under reverse reorder acceptance.
+
+## Q16 — cancellation, outside release and scrolling closure
+
+Owner reports the next **steps 1–3 PASS** on the same tested `.2` build: Escape cancels Alt-reorder without changing order/opening an editor; releasing Alt-drag over empty desktop does not reorder/open an editor/stick the dock; ten-plus captures retain two selections across scrolling/leave/re-entry, and later-item insertion works without accidental editing.
+
+**PASS / CLOSED for Q16.** Combine these with recorded actual click/edit behavior, adjacent/nonadjacent reorder both ways, hover reachability and selection-collapse passes, Q15 native keyboard acceptance and independent production pointer-capture/drag-threshold/64-layout/selection/cache regressions. The formerly listed settings matrix is retained under Q18/Q19/Q32/Q49 rather than expanding Q16's stated interaction criteria into a new all-settings requirement. This closes no broader motion/accessibility/hardware gate.
+
+Current queue: **27 required gates open; 24 entries checked**. Next owner check is the previously unverified alternate orientation/corner, thumbnail sizes and application animation settings under Q49/Q18, recorded in USER-TESTING. No application source changed for this acceptance update.

@@ -49,6 +49,3 @@ jobs:
           $prerelease = if ($version.Contains('-')) { @('--prerelease') } else { @() }
           $installer = "artifacts/SnippyGrab-$version-Setup.exe"
           gh release create $env:GITHUB_REF_NAME $bundle "$bundle.sha256" $installer "$installer.sha256" --verify-tag --notes-file CHANGELOG.md @prerelease
-
-
-

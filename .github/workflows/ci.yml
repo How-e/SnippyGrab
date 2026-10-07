@@ -28,6 +28,3 @@ jobs:
           ./scripts/audit-dependencies.ps1 -SelfTest
       - run: ./scripts/audit-dependencies.ps1
         shell: pwsh
-
-
-

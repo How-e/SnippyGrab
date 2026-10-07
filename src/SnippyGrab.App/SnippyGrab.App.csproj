@@ -32,8 +32,9 @@
   </Target>
   <Target Name="PublishPinnedNativeOcr" AfterTargets="ComputeFilesToPublish">
     <ItemGroup>
-      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(FileName)' == 'tesseract50' or '%(FileName)' == 'leptonica-1.82.0'" />
-      <ResolvedFileToPublish Include="$(SnippyNativeRoot)x64\*.dll"><RelativePath>x64\%(Filename)%(Extension)</RelativePath><CopyToPublishDirectory>Always</CopyToPublishDirectory><ExcludeFromSingleFile>true</ExcludeFromSingleFile></ResolvedFileToPublish>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(ResolvedFileToPublish.FileName)' == 'tesseract50' or '%(ResolvedFileToPublish.FileName)' == 'leptonica-1.82.0'" />
+      <SnippyNativePublish Include="$(SnippyNativeRoot)x64\*.dll" />
+      <ResolvedFileToPublish Include="@(SnippyNativePublish)"><RelativePath>x64\%(SnippyNativePublish.Filename)%(SnippyNativePublish.Extension)</RelativePath><CopyToPublishDirectory>Always</CopyToPublishDirectory><ExcludeFromSingleFile>true</ExcludeFromSingleFile></ResolvedFileToPublish>
       <ResolvedFileToPublish Include="$(SnippyNativeRoot)NATIVE-OCR-PROVENANCE.json"><RelativePath>NATIVE-OCR-PROVENANCE.json</RelativePath><CopyToPublishDirectory>Always</CopyToPublishDirectory><ExcludeFromSingleFile>true</ExcludeFromSingleFile></ResolvedFileToPublish>
     </ItemGroup>
   </Target>

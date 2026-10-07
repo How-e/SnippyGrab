@@ -34,6 +34,9 @@ try {
             New-Item -ItemType Directory -Path $source | Out-Null
             & git -C $source init --quiet
             if ($LASTEXITCODE -ne 0) { throw 'Source initialization failed.' }
+            # Preserve upstream LF bytes regardless of the build machine's Git defaults.
+            & git -C $source config core.autocrlf false
+            if ($LASTEXITCODE -ne 0) { throw 'Native source line-ending configuration failed.' }
             $url = if ($component -eq 'Leptonica') { 'https://github.com/DanBloomberg/leptonica.git' } else { 'https://github.com/tesseract-ocr/tesseract.git' }
             & git -C $source fetch --depth 1 $url $manifest.sources.$component
             if ($LASTEXITCODE -ne 0) { throw 'Pinned source fetch failed.' }
@@ -59,7 +62,9 @@ try {
     $install = Join-Path $buildRoot 'install'
     Run-CMake @('-S', (Join-Path $buildRoot 'leptonica'), '-B', (Join-Path $buildRoot 'leptonica-build'), '-G', 'Visual Studio 17 2022', '-A', 'x64', '-DBUILD_SHARED_LIBS=ON', '-DBUILD_PROG=OFF', '-DSW_BUILD=OFF', '-DENABLE_ZLIB=OFF', '-DENABLE_PNG=OFF', '-DENABLE_GIF=OFF', '-DENABLE_JPEG=OFF', '-DENABLE_TIFF=OFF', '-DENABLE_WEBP=OFF', '-DENABLE_OPENJPEG=OFF', "-DCMAKE_INSTALL_PREFIX=$install")
     Run-CMake @('--build', (Join-Path $buildRoot 'leptonica-build'), '--config', 'Release', '--parallel', '4', '--target', 'install')
-    Run-CMake @('-S', (Join-Path $buildRoot 'tesseract'), '-B', (Join-Path $buildRoot 'tesseract-build'), '-G', 'Visual Studio 17 2022', '-A', 'x64', '-DBUILD_SHARED_LIBS=ON', '-DBUILD_TRAINING_TOOLS=OFF', '-DBUILD_TESTS=OFF', '-DGRAPHICS_DISABLED=ON', '-DDISABLED_LEGACY_ENGINE=OFF', '-DDISABLE_TIFF=ON', '-DDISABLE_ARCHIVE=ON', '-DDISABLE_CURL=ON', '-DOPENMP_BUILD=OFF', '-DENABLE_NATIVE=OFF', "-DCMAKE_PREFIX_PATH=$install")
+    # MSVC ignores this optional OpenMP SIMD reduction with OpenMP disabled.
+    # Suppress only C4849, which otherwise surfaces through MSBuild Exec as an error.
+    Run-CMake @('-S', (Join-Path $buildRoot 'tesseract'), '-B', (Join-Path $buildRoot 'tesseract-build'), '-G', 'Visual Studio 17 2022', '-A', 'x64', '-DBUILD_SHARED_LIBS=ON', '-DBUILD_TRAINING_TOOLS=OFF', '-DBUILD_TESTS=OFF', '-DGRAPHICS_DISABLED=ON', '-DDISABLED_LEGACY_ENGINE=OFF', '-DDISABLE_TIFF=ON', '-DDISABLE_ARCHIVE=ON', '-DDISABLE_CURL=ON', '-DOPENMP_BUILD=OFF', '-DENABLE_NATIVE=OFF', '-DCMAKE_CXX_FLAGS=/wd4849', "-DCMAKE_PREFIX_PATH=$install")
     Run-CMake @('--build', (Join-Path $buildRoot 'tesseract-build'), '--config', 'Release', '--parallel', '4', '--target', 'libtesseract')
     New-Item -ItemType Directory -Force (Join-Path $output 'x64') | Out-Null
     Copy-Item -LiteralPath (Join-Path $install 'bin/leptonica-1.82.0.dll') -Destination (Join-Path $output 'x64') -Force

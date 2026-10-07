@@ -18,4 +18,8 @@ Local verification before publication:
 
 Publication sequence: push main, require successful hosted CI and CodeQL plus no open security alerts, then push only the matching candidate tag. The release workflow rebuilds and verifies ZIP/setup/checksums from that tag. A failed hosted check blocks publication of downloadable artifacts. Final hosted status is available in [Actions](https://github.com/How-e/SnippyGrab/actions) and the [release](https://github.com/How-e/SnippyGrab/releases/tag/v0.1.0-alpha.queue.20261006.3).
 
+The first hosted CI clean build exposed native source Git line-ending warnings and MSVC C4849, promoted to errors through MSBuild Exec. The recipe now preserves upstream LF checkouts and disables only the known ignored optional SIMD-pragma warning. Source pins, codec restrictions and managed warnings-as-errors policy remain in effect. The changed recipe invalidates the previous native receipt and requires fresh source-built libraries and renewed package verification.
+
+On 2026-10-07 the owner also reported successful drop and paste in Codex, ChatGPT, VS Code and a browser. These user-reported receiver passes are recorded in USER-TESTING.md; unspecified build/receiver versions, exact selection/order and delayed-read cases remain open.
+
 These checks establish the documented alpha publication boundary. They do not prove absence of unknown vulnerabilities, signed publisher identity, exhaustive native fuzzing, or completion of the remaining desktop acceptance gates.

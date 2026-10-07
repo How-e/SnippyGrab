@@ -8,6 +8,10 @@ Use the current **0.1.0 alpha** and record whether it is the portable or install
 
 This is alpha acceptance. Implementations and agent checks are recorded in [TASK_QUEUE.md](../TASK_QUEUE.md) and [VALIDATION.md](VALIDATION.md). Use disposable captures. Do not deliberately corrupt your cache or make files unwritable. Automated failure injection and regressions are the agent's responsibility.
 
+## Recorded user results — 2026-10-07
+
+During publication review, the owner reported that drop and paste worked in Codex, ChatGPT, VS Code and a browser. These are user-reported passes for ordinary receiver behavior. Exact build/receiver versions, browser identity, selected-image membership/order and delayed-read coverage were not supplied. Preserve these successes without treating the complete Q12/Q30/Q50 matrix as closed.
+
 ## Recorded user results — 2026-10-06
 
 Source: user report in chat following U01–U06 testing. These results were not independently rerun by the agent. Exact tested build/commit, portable/installed category, Windows version, receiver version, monitor layout, repetition counts and timings were not provided. Record those details on the next relevant retest; unspecified checklist cases remain unverified. PASS below applies to reported behavior, not an entire milestone or stable-release gate.

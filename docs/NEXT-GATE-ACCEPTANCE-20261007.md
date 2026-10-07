@@ -18,3 +18,15 @@ Focused tests: 11 core ShelfSelection/CaptureExport and 15 Windows EditorDocumen
 Some automation clicks initially rejected stale bounds/index/screenshot references. Fresh window selection plus activation recovered input; rejected actions were not counted as passes.
 
 During editor checks, drawing left focus in the color input and suppressed Ctrl+S. That separate editor focus defect is tracked under Q19; Q15's shelf shortcut/selection routing passed.
+
+## Q19 — canvas shortcut remediation
+
+FIXED / native regression PASS; Q19 remains OPEN for the complete accessibility matrix.
+
+Reproduced on `5213acb`: focus remained in the color TextBox after an actual arrow gesture, and Ctrl+S did not open Export PNG. The editor intentionally preserves text-editing shortcuts when a TextBox owns focus. The canvas was already focusable but did not explicitly acquire focus during its mouse-down handler.
+
+The handler now focuses the canvas when an allowed gesture begins. Text fields retain their own shortcut handling while the user edits them; document gestures transfer input to the canvas. No pointer-position or clipboard behavior changed.
+
+Windows native verification on the rebuilt Release executable, `4753123` plus this one-line focus change: click the color field, draw an arrow, Ctrl+Z visibly removes it, Ctrl+Y visibly restores it, Ctrl+S opens the actual native export dialog. Its saved PNG contains the annotation. This establishes executed pointer/keyboard behavior, not merely raised routed events. UI Automation continued to report a stale color-field focus string, so the actual shortcut outcomes and rendered pixels are the acceptance evidence.
+
+Local fixture report: `artifacts/acceptance-results/editor-focus-20261007.json`. Broader keyboard-only flows, screen-reader/high-contrast/text-scale/theme acceptance stay under Q19/Q32.

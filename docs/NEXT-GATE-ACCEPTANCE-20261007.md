@@ -63,8 +63,10 @@ PASS / CLOSED. Exact candidate and receiver identity plus all targeted real-rece
 
 Current queue: **28 required gates open; 23 entries checked**. Stable packaging remains blocked. No application source changed while recording these owner results.
 
-## Next owner check — reverse nonadjacent insertion under Q16
+## Completed owner check — reverse nonadjacent insertion under Q16
 
 Use the currently running tested `.2` application; no receiver repetition or rebuild is needed for this check. With the preceding test's shelf order B,A,C, clear selection and Alt-drag C from slot 3 onto slot 1: expect C,B,A. Alt-drag C back from slot 1 onto slot 3: expect B,A,C. Cards between the source and target shift; items do not swap. No editor should open during either drag. Then select shelf 1 and 3, leave/re-enter three times and confirm both remain selected and reachable without jitter or premature collapse. Report PASS/FAIL per direction and for leave/re-entry. If captures have changed, create fresh synthetic A then B then C and identify the images rather than relying on old numbers.
 
 This resolves the specifically unreported reverse-nonadjacent gesture. Q16's broader release-outside-card, drag-threshold/scrolling/settings coverage and Q49's full cold/warm placement matrix are not automatically closed by this short check.
+
+Owner subsequently reports **steps 1–3 PASS**: both C insertion directions, no accidental editor, selection preservation/reachability and three jitter-free leave/re-entry cycles. This closes that acceptance subset. Q16 remains OPEN for the remaining native cancellation/release/threshold/scrolling/settings edge cases. No source changed and the current count remains **28 required gates open; 23 entries checked**. Next test procedure is recorded in USER-TESTING under reverse reorder acceptance.

@@ -30,6 +30,14 @@ Owner tested `0.1.0-alpha.acceptance.20261007.1+6849be66527cc69254addb551b2dcc6d
 
 These reports improve the recorded native interaction evidence without automatically closing broad queue gates. The reorder expectation is resolved; insertion is the accepted contract. Earlier reported failures remain historical results of their tested builds.
 
+### Reverse nonadjacent reorder and selection re-entry — PASS
+
+Owner reports **PASS for all three prescribed Q16 steps** on the same `.2` build used for the receiver check: B,A,C → C,B,A by moving C from 3 to 1; C,B,A → B,A,C by moving C from 1 to 3; selected shelf 1/3 retained and reachable after three leave/re-entry cycles without jitter or premature collapse. Neither reorder opened an editor. These are owner-reported passes in the tested current configuration, supplementing the earlier current-build adjacent reorder, reachability and scrolling results.
+
+The specifically missing reverse-nonadjacent gesture is now verified. Q16 remains open for actual cancellation/release-outside-card/drag-threshold and scrolling/settings edge cases. Q49's wider cold/warm placement/orientation matrix and Q18/Q19 visual/accessibility cases remain separate. No full gate or configuration matrix is inferred from this three-step pass.
+
+Next, in the same running build with synthetic captures: (1) begin an Alt-reorder drag, press Esc while holding the mouse, then release: order stays unchanged and no editor opens; (2) Alt-drag to empty desktop space and release: no reorder/editor/stuck expansion; re-enter and verify normal controls; (3) with at least ten disposable captures, Ctrl-select two captures separated by scrolling, scroll between them, leave/re-enter and verify both selections survive; perform a nearby Alt-reorder among the later captures, confirm the intended insertion and no accidental editor. Report PASS/FAIL per case. Never drop onto a receiver or file-management target for the cancellation tests.
+
 ### Codex selected-transfer acceptance — PASS
 
 Owner report in chat: **Codex 0.160.1; all prescribed steps 2–4 PASS**. Tested candidate from the preceding handoff: **0.1.0-alpha.acceptance.20261007.2**, clean source `06f4c9acd70be3253fbb11fcc02d75ffea391ed1` as verified in its local BUILD-PROVENANCE.json. These are owner-reported real receiver results, not agent automation.

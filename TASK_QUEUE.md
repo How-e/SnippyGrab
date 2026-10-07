@@ -1,4 +1,6 @@
-Latest owner receiver result: Codex 0.160.1, targeted steps 2–4 PASS; Q50 and Q30 CLOSED with recorded nonadjacent/reordered/drop/delayed-paste evidence. Next owner check is Q16 reverse nonadjacent insertion. Other receivers remain Q12.
+Latest owner dock result: Q16 reverse nonadjacent insertion in both directions and three selection leave/re-entry cycles PASS on the tested `.2` build. That subset is complete; Q16 remains open for cancellation/release/threshold/scrolling/settings edge cases. Next owner checks are recorded in USER-TESTING.
+
+Owner receiver result: Codex 0.160.1, targeted steps 2–4 PASS; Q50 and Q30 CLOSED with recorded nonadjacent/reordered/drop/delayed-paste evidence. Other receivers remain Q12.
 
 Latest [targeted keyboard acceptance](docs/NEXT-GATE-ACCEPTANCE-20261007.md) closes Q15 and Q21 with native shelf keyboard and export-dialog/file evidence. The canvas shortcut defect is fixed; broader dock/accessibility and receiver gates remain open.
 
@@ -6,7 +8,7 @@ Latest [targeted keyboard acceptance](docs/NEXT-GATE-ACCEPTANCE-20261007.md) clo
 
 Latest [P0 acceptance](docs/P0-ACCEPTANCE-20261007.md): Q02 and Q03 PASS / CLOSED after actual isolated editor/recovery dialogs, real clipboard contention/retry, owner tray Exit/Discard actions and process restarts. **28 required gates remain open; 23 entries are checked.** Earlier dated 34/17 reviews are historical.
 
-Earlier [agent completion review](docs/AGENT-COMPLETION-20261007.md): diagnostic settings isolation fixed, numbered interaction fixtures and repeatable local verification added, fresh-process/native OCR distributions measured. All available local stages passed at that review with 34 gates open; the subsequent Q15/Q21 closures leave 30. The [current dock retest](docs/USER-TESTING.md#current-local-dock-retest) passes its reported cases; the owner accepts nonadjacent insertion as correct. Targeted Codex membership/order/delayed paste now passes; next owner check is reverse nonadjacent insertion under Q16.
+Earlier [agent completion review](docs/AGENT-COMPLETION-20261007.md): diagnostic settings isolation fixed, numbered interaction fixtures and repeatable local verification added, fresh-process/native OCR distributions measured. All available local stages passed at that review with 34 gates open; the subsequent Q15/Q21 closures leave 30. The [current dock retest](docs/USER-TESTING.md#current-local-dock-retest) passes its reported cases; the owner accepts nonadjacent insertion as correct. Targeted Codex membership/order/delayed paste and Q16 reverse nonadjacent insertion now pass; remaining Q16 input edge cases are next.
 
 Current implementation/acceptance status is in [MILESTONES.md](docs/MILESTONES.md). Most unchecked items have committed implementations and remain open for their recorded acceptance gates. Read the closure records before treating an original issue description as still-unfixed code. Q51 native remediation is verified locally; remaining unchecked entries retain their recorded acceptance gates.
 

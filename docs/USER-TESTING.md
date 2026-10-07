@@ -48,6 +48,10 @@ Owner subsequently reports **PASS for all steps** on `.3`, clean source `9103b9d
 
 **Q49 PASS / CLOSED** with this actual owner report, earlier 1/3/5/20 cold/repeated-hover acceptance, Q16 selection/reorder/cancellation results and the independent 64-layout/768-anchor-sample evidence. It establishes the stated jitter/reachability/collapse criteria, not every monitor/topology/accessibility setting.
 
+### Next visual check — Q18
+
+The completed hover tests used existing captures. **Fade new captures into the shelf** affects new arrivals, so its actual fade remains untested. In the current running build, turn that setting off and capture one synthetic image: expect immediate stable appearance. Turn it on and capture another: expect a brief stable fade if Windows animations are enabled, otherwise immediate appearance. Inspect Light and Dark application themes at smallest/largest thumbnail sizes: screenshot edges stay inside rounded cards, badges/selection/focus/buttons remain readable, and controls are not clipped or obscured. Restore original settings. Report PASS/FAIL for arrivals off/on and both themes, including whether fade was visible. If you already use Windows reduced motion/high contrast, mention that existing configuration; no OS preference change is requested. Q18 remains open for this visual/motion acceptance; bounded thumbnail work and hover stability have evidence.
+
 ### Codex selected-transfer acceptance — PASS
 
 Owner report in chat: **Codex 0.160.1; all prescribed steps 2–4 PASS**. Tested candidate from the preceding handoff: **0.1.0-alpha.acceptance.20261007.2**, clean source `06f4c9acd70be3253fbb11fcc02d75ffea391ed1` as verified in its local BUILD-PROVENANCE.json. These are owner-reported real receiver results, not agent automation.

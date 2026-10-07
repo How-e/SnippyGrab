@@ -56,3 +56,15 @@ Q16/Q49 remaining gesture/settings coverage, Q18 motion/contrast, Q19 accessibil
 PASS / CLOSED. Owner reports **Codex 0.160.1, steps 2–4 all PASS** on the preceding handoff's `0.1.0-alpha.acceptance.20261007.2` candidate (clean source `06f4c9a`, verified bundle provenance). Nonadjacent C/A drop, reordered A/C drop and one-minute delayed selected-file paste satisfy the prescribed receiver count/content/order checks. Existing independent reverse/nonadjacent/duplicate/reordered/restart/scrolling payload checks establish SnippyGrab's ascending-current-shelf-number contract.
 
 The owner reported PASS, without a separate exact order trace; retain that evidence level. This is actual user-reported receiver acceptance, not synthetic receiver or agent-observed attachment evidence. Other receivers remain Q12; native drag/retention/crash and longer delayed reads remain Q13. The one-minute case does not prove a receiver defers reads after first ingesting files.
+
+## Q30 — primary Codex acceptance
+
+PASS / CLOSED. Exact candidate and receiver identity plus all targeted real-receiver steps 2–4 PASS now complete the remaining count/content/nonadjacent/reordered/delayed-paste gaps. Earlier owner U01 preserved-focus/latest-image/Esc/zero-selection passes and ordinary single-file drop remain valid complementary observations. Q50's contract and independent regressions are closed above. This is the tested Codex 0.160.1 result; compatibility with future versions is not implied.
+
+Current queue: **28 required gates open; 23 entries checked**. Stable packaging remains blocked. No application source changed while recording these owner results.
+
+## Next owner check — reverse nonadjacent insertion under Q16
+
+Use the currently running tested `.2` application; no receiver repetition or rebuild is needed for this check. With the preceding test's shelf order B,A,C, clear selection and Alt-drag C from slot 3 onto slot 1: expect C,B,A. Alt-drag C back from slot 1 onto slot 3: expect B,A,C. Cards between the source and target shift; items do not swap. No editor should open during either drag. Then select shelf 1 and 3, leave/re-enter three times and confirm both remain selected and reachable without jitter or premature collapse. Report PASS/FAIL per direction and for leave/re-entry. If captures have changed, create fresh synthetic A then B then C and identify the images rather than relying on old numbers.
+
+This resolves the specifically unreported reverse-nonadjacent gesture. Q16's broader release-outside-card, drag-threshold/scrolling/settings coverage and Q49's full cold/warm placement matrix are not automatically closed by this short check.

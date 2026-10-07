@@ -1,6 +1,6 @@
-Latest owner acceptance: Q50 CLOSED, Codex 0.160.1 steps 2–4 PASS; see [recorded receiver results](USER-TESTING.md#codex-selected-transfer-acceptance--pass).
+Latest owner acceptance: Q50/Q30 CLOSED, Codex 0.160.1 steps 2–4 PASS; see [recorded receiver results](USER-TESTING.md#codex-selected-transfer-acceptance--pass).
 
-Latest [targeted keyboard acceptance](NEXT-GATE-ACCEPTANCE-20261007.md) closes Q15/Q21; **29 required gates remain open, 22 entries checked**. Earlier dated counts below are historical.
+Latest [targeted keyboard acceptance](NEXT-GATE-ACCEPTANCE-20261007.md) closes Q15/Q21; **28 required gates remain open, 23 entries checked**. Earlier dated counts below are historical.
 
 # Remaining acceptance review — 2026-10-07
 
@@ -33,7 +33,7 @@ The completed user-run report has now been reviewed: **Q35 PASS**, 7,201.09 seco
 | Q06 | Closed: orphan/lazy dimensions, bounded pages, failed manifest/pin preservation and safe abandoned-page compaction pass current regressions. Existing Q35 two-hour retained-history evidence supplies resource coverage. Metadata remains proportional to retained history; all-day behavior is unverified. |
 | Q15–Q16, Q18–Q21, Q32, Q49 | Dock repeated cold/warm hover, selection leave/re-entry, symmetric Alt-reorder, full keyboard/selection traversal, editor/export failure/dialog and accessibility checks. Existing short UI passes are partial. Shared. |
 | Q08–Q11, Q25–Q27, Q31, Q41 | Available hardware/hotkey modes, reconnect/DPI/HDR, Explorer/sleep/login and clean Windows 10/11 installation/uninstall. Environment/user evidence required; no new OS/account/hardware changes in this review. |
-| Q12, Q30, Q50 | Exact build/receiver versions, nonadjacent selection, exact count/content/order after reorder and delayed receiver reads. User/shared. |
+| Q12 | Q30/Q50 are CLOSED for Codex 0.160.1; exact versions/formats and remaining coverage for other available receivers stay open. One-minute paste is verified by the owner, not deferred post-ingest reads. User/shared. |
 | Q34 | Cold/warm end-to-end startup/capture/OS clipboard/OCR distributions and same-machine Snipping Tool comparison. Run separately from the stress workload. Shared. |
 | Q01, Q44 | Consolidate final acceptance only after required gates close or explicit scope decisions. Privacy-safe capture-to-Codex GIF remains deferred; stable remains blocked. Next authorized tag should verify corrected automated publishing. |
 

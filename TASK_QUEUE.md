@@ -1,6 +1,6 @@
 # Remaining work queue
 
-Latest [agent completion review](docs/AGENT-COMPLETION-20261007.md): diagnostic settings isolation fixed, numbered interaction fixtures and repeatable local verification added, fresh-process/native OCR distributions measured. All available local stages pass; 34 required acceptance gates remain. Follow its current-build dock retest before broader receiver/hardware work.
+Latest [agent completion review](docs/AGENT-COMPLETION-20261007.md): diagnostic settings isolation fixed, numbered interaction fixtures and repeatable local verification added, fresh-process/native OCR distributions measured. All available local stages pass; 34 required acceptance gates remain. The [current dock retest](docs/USER-TESTING.md#current-local-dock-retest) passes its reported cases; the owner accepts nonadjacent insertion as correct. Next is targeted real-receiver membership/order/delayed-paste verification.
 
 Current implementation/acceptance status is in [MILESTONES.md](docs/MILESTONES.md). Most unchecked items have committed implementations and remain open for their recorded acceptance gates. Read the closure records before treating an original issue description as still-unfixed code. Q51 native remediation is verified locally; remaining unchecked entries retain their recorded acceptance gates.
 

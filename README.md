@@ -10,7 +10,7 @@ A native Windows screenshot shelf for AI and developer workflows.
 
 The [current remaining-work review](docs/REMAINING-WORK.md) verifies GitHub checks/protection and alpha publication. There are still 34 open acceptance gates; stable readiness is not established. The [latest agent completion review](docs/AGENT-COMPLETION-20261007.md) records current verification, startup/OCR measurements and the exact next dock retest. The [earlier local acceptance record](docs/TAKEOVER-ACCEPTANCE.md) separates short automated checks and real isolated WPF interaction from unperformed receiver/hardware tests.
 
-[Remaining work queue](TASK_QUEUE.md) tracks incomplete requirements and review findings. [User testing checklist](docs/USER-TESTING.md) explains the interactive checks requested from contributors; the current next step is the reported dock regression retest on the latest local build.
+[Remaining work queue](TASK_QUEUE.md) tracks incomplete requirements and review findings. [User testing checklist](docs/USER-TESTING.md) records the current dock passes and accepted insertion behavior; the current next step is targeted real-receiver membership/order/delayed-paste verification.
 
 ## Preview
 

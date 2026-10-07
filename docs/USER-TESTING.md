@@ -1,6 +1,6 @@
 # Desktop testing requested from you
 
-**Current next step:** use the new local acceptance candidate and follow the ten-minute [dock regression retest](AGENT-COMPLETION-20261007.md#most-important-next-step-retest-the-reported-dock-failures). It targets the reported hover/reachability/reorder/keyboard failures with distinct synthetic images. The published alpha predates the latest fixes; the launcher verifies current source and bundle hashes. Keep previous paste/drop passes below.
+**Current next step:** the current dock retest passes its reported cases, including owner-confirmed insertion order. Continue with targeted real-receiver membership/order/delayed-paste checks below. The published alpha predates the latest fixes; the launcher verifies current source and bundle hashes. Keep previous paste/drop passes below.
 
 The [2026-10-07 acceptance record](TAKEOVER-ACCEPTANCE.md) records fresh computer-use checks against the packaged native upgrade, including editor close/Discard, shelf keyboard selection and PNG export/overwrite. These use isolated synthetic data and intercepted clipboard writes. External receiver, recovery, hardware, accessibility and prolonged gates remain open. Earlier results below are historical observations of their stated builds.
 
@@ -20,11 +20,22 @@ Owner tested `0.1.0-alpha.acceptance.20261007.1+6849be66527cc69254addb551b2dcc6d
 |---|---|---|
 | 1: 1/3/5/20-capture hover, reachability and scrolling | PASS — user reports everything works as expected | Current prescribed fixture workflow; broader settings/accessibility/hardware cases remain separate. |
 | 2: nonadjacent selection across leave/re-entry | PASS — user reports everything works as expected | Current fixture interaction; no external receiver evidence. |
-| 3: Alt-reorder | PARTIAL — adjacent 1→2 works; dragging does not open editor; nonadjacent expectation unresolved | User observes `[1,2,3] → [2,3,1]` for 1→3 and considers it unexpected. Screenshot matches that result. Source and README define insertion into the target's original slot, shifting intervening items. A swap would be `[3,2,1]`; do not change that contract without resolving the intended behavior. Reverse nonadjacent acceptance was not explicitly reported. |
+| 3: Alt-reorder | PASS — reported adjacent and forward nonadjacent moves; dragging does not open editor | Owner explicitly chose to retain insertion and mark `[1,2,3] → [2,3,1]` for 1→3 as correct behavior. Screenshot, source and README agree: move into the target's original slot, shifting intervening items. No swapping change is required. Reverse nonadjacent acceptance was not explicitly reported. |
 | 4: focus/keyboard/editor/export | PASS — user reports everything works as expected | Report confirms one intercepted image copy and an edited/dismissed capture; its final snapshot has no exported flag. Preserve the user report separately from automated export evidence. Full tool/export-dialog/accessibility matrices remain open. |
 | 5: supplied local report | RECEIVED | Exact build identified. Isolated data and clipboard interception do not establish actual receiver delivery. |
 
-These reports improve the recorded native interaction evidence without automatically closing broad queue gates. Resolve insertion versus swapping, then continue with the targeted real-receiver check in the completion review. Earlier reported failures remain historical results of their tested builds.
+These reports improve the recorded native interaction evidence without automatically closing broad queue gates. The reorder expectation is resolved; insertion is the accepted contract. Earlier reported failures remain historical results of their tested builds.
+
+### Next targeted real-receiver check
+
+Exit the fixture with **Exit checks** and exit other SnippyGrab instances through their trays. Run `pwsh ./scripts/start-acceptance.ps1 -RealApp`. This mode uses normal capture history, hotkeys and the OS clipboard. Use synthetic content and an unsent Codex draft; no message needs sending.
+
+1. Capture distinct A, then B, then C images. Shelf numbers should be 1=C, 2=B, 3=A. Record SnippyGrab and Codex versions.
+2. Ctrl-select shelf numbers 1 and 3 and drag a selected card into the draft. Expect exactly C and A; SnippyGrab payload order is C,A. Record the receiver's displayed order separately.
+3. Clear selection, Alt-drag C from slot 1 to slot 3, then select A and C. Current shelf order is B,A,C, so the selected payload should be A,C. Verify exactly those two images and their displayed order.
+4. With A and C selected, focus the shelf and press Ctrl+C to copy file-drop data. Wait one minute without another clipboard write, then paste into an empty unsent draft. Record supported/unsupported, exact count/content/order and any missing-file error. This tests delayed paste/file availability, not proof that a receiver which already read files deferred its reads.
+
+Report PASS/FAIL/NOT SUPPORTED per case and exact receiver version. Ordinary previous single-image paste/drop successes stand; only these gaps need targeted verification now.
 
 During publication review, the owner reported that drop and paste worked in Codex, ChatGPT, VS Code and a browser. These are user-reported passes for ordinary receiver behavior. Exact build/receiver versions, browser identity, selected-image membership/order and delayed-read coverage were not supplied. Preserve these successes without treating the complete Q12/Q30/Q50 matrix as closed.
 

@@ -1,3 +1,5 @@
+Latest owner Q19/Q32 steps 1–4 PASS on acceptance .5: Settings/History/Editor keyboard navigation and Light/Dark readability at current text scale. Remaining shelf workflow/System theme and broader accessibility stay OPEN; 25 required gates open / 26 checked. See [owner evidence](docs/USER-TESTING.md).
+
 Latest owner dock settings result: all prescribed `.3` configurations PASS; Q49 CLOSED. Q18 presentation/reduced-motion checks now PASS / CLOSED; broader Q19/Q32 accessibility configurations remain open.
 
 Latest owner dock result: Q16 reverse nonadjacent insertion in both directions and three selection leave/re-entry cycles PASS on the tested `.2` build. Cancellation, outside release and scrolling also PASS; Q16 CLOSED. Q49 settings acceptance now passes; Q18 visual acceptance now passes; next priority is Q19 keyboard/accessibility.

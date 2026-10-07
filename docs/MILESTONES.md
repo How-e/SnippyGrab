@@ -1,3 +1,5 @@
+Latest owner Q19/Q32 steps 1–4 PASS on acceptance .5: Settings/History/Editor keyboard navigation and Light/Dark readability at current text scale. Remaining shelf workflow/System theme and broader accessibility stay OPEN; 25 required gates open / 26 checked. See [owner evidence](USER-TESTING.md).
+
 Latest owner arrival/reduced-motion and Light/Dark clipping/contrast PASS closes Q18. Q19/Q32 broader accessibility remains; see [current results](USER-TESTING.md).
 
 Latest actual dock settings PASS closes Q49; Q18 fade/clipping/contrast and Q19/Q32 accessibility remain. See [current owner results](USER-TESTING.md).

@@ -282,3 +282,19 @@ Use the fresh acceptance .5 package: exit older SnippyGrab instances through the
 4. At your current Windows text scale, repeat a brief focus/readability check in Light and Dark application themes for Settings, History and Editor. Labels, values and action buttons must stay readable and unclipped. Restore your theme. Report any existing high-contrast/screen-reader coverage separately; if unavailable report NOT AVAILABLE. No OS changes or software installation are required.
 
 Report PASS/FAIL for steps 1–4 and any confusing focus position. These are a keyboard/theme subset of Q19; unavailable high-contrast, screen-reader and other text-scale/hardware cases remain open under Q19/Q32.
+
+## Q19/Q32 — owner keyboard and theme subset PASS (2026-10-07)
+
+Owner reports PASS for all four prescribed steps on the handoff's acceptance `.5` build (source `0989076`): Settings Tab/Shift+Tab through all hotkey fields and controls without changing bindings, reversible checkbox navigation and Cancel; History arrow selection/matching preview and keyboard Edit; editor tool/field/zoom/action traversal, keyboard export cancellation and unchanged close; readable focus/labels/actions in Light/Dark at the current Windows text scale, with theme restored. This is owner-reported real interaction, distinct from the earlier isolated native agent checks.
+
+No separate high-contrast or screen-reader result was supplied. System theme, keyboard capture/copy/export/pin end-to-end and the wider text-scale/hardware/assistive-technology matrix remain unverified. Q19 and Q32 stay OPEN; queue remains 25 required gates open / 26 checked. Next owner check targets the remaining shelf copy/export/pin keyboard workflow and System theme. Do not repeat the four successful checks solely for this documentation change.
+
+## Next owner gate — remaining Q19/Q32 shelf workflow and System theme
+
+Use acceptance `.6` after exiting older SnippyGrab through its tray and running `pwsh ./scripts/start-acceptance.ps1 -RealApp`. Application source is unchanged from the passed `.5`; this refresh keeps launcher provenance current after recording results. Create two disposable synthetic captures labelled A and B. Use an unsent draft or image-capable local app for paste inspection; do not send content.
+
+1. Focus the shelf using its numbered badge/tray focus action. Press Escape to clear prior selection, refocus, use arrows to focus A and Space to select only A. Ctrl+C, switch to the draft and Ctrl+V: expect A, not newer B. Return to shelf, focus A, press Ctrl+P. Ctrl+H: the A row must show PIN. Close History with Escape, refocus A and Ctrl+P again to restore unpinned state. The pin state must be readable as text/icon, not only transparency.
+2. With A focused, Ctrl+S from the shelf. Use the save dialog keyboard to export to a disposable PNG path. Open that file and confirm it is A. Refocus A and Ctrl+S again, then Escape: no extra file or false export-success message. This verifies the shelf keyboard route, not another repeat of editor drawing/overwrite tests.
+3. In Settings choose System theme and Apply. Check shelf focus/selection/pin cues plus Settings, History and Editor at your current Windows text scale: readable contrast, visible focus, reachable controls and no clipping. Restore your original application theme. No Windows preference changes are required.
+
+Report PASS/FAIL for steps 1–3, and separately whether high contrast or a screen reader is already available. These tests do not establish unavailable accessibility configurations or keyboard global-hotkey capture behavior; those remain open.

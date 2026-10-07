@@ -41,7 +41,8 @@ internal sealed class SettingsWindow : Window
         Add(nameof(Settings.PrimaryHotkey), "Primary hotkey"); Add(nameof(Settings.DefaultCaptureMode), "Primary capture mode");
         Add(nameof(Settings.DesktopHotkey), "Entire desktop hotkey"); Add(nameof(Settings.WindowHotkey), "Window picker hotkey"); Add(nameof(Settings.ActiveWindowHotkey), "Active window hotkey"); Add(nameof(Settings.FallbackHotkey), "Fallback region hotkey");
         body.Children.Add(Ui.Text("Click a hotkey field, then press the desired combination. Escape disables it. Windows may intercept Print Screen: Settings → Accessibility → Keyboard → ‘Use the Print Screen key to open screen capture’. Disable it and restart if necessary.", 12, true));
-        Add(nameof(Settings.IncludeCursor), "Include cursor"); Add(nameof(Settings.Animate), "Animate capture arrival");
+        Add(nameof(Settings.IncludeCursor), "Include cursor"); Add(nameof(Settings.Animate), "Fade new captures into the shelf");
+        body.Children.Add(Ui.Text("Animation affects arrival only, respects Windows reduced motion/high contrast, and does not animate selection or shelf expansion.", 12, true));
         Section("Screenshot shelf");
         AddMonitor(); Add(nameof(Settings.Corner), "Screen position"); Add(nameof(Settings.Orientation), "Corner orientation (edges expand inward)");
         Add(nameof(Settings.ThumbnailSize), "Thumbnail width (120–400 DIP)"); Add(nameof(Settings.ExpandedItems), "Maximum expanded items (1–5)"); Add(nameof(Settings.DockOpacity), "Opacity (0.25–1)");
@@ -49,7 +50,7 @@ internal sealed class SettingsWindow : Window
         Section("Clipboard"); Add(nameof(Settings.AutoCopy), "Copy automatically on capture"); Add(nameof(Settings.ClipboardPng), "Include PNG representation with image");
         Section("Files and history"); Add(nameof(Settings.CachePath), "Dedicated cache path (empty = LocalAppData)");
         body.Children.Add(Ui.Text("Cache path changes apply on next launch. Use a dedicated local directory. Existing captures stay in their original cache.", 12, true));
-        Add(nameof(Settings.RetentionHours), "Retention hours (1, 24, 168; -1 = never)"); Add(nameof(Settings.CleanupMinutes), "Cleanup interval minutes"); Add(nameof(Settings.SessionOnly), "Clear unpinned session captures on exit"); Add(nameof(Settings.SaveDirectory), "Default Save directory"); Add(nameof(Settings.HistoryEnabled), "Remember unpinned capture history");
+        AddRetention(); Add(nameof(Settings.CleanupMinutes), "Cleanup interval minutes"); Add(nameof(Settings.SessionOnly), "Clear unpinned session captures on exit"); Add(nameof(Settings.SaveDirectory), "Default export directory"); Add(nameof(Settings.HistoryEnabled), "Remember unpinned capture history");
         body.Children.Add(Ui.Text("Pins are retained. Active editors and transfers are protected; file transfers have a 24-hour grace period, even when clearing.", 12, true));
         body.Children.Add(Ui.Button("Clear temporary captures", "Clear unpinned captures, excluding transfers and editors", controller.ClearTemporary));
         Section("Editor"); Add(nameof(Settings.AnnotationColor), "Default color (#RRGGBB)"); Add(nameof(Settings.StrokeSize), "Stroke thickness"); Add(nameof(Settings.TextSize), "Text size");
@@ -58,6 +59,16 @@ internal sealed class SettingsWindow : Window
         foreach (var text in body.Children.OfType<TextBlock>()) text.TextWrapping = TextWrapping.Wrap;
     }
     private void Section(string title) => body.Children.Add(new TextBlock { Text = title, FontSize = 16, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 20, 0, 8) });
+    private sealed record RetentionChoice(int Hours, string Label) { public override string ToString() => Label; }
+    private void AddRetention()
+    {
+        body.Children.Add(Ui.Text("Temporary capture retention"));
+        var choices = new List<RetentionChoice> { new(1, "1 hour"), new(24, "24 hours"), new(168, "7 days"), new(-1, "Never automatically delete") };
+        if (!choices.Any(c => c.Hours == draft.RetentionHours)) choices.Add(new(draft.RetentionHours, $"Custom · {draft.RetentionHours} hours"));
+        var combo = new ComboBox { ItemsSource = choices, SelectedItem = choices.Single(c => c.Hours == draft.RetentionHours) };
+        AutomationProperties.SetName(combo, "Temporary capture retention"); body.Children.Add(combo);
+        values[nameof(Settings.RetentionHours)] = () => ((RetentionChoice)combo.SelectedItem).Hours;
+    }
     private sealed record MonitorChoice(int Index, string Identity, string Label) { public override string ToString() => Label; }
     private void AddMonitor()
     {

@@ -12,6 +12,20 @@ This is alpha acceptance. Implementations and agent checks are recorded in [TASK
 
 ## Recorded user results — 2026-10-07
 
+### Current local dock retest
+
+Owner tested `0.1.0-alpha.acceptance.20261007.1+6849be66527cc69254addb551b2dcc6d75b4931f`; report `artifacts/acceptance-results/interactive-20261007-160916-061.json`. The isolated fixture uses intercepted clipboard writes. Reported monitor DPIs are 96/96/144 (100%/100%/150%). Windows build was not supplied in this feedback. The attached screenshot is not copied into Git.
+
+| Requested step | User result | Evidence boundary / follow-up |
+|---|---|---|
+| 1: 1/3/5/20-capture hover, reachability and scrolling | PASS — user reports everything works as expected | Current prescribed fixture workflow; broader settings/accessibility/hardware cases remain separate. |
+| 2: nonadjacent selection across leave/re-entry | PASS — user reports everything works as expected | Current fixture interaction; no external receiver evidence. |
+| 3: Alt-reorder | PARTIAL — adjacent 1→2 works; dragging does not open editor; nonadjacent expectation unresolved | User observes `[1,2,3] → [2,3,1]` for 1→3 and considers it unexpected. Screenshot matches that result. Source and README define insertion into the target's original slot, shifting intervening items. A swap would be `[3,2,1]`; do not change that contract without resolving the intended behavior. Reverse nonadjacent acceptance was not explicitly reported. |
+| 4: focus/keyboard/editor/export | PASS — user reports everything works as expected | Report confirms one intercepted image copy and an edited/dismissed capture; its final snapshot has no exported flag. Preserve the user report separately from automated export evidence. Full tool/export-dialog/accessibility matrices remain open. |
+| 5: supplied local report | RECEIVED | Exact build identified. Isolated data and clipboard interception do not establish actual receiver delivery. |
+
+These reports improve the recorded native interaction evidence without automatically closing broad queue gates. Resolve insertion versus swapping, then continue with the targeted real-receiver check in the completion review. Earlier reported failures remain historical results of their tested builds.
+
 During publication review, the owner reported that drop and paste worked in Codex, ChatGPT, VS Code and a browser. These are user-reported passes for ordinary receiver behavior. Exact build/receiver versions, browser identity, selected-image membership/order and delayed-read coverage were not supplied. Preserve these successes without treating the complete Q12/Q30/Q50 matrix as closed.
 
 ## Recorded user results — 2026-10-06

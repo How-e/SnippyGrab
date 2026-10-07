@@ -36,12 +36,14 @@ public sealed class SettingsCoverageTests
         var settings = JsonSerializer.Deserialize<Settings>(json)!; settings.Validate();
         Assert.Equal(1, settings.SchemaVersion); Assert.Equal(24, settings.RetentionHours);
         Assert.Equal(CaptureMode.Region, settings.DefaultCaptureMode); Assert.True(settings.StartMinimized);
+        Assert.Equal(PreviewQuality.Sharp, settings.PreviewQuality); Assert.True(settings.OcrEnhanceSmallText); Assert.Equal(OcrLayout.Auto, settings.OcrLayout);
     }
     [Fact]
     public void InvalidEnumerationsAndNonfiniteNumbersRecoverPredictably()
     {
-        var settings = new Settings { Corner = (DockCorner)99, Theme = (AppTheme)99, DockOpacity = double.NaN, TextSize = double.PositiveInfinity };
+        var settings = new Settings { Corner = (DockCorner)99, Theme = (AppTheme)99, PreviewQuality = (PreviewQuality)99, OcrLayout = (OcrLayout)99, DockOpacity = double.NaN, TextSize = double.PositiveInfinity };
         settings.Validate(); Assert.Equal(DockCorner.BottomRight, settings.Corner); Assert.Equal(.96, settings.DockOpacity); Assert.Equal(24, settings.TextSize);
+        Assert.Equal(PreviewQuality.Sharp, settings.PreviewQuality); Assert.Equal(OcrLayout.Auto, settings.OcrLayout);
         Assert.Throws<InvalidDataException>(() => new Settings { SchemaVersion = 2 }.Validate());
     }
 }

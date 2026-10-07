@@ -1,5 +1,14 @@
 # Validation — 2026-10-06
 
+## Installer and image quality fix — 2026-10-06
+
+- Release build with warnings as errors and format verification pass. All 196 tests pass (145 core, 51 WPF integration), including 11px dialog OCR across all layout choices, enhancement bounds, preview/original fidelity and legacy settings defaults.
+- The real install.ps1 ancestor guard passes against a hidden ancestor fixture under Windows PowerShell 5.1, reproducing the hidden AppData condition from the supplied setup error. Isolated fresh install, upgrade, rollback, checksum rejection and data-preservation checks pass under Windows PowerShell and PowerShell 7. This does not exercise Start menu/Apps registration or a clean user profile.
+- Development offscreen reliability, editor layout and dock layout checks pass. Reliability checks verify all preview-quality decode widths, unchanged stored PNG bytes and a resized pin decoding beyond its previous 800px cap. Editor screenshots were inspected at 660 DIP / 225% text with the new 100% zoom action. Dock coverage retains bounded five-card/twelve-thumbnail caches. DPI handlers defer work and ignore bubbled child-image events to avoid reentrant WPF layout.
+- The revised real OCR service was run locally against the supplied 825×421 image without modifying it. The chosen enhanced sparse-text output correctly reads `Get-Item` and `Could not find item`, which the original automatic pass misread. The comparative native passes report 0.77 confidence for original Auto and 0.81 for 2× SparseText; confidence is not measured transcription accuracy. Paths, punctuation and some characters remain imperfect. 3× scaling performed worse and is not used.
+- Enhancement/layout choices follow [Tesseract's image-quality guidance](https://tesseract-ocr.github.io/tessdoc/ImproveQuality.html). OCR still uses original capture pixels; the preview-size setting never controls its input. Auto retains the original pass unless a candidate improves reported confidence, and does not merge duplicate text from multiple passes.
+- The corrected setup/bundle is generated locally as `0.1.0-alpha.qualityfix.20261006`. Public release publication and clean-profile Windows installation acceptance remain separate gates.
+
 Status: runnable **0.1.0 alpha**, not stable acceptance.
 
 ## Evidence

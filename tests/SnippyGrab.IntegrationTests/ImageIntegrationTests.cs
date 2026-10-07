@@ -56,6 +56,27 @@ public sealed class ImageIntegrationTests
             return true;
         });
     }
+    [Theory]
+    [InlineData(PreviewQuality.Balanced, 40)]
+    [InlineData(PreviewQuality.Sharp, 80)]
+    [InlineData(PreviewQuality.Original, 160)]
+    public void PreviewQualityChangesDecodeWithoutChangingOriginal(PreviewQuality quality, int expectedWidth)
+    {
+        Sta(() =>
+        {
+            var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".png");
+            try
+            {
+                var encoded = ImageService.Png(Synthetic()); File.WriteAllBytes(path, encoded);
+                var pixels = ImageService.PreviewPixels(40, quality);
+                Assert.Equal(expectedWidth, ImageService.Load(path, pixels, pixels).PixelWidth);
+                Assert.Equal(encoded, File.ReadAllBytes(path));
+                Assert.Equal(160, ImageService.Load(path).PixelWidth);
+            }
+            finally { File.Delete(path); }
+            return true;
+        });
+    }
     [Fact]
     public void CropClipsAndDetachesFromOriginal()
     {

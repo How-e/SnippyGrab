@@ -16,7 +16,8 @@ internal sealed class AppController : IDisposable
     public CaptureRepository Repository { get; }
     public ClipboardService Clipboard { get; internal set; } = new();
     public DragDropService DragDrop { get; }
-    public IOcrService OcrService { get; internal set; } = new OcrService();
+    public IOcrService OcrService { get; internal set; }
+    internal event Action? SettingsChanged;
     public HotkeyService Hotkeys { get; } = new();
     public DockWindow Dock { get; }
     public bool Exiting { get; private set; }
@@ -47,6 +48,7 @@ internal sealed class AppController : IDisposable
         ManagedPath.RejectRedirects(dataDirectory);
         Directory.CreateDirectory(dataDirectory);
         settingsService = new(Path.Combine(dataDirectory, "settings.json")); Settings = settingsService.Load();
+        OcrService = new OcrService(settingsProvider: () => Settings);
         if (Settings.DockMonitor >= 0 && Settings.DockMonitorIdentity.Length == 0)
         {
             Settings.DockMonitorIdentity = MonitorService.All().ElementAtOrDefault(Settings.DockMonitor)?.Identity ?? "";
@@ -230,6 +232,7 @@ internal sealed class AppController : IDisposable
         StartupService.Apply(settings, settingsService.Save); Settings = settings;
         Repository.HistoryEnabled = settings.HistoryEnabled; Try(Repository.Persist);
         Ui.Theme(settings.Theme); Hotkeys.Configure(settings, Hotkeys.Paused); cleanup.Interval = TimeSpan.FromMinutes(settings.CleanupMinutes); Dock.Refresh(); BuildTray();
+        SettingsChanged?.Invoke();
         if (Hotkeys.Warnings.Count > 0) Notify(string.Join("\n", Hotkeys.Warnings));
     }
     private void BuildTray()

@@ -5,7 +5,7 @@ $installRoot = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'Programs/Sni
 $programRoot = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'Programs'))
 if (-not $installRoot.StartsWith($programRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -or (Split-Path -Leaf $installRoot) -ne 'SnippyGrab') { throw 'Unexpected install path.' }
 for ($checkPath = $installRoot; $checkPath; $checkPath = Split-Path -Parent $checkPath) {
-    if ((Test-Path -LiteralPath $checkPath) -and ((Get-Item -LiteralPath $checkPath).Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw 'Redirected installation directories are not supported.' }
+    if ((Test-Path -LiteralPath $checkPath) -and ((Get-Item -LiteralPath $checkPath -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw 'Redirected installation directories are not supported.' }
 }
 $exePath = Join-Path $installRoot 'SnippyGrab.exe'
 $running = Get-Process -Name SnippyGrab -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exePath }

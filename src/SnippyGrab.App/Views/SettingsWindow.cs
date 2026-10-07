@@ -46,6 +46,8 @@ internal sealed class SettingsWindow : Window
         Section("Screenshot shelf");
         AddMonitor(); Add(nameof(Settings.Corner), "Screen position"); Add(nameof(Settings.Orientation), "Corner orientation (edges expand inward)");
         Add(nameof(Settings.ThumbnailSize), "Thumbnail width (120–400 DIP)"); Add(nameof(Settings.ExpandedItems), "Maximum expanded items (1–5)"); Add(nameof(Settings.DockOpacity), "Opacity (0.25–1)");
+        Add(nameof(Settings.PreviewQuality), "Preview quality");
+        body.Children.Add(Ui.Text("Balanced uses less memory; Sharp improves detail; Original decodes every pixel and uses more memory. Small previews still shrink text to fit. Open the editor to inspect at 100%. Captures, copies, exports and OCR always use the full-resolution lossless PNG.", 12, true));
         Add(nameof(Settings.AlwaysOnTop), "Always on top"); Add(nameof(Settings.AutoCollapse), "Collapse when pointer leaves"); Add(nameof(Settings.AutoHideSeconds), "Auto-hide seconds (0 = off)"); Add(nameof(Settings.DockLifetimeMinutes), "Shelf lifetime minutes (0 = indefinitely)");
         Section("Clipboard"); Add(nameof(Settings.AutoCopy), "Copy automatically on capture"); Add(nameof(Settings.ClipboardPng), "Include PNG representation with image");
         Section("Files and history"); Add(nameof(Settings.CachePath), "Dedicated cache path (empty = LocalAppData)");
@@ -54,6 +56,8 @@ internal sealed class SettingsWindow : Window
         body.Children.Add(Ui.Text("Pins are retained. Active editors and transfers are protected; file transfers have a 24-hour grace period, even when clearing.", 12, true));
         body.Children.Add(Ui.Button("Clear temporary captures", "Clear unpinned captures, excluding transfers and editors", controller.ClearTemporary));
         Section("Editor"); Add(nameof(Settings.AnnotationColor), "Default color (#RRGGBB)"); Add(nameof(Settings.StrokeSize), "Stroke thickness"); Add(nameof(Settings.TextSize), "Text size");
+        Section("Text recognition"); Add(nameof(Settings.OcrEnhanceSmallText), "Enhance small text for OCR"); Add(nameof(Settings.OcrLayout), "OCR text layout");
+        body.Children.Add(Ui.Text("Auto keeps paragraph layout and retries scattered text when confidence is low. SparseText suits dialogs or mixed screenshots; SingleBlock suits one paragraph. Enhancement enlarges smaller inputs without changing the saved image. For best accuracy, use OCR selected area in the editor around the text. Recognition is local and English only.", 12, true));
         Section("Application"); Add(nameof(Settings.LaunchOnStartup), "Launch at Windows login"); Add(nameof(Settings.StartMinimized), "Start silently in tray after setup"); Add(nameof(Settings.Theme), "Theme");
         body.Children.Add(Ui.Text("Updates are manual through release downloads. No automatic network requests, accounts or analytics. SnippyGrab " + BuildVersion.Display + " · MIT", 12, true));
         foreach (var text in body.Children.OfType<TextBlock>()) text.TextWrapping = TextWrapping.Wrap;

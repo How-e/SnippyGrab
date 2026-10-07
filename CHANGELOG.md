@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.0-alpha.qualityfix.20261006 — 2026-10-06
+
+- Fixed Setup's hidden AppData ancestor check under Windows PowerShell; kept redirect rejection and staged-install integrity checks.
+- Added Balanced/Sharp/Original preview quality, DPI-aware shelf/history decoding, high-quality scaling, and resized pin refreshes. Original captures, exports and OCR remain full resolution.
+- Added editor 100% zoom, bounded small-text OCR enhancement, selectable text layout, and low-confidence scattered-text retry. Already readable text retains its original recognition path.
+- Installer failures now direct users to the actual error details. Regression checks cover hidden ancestors, settings migration, preview/original fidelity and small dialog text.
+
 ## 0.1.0-alpha — 2026-10-06
 Initial native Windows implementation. Desktop acceptance remains a release gate; see docs/VALIDATION.md.
 

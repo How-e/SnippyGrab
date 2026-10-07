@@ -8,6 +8,13 @@ function Write-Fixture([string]$Version) {
     Get-ChildItem -LiteralPath $source -File | Where-Object Name -ne 'SHA256SUMS.txt' | ForEach-Object { '{0}  {1}' -f (Get-FileHash -LiteralPath $_.FullName).Hash, $_.Name } | Set-Content -LiteralPath (Join-Path $source 'SHA256SUMS.txt')
 }
 try {
+    # Hidden ancestors mirror the real LocalAppData installation path, including Windows PowerShell 5.1.
+    (Get-Item -LiteralPath $root -Force).Attributes = [IO.FileAttributes]::Directory -bor [IO.FileAttributes]::Hidden
+    Assert-SnippyInstallPath $target (Split-Path -Parent $target)
+    $installScript = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'install.ps1') -Raw
+    $guard = $installScript.Substring($installScript.IndexOf('for ($checkPath'), $installScript.IndexOf('$exePath =') - $installScript.IndexOf('for ($checkPath'))
+    # Execute the real entry script's ancestor guard against the isolated hidden fixture.
+    & { $installRoot = $target; Invoke-Expression $guard }
     Set-Content -LiteralPath (Join-Path $data 'sentinel.txt') 'preserve'
     Write-Fixture 'old'; $first = Install-SnippyFiles $source $target
     if ($first.Backup) { throw 'Fresh install had backup.' }
@@ -22,7 +29,7 @@ try {
     if ((Get-Content -LiteralPath (Join-Path $data 'sentinel.txt')) -ne 'preserve') { throw 'User data changed.' }
     $rejected = $false; try { Assert-SnippyInstallPath (Join-Path $root '../escape') $root } catch { $rejected = $true }
     if (-not $rejected) { throw 'Escaped target accepted.' }
-    Write-Output 'PASS: fresh install, upgrade/obsolete isolation, rollback, checksum rejection, data preservation and path containment.'
+    Write-Output 'PASS: hidden ancestor entry guard, fresh install, upgrade/obsolete isolation, rollback, checksum rejection, data preservation and path containment.'
 } finally {
     $full = [IO.Path]::GetFullPath($root)
     if ([IO.Path]::GetDirectoryName($full) -ne [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\') -or -not [IO.Path]::GetFileName($full).StartsWith('SnippyGrab-install-lab-')) { throw 'Unexpected fixture cleanup path.' }

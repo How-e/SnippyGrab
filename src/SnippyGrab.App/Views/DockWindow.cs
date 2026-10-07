@@ -14,7 +14,7 @@ internal sealed class DockWindow : Window
     private HashSet<Guid> selected => selection.Selected;
     private readonly BoundedCache<(string File, int Pixels), BitmapSource> thumbnails = new(12);
     private readonly BoundedCache<CardStamp, CardVisual> cards = new(5);
-    private sealed record CardStamp(Guid Id, string File, int Width, int Height, int Size, int Number, int Total, bool Pinned, string ExportPath, Brush Surface, Brush Accent);
+    private sealed record CardStamp(Guid Id, string File, int Width, int Height, int Size, int PreviewPixels, int Number, int Total, bool Pinned, string ExportPath, Brush Surface, Brush Accent);
     private sealed record CardVisual(Border Frame, StackPanel Controls, TextBlock State, bool Available);
     private readonly DispatcherTimer hideTimer = new();
     private readonly DispatcherTimer collapseTimer = new() { Interval = TimeSpan.FromMilliseconds(180) };
@@ -67,6 +67,8 @@ internal sealed class DockWindow : Window
         KeyDown += OnKey;
         hideTimer.Tick += (_, _) => { hideTimer.Stop(); if (!PointerInside() && !dragging && pressed is null && !HasOpenMenu() && !(keyboardMode && IsKeyboardFocusWithin)) Hide(); };
         SizeChanged += (_, _) => QueuePosition();
+        // Child Image DPI events bubble during layout; never rebuild the visual tree inside that pass.
+        DpiChanged += (_, e) => { if (ReferenceEquals(e.Source, this)) Dispatcher.BeginInvoke(new Action(() => { if (IsLoaded) controller.Try(() => Refresh()); })); };
         LostKeyboardFocus += (_, _) => { if (!IsKeyboardFocusWithin) { keyboardMode = false; collapseTimer.Start(); } };
         IsVisibleChanged += (_, _) => { if (!IsVisible) { hideTimer.Stop(); collapseTimer.Stop(); } };
         Closed += (_, _) => { hideTimer.Stop(); collapseTimer.Stop(); };
@@ -170,7 +172,7 @@ internal sealed class DockWindow : Window
     }
     private UIElement Card(CaptureRecord capture)
     {
-        var stamp = new CardStamp(capture.Id, capture.FileName, capture.Width, capture.Height, controller.Settings.ThumbnailSize, visible.IndexOf(capture) + 1, visible.Count, capture.Pinned, capture.ExportPath, (Brush)FindResource("Surface"), (Brush)FindResource("Accent"));
+        var stamp = new CardStamp(capture.Id, capture.FileName, capture.Width, capture.Height, controller.Settings.ThumbnailSize, PreviewPixels(), visible.IndexOf(capture) + 1, visible.Count, capture.Pinned, capture.ExportPath, (Brush)FindResource("Surface"), (Brush)FindResource("Accent"));
         if (cards.TryGetValue(stamp, out var old) && !old.Available) cards.Remove(stamp);
         var card = cards.GetOrAdd(stamp, () => CreateCard(capture));
         card.Frame.BorderBrush = (Brush)FindResource(selected.Contains(capture.Id) ? "Accent" : "Muted");
@@ -183,6 +185,7 @@ internal sealed class DockWindow : Window
         card.Controls.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
         return card.Frame;
     }
+    private int PreviewPixels() => ImageService.PreviewPixels((int)Math.Ceiling(controller.Settings.ThumbnailSize * VisualTreeHelper.GetDpi(this).DpiScaleX), controller.Settings.PreviewQuality);
     private CardVisual CreateCard(CaptureRecord capture)
     {
         CardBuildCount++;
@@ -192,8 +195,11 @@ internal sealed class DockWindow : Window
         var available = true;
         try
         {
-            var thumb = thumbnails.GetOrAdd((capture.FileName, size * 2), () => { var decoded = ImageService.Load(controller.Repository.PathFor(capture), size * 2, size * 2); ThumbnailDecodeCount++; return decoded; });
-            grid.Children.Add(new Image { Source = thumb, Stretch = Stretch.Uniform });
+            var pixels = PreviewPixels();
+            var thumb = thumbnails.GetOrAdd((capture.FileName, pixels), () => { var decoded = ImageService.Load(controller.Repository.PathFor(capture), pixels, pixels); ThumbnailDecodeCount++; return decoded; });
+            var image = new Image { Source = thumb, Stretch = Stretch.Uniform };
+            RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.HighQuality);
+            grid.Children.Add(image);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or InvalidDataException or ArgumentException)
         { available = false; grid.Children.Add(Ui.Text("Image unavailable", 12)); }

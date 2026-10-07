@@ -51,6 +51,7 @@ internal sealed class EditorWindow : Window
         openExportFolder.ToolTip = string.IsNullOrWhiteSpace(record.ExportPath) ? "Export a PNG first" : "Last PNG export: " + record.ExportPath;
         actions.Children.Add(Ui.Button("Undo", "Undo (Ctrl+Z)", Undo)); actions.Children.Add(Ui.Button("Redo", "Redo (Ctrl+Y)", Redo));
         actions.Children.Add(Ui.Button("−", "Zoom out", () => Zoom(scale.ScaleX / 1.2))); actions.Children.Add(Ui.Button("+", "Zoom in", () => Zoom(scale.ScaleX * 1.2)));
+        actions.Children.Add(Ui.Button("100%", "Inspect the full-resolution image at 100% zoom", () => Zoom(1)));
         actions.Children.Add(Ui.Button("Fit", "Fit image", Fit));
         actions.Children.Add(Ui.Button("OCR", "Copy text from the edited screenshot", () => controller.Run(() => CopyDocumentOcr())));
         actions.Children.Add(Ui.Button("Discard", "Close without applying unsaved changes", () => { discard = true; Close(); }));

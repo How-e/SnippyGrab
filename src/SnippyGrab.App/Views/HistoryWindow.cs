@@ -49,7 +49,9 @@ internal sealed class HistoryWindow : Window
         list.PreviewMouseMove += (_, e) => { if (e.LeftButton == MouseButtonState.Pressed && Selected().Count > 0 && (Keyboard.Modifiers & ModifierKeys.Alt) != 0) controller.Try(() => controller.DragDrop.Drag(list, Selected())); };
         KeyDown += (_, e) => { if (e.Key == Key.Escape) Close(); if (e.Key == Key.Delete) { controller.Dismiss(Selected()); Refresh(); } };
         controller.Repository.Changed += RepositoryChanged;
-        Closed += (_, _) => controller.Repository.Changed -= RepositoryChanged;
+        controller.SettingsChanged += RepositoryChanged;
+        DpiChanged += (_, e) => { if (ReferenceEquals(e.Source, this)) Dispatcher.BeginInvoke(new Action(() => { if (IsLoaded) controller.Try(RefreshPreview); })); };
+        Closed += (_, _) => { controller.Repository.Changed -= RepositoryChanged; controller.SettingsChanged -= RepositoryChanged; };
         Refresh();
     }
     private static TextBlock HistoryNotice(AppController controller)
@@ -62,7 +64,8 @@ internal sealed class HistoryWindow : Window
     {
         var capture = Selected().FirstOrDefault();
         if (capture is not null) controller.Repository.ResolveDimensions(capture);
-        preview.Source = capture is null ? null : Services.ImageService.Load(controller.Repository.PathFor(capture), 600);
+        preview.Source = capture is null ? null : Services.ImageService.Load(controller.Repository.PathFor(capture), Services.ImageService.PreviewPixels((int)Math.Ceiling(600 * VisualTreeHelper.GetDpi(this).DpiScaleX), controller.Settings.PreviewQuality));
+        RenderOptions.SetBitmapScalingMode(preview, BitmapScalingMode.HighQuality);
     }
     private void RepositoryChanged() => controller.Try(Refresh);
     private void Refresh()

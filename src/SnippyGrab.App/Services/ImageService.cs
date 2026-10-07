@@ -8,6 +8,12 @@ namespace SnippyGrab.App.Services;
 internal static class ImageService
 {
     public const long MaxPixels = 80_000_000;
+    internal static int PreviewPixels(int pixels, PreviewQuality quality) => quality switch
+    {
+        PreviewQuality.Original => 0,
+        PreviewQuality.Sharp => checked(pixels * 2),
+        _ => pixels
+    };
     public static BitmapSource Capture(PixelRect rect, bool cursor)
     {
         if (rect.IsEmpty || (long)rect.Width * rect.Height > MaxPixels) throw new InvalidDataException("Capture area is too large (80 megapixel limit).");

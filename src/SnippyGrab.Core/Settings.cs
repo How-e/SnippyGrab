@@ -6,6 +6,8 @@ public enum CaptureMode { Region, Desktop, Window, ActiveWindow }
 public enum DockCorner { BottomRight, BottomLeft, TopRight, TopLeft, Top, Bottom, Left, Right }
 public enum DockOrientation { Vertical, Horizontal }
 public enum AppTheme { System, Dark, Light }
+public enum PreviewQuality { Balanced, Sharp, Original }
+public enum OcrLayout { Auto, SparseText, SingleBlock }
 public sealed record Hotkey(uint Key, uint Modifiers)
 {
     private string KeyName => Key == 44 ? "PrintScreen" : Key is >= 112 and <= 135 ? "F" + (Key - 111) : Key is >= 65 and <= 90 or >= 48 and <= 57 ? ((char)Key).ToString() : "VK " + Key;
@@ -29,6 +31,9 @@ public sealed class Settings
     public DockCorner Corner { get; set; } = DockCorner.BottomRight;
     public DockOrientation Orientation { get; set; }
     public int ThumbnailSize { get; set; } = 224;
+    public PreviewQuality PreviewQuality { get; set; } = PreviewQuality.Sharp;
+    public bool OcrEnhanceSmallText { get; set; } = true;
+    public OcrLayout OcrLayout { get; set; } = OcrLayout.Auto;
     public int ExpandedItems { get; set; } = 3;
     public double DockOpacity { get; set; } = 0.96;
     public bool AlwaysOnTop { get; set; } = true;
@@ -70,6 +75,8 @@ public sealed class Settings
         if (!Enum.IsDefined(Corner)) Corner = DockCorner.BottomRight;
         if (!Enum.IsDefined(Orientation)) Orientation = DockOrientation.Vertical;
         if (!Enum.IsDefined(Theme)) Theme = AppTheme.System;
+        if (!Enum.IsDefined(PreviewQuality)) PreviewQuality = PreviewQuality.Sharp;
+        if (!Enum.IsDefined(OcrLayout)) OcrLayout = OcrLayout.Auto;
         if (!Enum.IsDefined(DefaultCaptureMode)) DefaultCaptureMode = CaptureMode.Region;
         foreach (var key in new[] { PrimaryHotkey, DesktopHotkey, WindowHotkey, ActiveWindowHotkey, FallbackHotkey })
             if (key is null || key.Key > 254 || key.Modifiers > 15 || (key.Key == 0 && key.Modifiers != 0)) throw new InvalidDataException("Invalid hotkey.");

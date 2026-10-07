@@ -72,7 +72,7 @@ internal static class Program
             var startAtLogin = startup.Checked;
             install.Enabled = false; startup.Enabled = false; status.Text = "Verifying and installing…";
             try { await Task.Run(() => Install(startAtLogin)); status.Text = "Installed. Open SnippyGrab from Start."; completed = true; install.Text = "Close"; install.Enabled = true; }
-            catch (Exception ex) { status.Text = "Install failed. Exit any running SnippyGrab and retry."; MessageBox.Show(form, ex.Message, "SnippyGrab Setup"); install.Enabled = true; startup.Enabled = true; }
+            catch (Exception ex) { status.Text = "Install failed. Review the error details and retry."; MessageBox.Show(form, ex.Message, "SnippyGrab Setup"); install.Enabled = true; startup.Enabled = true; }
         };
         form.Controls.AddRange([title, details, startup, status, install]); form.AcceptButton = install; return form;
     }

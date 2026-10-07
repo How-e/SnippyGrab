@@ -9,13 +9,15 @@ internal sealed class PinWindow : Window
     private readonly CaptureRecord record;
     private readonly Image preview;
     private readonly CaptureViewLease lease;
+    private readonly System.Windows.Threading.DispatcherTimer resizeTimer = new() { Interval = TimeSpan.FromMilliseconds(150) };
     public PinWindow(AppController controller, CaptureRecord record)
     {
         Ui.StyleWindow(this);
         this.controller = controller; this.record = record;
         Title = "SnippyGrab pin"; WindowStyle = WindowStyle.None; AllowsTransparency = true; Background = Brushes.Transparent;
         ShowInTaskbar = false; ShowActivated = false; Topmost = true; Width = 320; Height = 220; MinWidth = 80; MinHeight = 60; ResizeMode = ResizeMode.CanResizeWithGrip;
-        preview = new Image { Source = ImageService.Load(controller.Repository.PathFor(record), 800), Stretch = Stretch.Uniform };
+        preview = new Image { Source = LoadPreview(), Stretch = Stretch.Uniform };
+        RenderOptions.SetBitmapScalingMode(preview, BitmapScalingMode.HighQuality);
         Content = new Border { Child = preview, CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1), BorderBrush = (Brush)FindResource("Muted"), Background = (Brush)FindResource("Surface") };
         MouseLeftButtonDown += (_, e) => { if (e.ClickCount == 2) controller.Edit(record); else DragMove(); };
         var menu = new ContextMenu();
@@ -29,16 +31,28 @@ internal sealed class PinWindow : Window
         ContextMenu = menu;
         lease = new(controller.Repository, record);
         controller.Repository.RevisionChanged += RevisionChanged;
-        Closed += (_, _) => { controller.Repository.RevisionChanged -= RevisionChanged; lease.Dispose(); };
+        controller.SettingsChanged += RefreshPreview;
+        resizeTimer.Tick += (_, _) => { resizeTimer.Stop(); RefreshPreview(); };
+        SizeChanged += (_, _) => { resizeTimer.Stop(); resizeTimer.Start(); };
+        DpiChanged += (_, e) => { if (ReferenceEquals(e.Source, this)) { resizeTimer.Stop(); resizeTimer.Start(); } };
+        Closed += (_, _) => { resizeTimer.Stop(); controller.SettingsChanged -= RefreshPreview; controller.Repository.RevisionChanged -= RevisionChanged; lease.Dispose(); };
         KeyDown += (_, e) => { if (e.Key == Key.Escape) Close(); };
     }
     private void RevisionChanged(CaptureRecord changed)
     {
-        if (changed.Id == record.Id) controller.Try(() => preview.Source = ImageService.Load(controller.Repository.PathFor(record), 800));
+        if (changed.Id == record.Id) controller.Try(() => preview.Source = LoadPreview());
     }
     public void RestoreInteraction()
     {
         var hwnd = new WindowInteropHelper(this).Handle; Native.SetWindowLongPtr(hwnd, -20, Native.GetWindowLongPtr(hwnd, -20) & ~((nint)0x20 | 0x08000000));
-        Show(); Activate(); preview.Source = ImageService.Load(controller.Repository.PathFor(record), 800);
+        Show(); Activate(); preview.Source = LoadPreview();
+    }
+    private void RefreshPreview() => controller.Try(() => preview.Source = LoadPreview());
+    private BitmapSource LoadPreview()
+    {
+        var dpi = VisualTreeHelper.GetDpi(this);
+        var width = ImageService.PreviewPixels((int)Math.Ceiling(Math.Max(800, ActualWidth * dpi.DpiScaleX)), controller.Settings.PreviewQuality);
+        var height = ImageService.PreviewPixels((int)Math.Ceiling(Math.Max(800, ActualHeight * dpi.DpiScaleY)), controller.Settings.PreviewQuality);
+        return ImageService.Load(controller.Repository.PathFor(record), width, height);
     }
 }

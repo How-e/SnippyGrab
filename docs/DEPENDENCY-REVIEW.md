@@ -15,3 +15,21 @@ Upstream Tesseract has model-deserialization advisories affecting versions throu
 Leptonica 1.82.0 is older than the [current upstream releases](https://github.com/DanBloomberg/leptonica/releases). Only app-encoded bounded PNGs enter OCR from ordinary capture/import; malformed external imports first go through Windows codecs. Native codec dependencies still require an inventory, applicable-advisory review and a tested upgrade before broad stable security acceptance.  tracks this concrete follow-up after the / policy/review closure. No approval of vulnerable native components is implied by a passing NuGet/integrity check.
 
 Packaged unsigned alpha builds remain suitable for local evaluation under the documented trust boundary, not a claim of stable security acceptance.
+
+## Exact native inventory and parser boundary —  follow-up
+
+On 2026-10-06, exported `TessVersion`, `getLeptonicaVersion` and `getImagelibVersions` from the hash-pinned x64 libraries reported the following. `scripts/inventory-native-ocr.ps1` repeats the query, frees owned version strings, refuses digest mismatches and checks expected inventory. Dependency auditing and packaging now execute it; BUILD-PROVENANCE carries expected versions beside digests.
+
+| Embedded component | Actual version | Admission/review status |
+|---|---|---|
+| Tesseract | **5.0.0**, despite wrapper package 5.2.0 | Native engine/model parser remains; pinned English model only. The upstream [model advisories](https://github.com/tesseract-ocr/tesseract/security/advisories) include FullyConnected/LSTM/recoder/GenericVector/DAWG/count and legacy model-loader failures. LSTM-only and trusted models reduce admission; they do not patch 5.0.0. |
+| Leptonica | 1.82.0, compiled Nov 7 2022, MSVC 1933 x64 | Raw-pixel allocation/scaling/recognition helpers remain. [Upstream convolution fix](https://github.com/DanBloomberg/leptonica/commit/f062b42c0ea8dddebdc6a152fd16152de215d614) and later releases need source/build applicability review; a build date alone does not prove backports. |
+| libgif | 5.2.1 | Embedded; production OCR does not call native GIF decoding. |
+| libjpeg | IJG 6b, libjpeg-turbo 2.1.4 | Embedded; production OCR does not call native JPEG decoding. [No published upstream GHSA entries](https://github.com/libjpeg-turbo/libjpeg-turbo/security/advisories) is not an exhaustive CVE clearance. |
+| libpng | 1.6.37 | Embedded version is in the affected range of [GHSA-qvg3-h654-xq3j](https://github.com/pnggroup/libpng/security/advisories/GHSA-qvg3-h654-xq3j). That advisory also requires a particular reader call sequence; version inclusion is not proof of application exploitability. Production OCR no longer calls the native PNG reader. |
+| libtiff | 4.4.0 | Embedded; production admits no TIFF and calls no native image decoder. Still needs upstream upgrade/source inventory; unreachable here does not mean patched. |
+| zlib | 1.2.13 | Embedded; production does not use the compressed native image readers. This version string does not prove whether optional minizip code was compiled; no unverified subcomponent claim is made. |
+
+Production OCR now admits encoded content through Windows WIC, then copies bounded decoded RGBA rows into a native Pix. It preserves resolution, samples-per-pixel and input-format metadata so Tesseract's alpha handling matches the former PNG input. No compressed PNG/JPEG/GIF/TIFF/BMP bytes reach native Leptonica readers. Tests compare the entire pixel buffer/resolution/samples with the former decoder on a benign fixture; the exact CS1002 recognition regression and full corpus/cancellation/error suite pass. Windows image decoding remains an OS-maintained trust boundary. Model parsing, native allocation/scaling and same-user replacement races remain.
+
+** stays open.** This is a concrete inventory and parser-exposure reduction, not an approved narrower stable scope or a tested upgraded native build. Stable acceptance still needs a source-pinned maintained native build with codec configuration/SBOM/licenses and packaged corpus/cancellation/error checks, or an explicit owner acceptance of a narrower security scope. Existing native hashes were deliberately preserved; no downloaded third-party DLL was substituted under the old identity.

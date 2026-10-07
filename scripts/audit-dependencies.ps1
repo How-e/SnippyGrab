@@ -53,3 +53,4 @@ foreach ($entry in $manifest.files.PSObject.Properties) {
     if (-not (Test-Path -LiteralPath $component -PathType Leaf) -or (Get-FileHash -LiteralPath $component -Algorithm SHA256).Hash -ne $entry.Value) { throw "OCR component integrity check failed: $($entry.Name)" }
 }
 Write-Output 'OCR component integrity passed. Native advisory review and residual risks are documented in docs/DEPENDENCY-REVIEW.md; this is not a native CVE scanner.'
+& (Join-Path $PSScriptRoot 'inventory-native-ocr.ps1') -ComponentDirectory $ComponentDirectory

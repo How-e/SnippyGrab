@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Tesseract;
 
 namespace SnippyGrab.App.Services;
@@ -24,7 +25,8 @@ internal sealed class OcrService(string? modelDirectory = null, Func<Settings>? 
                 using (var encoded = new MemoryStream(png, writable: false)) ImageService.ValidateEncoded(encoded);
                 TesseractEnviornment.CustomSearchPath = AppContext.BaseDirectory;
                 using var engine = new TesseractEngine(directory, "eng", EngineMode.LstmOnly);
-                using var pix = Pix.LoadFromMemory(png);
+                // Windows decodes admitted images; native OCR receives raw pixels, never codec input.
+                using var pix = DecodePixels(png, cancellation);
                 if ((long)pix.Width * pix.Height > ImageService.MaxPixels) throw new InvalidDataException("OCR image exceeds 80 megapixels.");
                 var mode = layout switch { OcrLayout.SparseText => PageSegMode.SparseText, OcrLayout.SingleBlock => PageSegMode.SingleBlock, _ => PageSegMode.Auto };
                 string text; float confidence; int lineHeight;
@@ -65,6 +67,58 @@ internal sealed class OcrService(string? modelDirectory = null, Func<Settings>? 
     {
         var scale = Math.Min(2, Math.Sqrt(8_000_000d / ((long)width * height)));
         return scale >= 1.25 ? (float)scale : 1;
+    }
+    internal static unsafe Pix DecodePixels(byte[] encoded, CancellationToken cancellation = default)
+    {
+        using var stream = new MemoryStream(encoded, writable: false);
+        ImageService.ValidateEncoded(stream); stream.Position = 0;
+        var decoder = BitmapDecoder.Create(stream, BitmapCreateOptions.PreservePixelFormat, BitmapCacheOption.OnLoad);
+        if (decoder is not (PngBitmapDecoder or JpegBitmapDecoder or BmpBitmapDecoder)) throw new InvalidDataException("Unsupported OCR image codec.");
+        var image = decoder.Frames[0];
+        if ((long)image.PixelWidth * image.PixelHeight > ImageService.MaxPixels) throw new InvalidDataException("OCR image exceeds 80 megapixels.");
+        var pixels = new FormatConvertedBitmap(image, PixelFormats.Bgra32, null, 0);
+        var pix = CreateRgba(pixels.PixelWidth, pixels.PixelHeight);
+        try
+        {
+            pix.XRes = (int)Math.Clamp(Math.Round(image.DpiX), 1, 2400);
+            pix.YRes = (int)Math.Clamp(Math.Round(image.DpiY), 1, 2400);
+            var data = pix.GetData(); var row = new byte[checked(pixels.PixelWidth * 4)];
+            for (var y = 0; y < pixels.PixelHeight; y++)
+            {
+                cancellation.ThrowIfCancellationRequested();
+                pixels.CopyPixels(new Int32Rect(0, y, pixels.PixelWidth, 1), row, row.Length, 0);
+                var destination = (uint*)data.Data + y * data.WordsPerLine;
+                for (var x = 0; x < pixels.PixelWidth; x++)
+                {
+                    var offset = x * 4;
+                    destination[x] = PixData.EncodeAsRGBA(row[offset + 2], row[offset + 1], row[offset], row[offset + 3]);
+                }
+            }
+            return pix;
+        }
+        catch { pix.Dispose(); throw; }
+    }
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    private delegate nint CreatePix(int width, int height, int depth);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    private delegate int SetSamples(nint pix, int samples);
+    private static Pix CreateRgba(int width, int height)
+    {
+        var library = NativeLibrary.Load(Path.Combine(AppContext.BaseDirectory, "x64", "leptonica-1.82.0.dll"));
+        try
+        {
+            var handle = Marshal.GetDelegateForFunctionPointer<CreatePix>(NativeLibrary.GetExport(library, "pixCreate"))(width, height, 32);
+            var pix = Pix.Create(handle);
+            try
+            {
+                // pixCreate defaults to RGB. Preserve the PNG reader's RGBA semantics for OCR.
+                if (Marshal.GetDelegateForFunctionPointer<SetSamples>(NativeLibrary.GetExport(library, "pixSetSpp"))(handle, 4) != 0) throw new InvalidOperationException("Could not initialize OCR pixels.");
+                if (Marshal.GetDelegateForFunctionPointer<SetSamples>(NativeLibrary.GetExport(library, "pixSetInputFormat"))(handle, 3) != 0) throw new InvalidOperationException("Could not initialize OCR alpha handling."); // IFF_PNG
+                return pix;
+            }
+            catch { pix.Dispose(); throw; }
+        }
+        finally { NativeLibrary.Free(library); }
     }
     internal static bool HasNativeLoaderFailure(Exception error) => error is DllNotFoundException or BadImageFormatException || error.InnerException is { } inner && HasNativeLoaderFailure(inner);
     internal static void ValidateModel(string path)

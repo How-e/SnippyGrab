@@ -2,6 +2,9 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'release-gates.ps1')
 $queue = (1..51 | ForEach-Object { "- [x] **Q$_ · P1 · Agent — fixture.**" }) -join "`n"
 Assert-SnippyReleaseGates -Version '0.1.0' -QueueText $queue | Out-Null
+$padded = (1..51 | ForEach-Object { '- [x] **Q{0:D2} · P1 · Agent — fixture.**' -f $_ }) -join "`n"
+Assert-SnippyReleaseGates -Version '0.1.0' -QueueText $padded | Out-Null
+Assert-SnippyReleaseGates -Version '0.1.0-alpha' -QueueText (Get-Content -LiteralPath (Join-Path (Split-Path -Parent $PSScriptRoot) 'TASK_QUEUE.md') -Raw) | Out-Null
 $open = $queue.Replace('[x] **Q2 ', '[ ] **Q2 ')
 Assert-SnippyReleaseGates -Version '0.1.0-alpha' -QueueText $open | Out-Null
 $optional = $open.Replace('Q2 · P1', 'Q2 · P2')
@@ -10,4 +13,4 @@ foreach ($fixture in @($open, '', $queue.Replace('Q51 ', 'Q1 '), $queue.Replace(
     $rejected = $false; try { Assert-SnippyReleaseGates -Version '0.1.0' -QueueText $fixture | Out-Null } catch { $rejected = $true }
     if (-not $rejected) { throw 'Incomplete stable gate fixture was admitted.' }
 }
-Write-Output 'Release gate policy: 8 fixtures passed.'
+Write-Output 'Release gate policy: 10 fixtures passed, including the actual queue and padded identities.'

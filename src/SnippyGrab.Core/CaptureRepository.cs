@@ -345,6 +345,7 @@ public static class TransferPayload
 }
 public static class StartupCommand
 {
+    public static bool Matches(string? command, string executable) => string.Equals(command, Build(executable), StringComparison.OrdinalIgnoreCase);
     public static string Build(string executable)
     {
         if (!Path.IsPathFullyQualified(executable) || executable.Contains('"') || !executable.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))

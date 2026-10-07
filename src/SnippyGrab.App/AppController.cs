@@ -56,6 +56,7 @@ internal sealed class AppController : IDisposable
         Ui.FailureHandler = Failure;
         Ui.Theme(Settings.Theme);
         Settings.LaunchOnStartup = StartupService.Enabled;
+        if (!diagnostic && StartupService.Stale) cacheWarning = "Windows startup points to another or older SnippyGrab path. Enable Launch at Windows login in Settings to register this executable, or disable it to remove the old entry.";
         try { Repository = new(Settings.CachePath.Length == 0 ? Path.Combine(dataDirectory, "cache") : Settings.CachePath); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or ArgumentException)
         { Repository = new(Path.Combine(dataDirectory, "cache")); Settings.CachePath = ""; cacheWarning = "Custom cache is unavailable. Using the default local cache; review Settings and retry the custom path."; }

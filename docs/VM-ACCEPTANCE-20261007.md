@@ -1,3 +1,5 @@
+Final acceptance — 2026-10-08: **zero required gates open / all 51 checked** after receiver/performance scope acceptance, verified hosted publication and final reconciliation. [Final evidence](FINAL-FOUR-ACCEPTANCE-20261007.md). VM-specific observations and earlier counts below retain their historical scope.
+
 # Fresh Windows VM acceptance and first-run setup
 
 Current acceptance: **4 required gates OPEN / 47 checked**. Q01, Q12, Q34 and Q44 remain open. Stable packaging remains blocked.

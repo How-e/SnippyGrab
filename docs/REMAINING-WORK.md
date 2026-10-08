@@ -1,3 +1,5 @@
+Latest owner Q09/Q19 fallback/help, capture/copy, pause preservation and held-key/tray steps 1–3 PASS. Q09 actual conflict/first-run and Q19/Q32 broader accessibility remain OPEN; **25 required gates open / 26 checked**. Preserve the running build. See [owner evidence](USER-TESTING.md).
+
 Latest owner Q19/Q32 shelf copy/export/pin and System-theme steps 1–3 PASS. Broader accessibility remains OPEN; **25 required gates open / 26 checked**. Preserve the running acceptance build; no rebuild for documentation-only results. See [owner evidence](USER-TESTING.md).
 
 Latest owner Q19/Q32 steps 1–4 PASS on acceptance .5: Settings/History/Editor keyboard navigation and Light/Dark readability at current text scale. Remaining shelf workflow/System theme and broader accessibility stay OPEN; 25 required gates open / 26 checked. See [owner evidence](USER-TESTING.md).

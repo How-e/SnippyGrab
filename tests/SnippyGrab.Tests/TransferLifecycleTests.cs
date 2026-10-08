@@ -30,6 +30,27 @@ public sealed class TransferLifecycleTests : IDisposable
         var next = new CaptureRepository(root); next.Load(); var current = next.Add([2], 2, 3);
         Assert.Equal(1, next.CleanupSession(DateTimeOffset.UtcNow)); Assert.True(File.Exists(first.PathFor(old))); Assert.False(File.Exists(next.PathFor(current)));
     }
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ClockRollbackCannotShortenDurableTransferGrace(bool rollbackBeforeRelease)
+    {
+        var started = DateTimeOffset.Parse("2026-01-01T12:00:00Z"); var now = started;
+        var repository = new CaptureRepository(root, utcNow: () => now);
+        var capture = repository.Add([1, 2, 3], 2, 3);
+        var first = repository.Lease([capture], transfer: true);
+        if (rollbackBeforeRelease) { now = started.AddHours(-12); first.Dispose(); }
+        else
+        {
+            first.Dispose(); now = started.AddHours(-12);
+            using (repository.Lease([capture], transfer: true)) { }
+        }
+        now = started.AddHours(23);
+        var reopened = new CaptureRepository(root, utcNow: () => now); reopened.Load();
+        Assert.Equal(0, reopened.Cleanup(now, 1, clear: true));
+        Assert.Equal(new byte[] { 1, 2, 3 }, File.ReadAllBytes(reopened.PathFor(capture)));
+        Assert.Equal(1, reopened.Cleanup(started.AddHours(24), 1, clear: true));
+    }
     [Fact]
     public void FailedTransferPersistenceReleasesLeaseForRetry()
     {

@@ -144,7 +144,7 @@ Agent work: Reproduced failed metadata edit reappearing as a second orphan captu
 
 Checks: Cross-view/failed metadata/view lease/superseded restart focused tests 7/7 PASS (orphan regression failed before fix); zero-warning Release build; q22-reliability-final.json PASS for native offscreen history/pin pixel refresh and actual editor close/copy retry; scoped formatting and git diff --check PASS.
 
-Status / remaining acceptance: OPEN: actual Apply/copy across shelf/history/detached pin and one-editor focus behavior. If the OS refuses deletion of an unpublished revision it is retained conservatively; no data-loss claim is made. Native programmatic consistency passes.
+Status / remaining acceptance: CLOSED for Q22 after owner actual Apply/copy across shelf/open History/detached pin/pasted output and one-editor focus behavior PASS on 2026-10-07, combined with the revision regressions above. If the OS refuses deletion of an unpublished revision it is retained conservatively. External transfer retention remains Q13. See NEXT-GATE-ACCEPTANCE-20261007.md.
 
 ## Q01
 

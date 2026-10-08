@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.0-alpha.acceptance.20261007.7 — 2026-10-07
+
+- First-run setup prominently prompts users to disable Windows Print Screen screen capture and offers a button to open Keyboard settings.
+- Added an initial Pictures / PNG export-folder choice with a native Browse picker, defaulting to the user's Windows Pictures location. Existing preferences remain intact; invalid destinations keep setup open with actionable feedback.
+- Recorded owner acceptance of fresh Windows 11 VM installation and feature workflows without additional programs/extensions. Four required acceptance gates remain open; stable readiness is not claimed.
+
 ## 0.1.0-alpha.queue.20261006.3 — 2026-10-06
 
 - Initial publication verification on 2026-10-07 fixed clean native builds under warnings-as-errors and made the synthetic desktop self-test wait for its own exposed pixels. Source pins and production capture behavior are preserved.

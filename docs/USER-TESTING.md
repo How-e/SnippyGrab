@@ -1,3 +1,7 @@
+# Latest owner VM acceptance — 2026-10-07
+
+Owner reports the entire install process and all features passed on a fresh Windows 11 26H2 / 26300.9457 VM with no additional programs/extensions, and explicitly requests closure of all VM-dependent gates. Q07/Q09/Q13/Q25/Q27/Q41 are CLOSED by owner acceptance/scope decision; **4 required gates remain open / 47 checked**. Exact conditional-event traces and the executed candidate filename were not separately restated. Windows 10 compatibility is untested and accepted as a limitation. [Current evidence and first-run changes](VM-ACCEPTANCE-20261007.md). Earlier tests/counts below remain historical.
+
 # Desktop testing requested from you
 
 **Current next step:** the current dock retest passes its reported cases, including owner-confirmed insertion order. Continue with targeted real-receiver membership/order/delayed-paste checks below. The published alpha predates the latest fixes; the launcher verifies current source and bundle hashes. Keep previous paste/drop passes below.

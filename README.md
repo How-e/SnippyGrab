@@ -2,6 +2,8 @@
 
 A native Windows screenshot shelf for AI and developer workflows.
 
+Current acceptance: **4 required gates open / 47 checked** after owner fresh-Windows-11 VM acceptance; see [the VM acceptance record](docs/VM-ACCEPTANCE-20261007.md). Earlier dated counts below are historical. Stable remains blocked by Q01/Q12/Q34/Q44.
+
 **Print Screen → select → release → paste or drag.** Captures land on the clipboard and a small transparent shelf. Click to annotate, Ctrl-click several images to attach together, or copy terminal errors with local OCR.
 
 .NET 10, WPF and Win32. No Electron, account, telemetry or cloud dependency.
@@ -36,7 +38,7 @@ Initial builds are unsigned; SmartScreen may prompt. Compare `Get-FileHash <down
 
 ## Usage
 
-The app lives in the tray. Closing a window keeps it running; **Exit** stops it. Double-click the tray icon to capture. First run offers a brief introduction and optional login startup.
+The app lives in the tray. Closing a window keeps it running; **Exit** stops it. Double-click the tray icon to capture. First run explains the Windows Print Screen prerequisite, opens Keyboard settings on request, and lets you choose a Pictures / PNG export folder and optional login startup. The export folder defaults to your Windows Pictures folder; Browse chooses another location. Captures remain in the temporary cache until explicitly exported.
 
 - Capture and immediately **Ctrl+V** into an application accepting clipboard images.
 - Drag a thumbnail to attach its temporary PNG file.

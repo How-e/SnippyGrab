@@ -1,5 +1,7 @@
 # Acceptance continuation — 2026-10-07
 
+Latest status: **4 required gates OPEN / 47 checked** after owner fresh-Windows-11 VM acceptance and explicit closure of Q07/Q09/Q13/Q25/Q27/Q41. No extra programs/extensions were required in the reported fresh environment. See [VM acceptance and setup changes](VM-ACCEPTANCE-20261007.md) for evidence boundaries and the two requested first-run improvements. Counts below describe earlier snapshots.
+
 Current status: **10 required gates OPEN, 41 entries CLOSED**. Stable packaging remains blocked. Historical counts in earlier reports describe their own snapshots.
 
 ## Owner acceptance and explicit scope decision

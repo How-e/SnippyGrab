@@ -45,6 +45,7 @@ internal static class InteractiveChecks
         Button("History", controller.ShowHistory);
         Button("Detached pin", () => controller.Detach(controller.Repository.Captures[0]));
         Button("Settings", controller.ShowSettings);
+        Button("First-run setup", () => new WelcomeWindow(controller).Show());
         foreach (var mode in Enum.GetValues<CaptureMode>()) Button("Capture " + mode, () => controller.Run(() => controller.Capture(mode)));
         Button("Hide shelf", controller.Dock.Hide);
         Button("Display change check", controller.Dock.TopologyChanged);

@@ -9,14 +9,18 @@ public sealed class EditorCommitCoordinator
     public Task<bool> RunAsync(Func<Task<bool>> apply)
     {
         if (Busy) return pending!;
-        pending = ExecuteAsync(apply);
-        return pending;
+        var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        pending = completion.Task;
+        _ = ExecuteAsync(apply, completion);
+        return completion.Task;
     }
 
-    private static async Task<bool> ExecuteAsync(Func<Task<bool>> apply)
+    private static async Task ExecuteAsync(Func<Task<bool>> apply, TaskCompletionSource<bool> completion)
     {
-        // Install the shared task before invoking code that may synchronously request close.
-        await Task.Yield();
-        return await apply();
+        // RunAsync installs the shared completion before calling code that can reenter.
+        // Yielding is insufficient: some contexts dispatch before the assignment returns.
+        try { completion.TrySetResult(await apply()); }
+        catch (OperationCanceledException ex) { completion.TrySetCanceled(ex.CancellationToken); }
+        catch (Exception ex) { completion.TrySetException(ex); }
     }
 }

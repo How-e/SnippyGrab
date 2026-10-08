@@ -4,6 +4,65 @@ namespace SnippyGrab.Tests;
 
 public sealed class EditorCommitTests
 {
+    private sealed class InlineSynchronizationContext : SynchronizationContext
+    {
+        public override void Post(SendOrPostCallback callback, object? state) => callback(state);
+    }
+
+    [Fact]
+    public async Task ReentrantCloseJoinsWhenDispatchRunsBeforeTaskAssignment()
+    {
+        var previous = SynchronizationContext.Current;
+        SynchronizationContext.SetSynchronizationContext(new InlineSynchronizationContext());
+        try
+        {
+            var gate = new EditorCommitCoordinator();
+            Task<bool>? close = null;
+            var calls = 0;
+            var apply = gate.RunAsync(() =>
+            {
+                calls++;
+                close = gate.RunAsync(() => throw new InvalidOperationException("Duplicate apply"));
+                return Task.FromResult(true);
+            });
+            Assert.Same(apply, close);
+            Assert.True(await apply);
+            Assert.Equal(1, calls);
+            Assert.False(gate.Busy);
+        }
+        finally { SynchronizationContext.SetSynchronizationContext(previous); }
+    }
+
+    [Fact]
+    public async Task ReentrantCloseJoinsApplyBeforeItsFirstAwait()
+    {
+        var gate = new EditorCommitCoordinator();
+        Task<bool>? close = null;
+        var calls = 0;
+        var apply = gate.RunAsync(() =>
+        {
+            calls++;
+            close = gate.RunAsync(() => throw new InvalidOperationException("Duplicate apply"));
+            return Task.FromResult(true);
+        });
+        Assert.True(await apply);
+        Assert.Same(apply, close);
+        Assert.Equal(1, calls);
+    }
+
+    [Fact]
+    public async Task CancelledApplyDoesNotPoisonRetryOrAnotherEditor()
+    {
+        var first = new EditorCommitCoordinator();
+        var second = new EditorCommitCoordinator();
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => first.RunAsync(() => Task.FromCanceled<bool>(cancellation.Token)));
+        Assert.False(first.Busy);
+        Assert.True(await second.RunAsync(() => Task.FromResult(true)));
+        Assert.True(await first.RunAsync(() => Task.FromResult(true)));
+    }
+
     [Fact]
     public async Task CloseAndExitWaitForTheSamePendingClipboardWork()
     {

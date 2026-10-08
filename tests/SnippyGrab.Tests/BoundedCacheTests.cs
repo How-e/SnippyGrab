@@ -5,6 +5,20 @@ namespace SnippyGrab.Tests;
 public sealed class BoundedCacheTests
 {
     [Fact]
+    public void RevisionInvalidationKeepsOtherWorkingThumbnails()
+    {
+        var cache = new BoundedCache<(string File, int Pixels), object>(3);
+        var unrelated = cache.GetOrAdd(("other", 100), () => new object());
+        cache.GetOrAdd(("old", 100), () => new object());
+        cache.GetOrAdd(("old", 200), () => new object());
+        cache.RemoveWhere(key => key.File == "old");
+        Assert.Equal(1, cache.Count);
+        Assert.Same(unrelated, cache.GetOrAdd(("other", 100), () => throw new InvalidOperationException()));
+        var revision = cache.GetOrAdd(("new", 100), () => new object());
+        Assert.Same(revision, cache.GetOrAdd(("new", 100), () => throw new InvalidOperationException()));
+    }
+
+    [Fact]
     public void RecentlyUsedThumbnailSurvivesScrollingEviction()
     {
         var cache = new BoundedCache<string, object>(2);

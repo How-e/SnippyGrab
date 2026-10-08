@@ -21,6 +21,14 @@ internal sealed class AppController : IDisposable
     public HotkeyService Hotkeys { get; } = new();
     public DockWindow Dock { get; }
     public bool Exiting { get; private set; }
+    internal bool Diagnostic { get; }
+    internal IReadOnlyCollection<EditorWindow> AcceptanceEditors => editors.Values.ToArray();
+    internal void ShowAcceptanceTray()
+    {
+        if (!Diagnostic) throw new InvalidOperationException("Acceptance tray requires diagnostic isolation.");
+        tray.Text = "SnippyGrab P0 acceptance";
+        tray.Visible = true;
+    }
     private readonly SettingsService settingsService;
     private readonly CaptureService capture = new();
     private readonly Forms.NotifyIcon tray;
@@ -40,14 +48,17 @@ internal sealed class AppController : IDisposable
     private bool exitRequested;
     private string? cacheWarning;
     private string lastNotice = "No recent notification.";
+    internal string LastOperationDetails => lastNotice;
     private DateTimeOffset lastNoticeUtc;
-    public AppController(bool background, string? isolatedDataDirectory = null, bool diagnostic = false)
+    public AppController(bool background, string? isolatedDataDirectory = null, bool diagnostic = false, Action<string, byte[]>? storageWriter = null)
     {
+        Diagnostic = diagnostic;
         lifecycle = new(action => Application.Current.Dispatcher.BeginInvoke(action));
         dataDirectory = isolatedDataDirectory ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SnippyGrab");
         ManagedPath.RejectRedirects(dataDirectory);
         Directory.CreateDirectory(dataDirectory);
         settingsService = new(Path.Combine(dataDirectory, "settings.json")); Settings = settingsService.Load();
+        if (diagnostic) Settings.CachePath = "";
         OcrService = new OcrService(settingsProvider: () => Settings);
         if (Settings.DockMonitor >= 0 && Settings.DockMonitorIdentity.Length == 0)
         {
@@ -58,11 +69,11 @@ internal sealed class AppController : IDisposable
         Ui.FailureHandler = Failure;
         capture.Timing += Log;
         Ui.Theme(Settings.Theme);
-        Settings.LaunchOnStartup = StartupService.Enabled;
+        Settings.LaunchOnStartup = !diagnostic && StartupService.Enabled;
         if (!diagnostic && StartupService.Stale) cacheWarning = "Windows startup points to another or older SnippyGrab path. Enable Launch at Windows login in Settings to register this executable, or disable it to remove the old entry.";
-        try { Repository = new(Settings.CachePath.Length == 0 ? Path.Combine(dataDirectory, "cache") : Settings.CachePath); }
+        try { Repository = new(Settings.CachePath.Length == 0 ? Path.Combine(dataDirectory, "cache") : Settings.CachePath, storageWriter); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or ArgumentException)
-        { Repository = new(Path.Combine(dataDirectory, "cache")); Settings.CachePath = ""; cacheWarning = "Custom cache is unavailable. Using the default local cache; review Settings and retry the custom path."; }
+        { Repository = new(Path.Combine(dataDirectory, "cache"), storageWriter); Settings.CachePath = ""; cacheWarning = "Custom cache is unavailable. Using the default local cache; review Settings and retry the custom path."; }
         Repository.HistoryEnabled = Settings.HistoryEnabled; Repository.Load();
         DragDrop = new(Repository); Dock = new(this);
         tray = new Forms.NotifyIcon { Icon = System.Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath!) ?? System.Drawing.SystemIcons.Application, Text = "SnippyGrab · Print Screen to capture", Visible = !diagnostic };
@@ -71,7 +82,7 @@ internal sealed class AppController : IDisposable
         tray.DoubleClick += (_, _) => Run(() => Capture(Settings.DefaultCaptureMode));
         Hotkeys.TaskbarRestored += () => lifecycle.Post(() => { if (!diagnostic) { tray.Visible = false; tray.Visible = true; } });
         Hotkeys.Capture += mode => Run(() => Capture(mode));
-        Hotkeys.Configure(Settings, diagnostic); BuildTray();
+        ConfigureHotkeys(false); BuildTray();
         cleanup.Tick += (_, _) => Try(() => { Repository.Cleanup(DateTimeOffset.UtcNow, Settings.RetentionHours); Dock.Refresh(); });
         cleanup.Interval = TimeSpan.FromMinutes(Settings.CleanupMinutes); cleanup.Start();
         expiry.Tick += (_, _) => { if (Repository.Captures.Any(c => !c.Dismissed)) Dock.Refresh(); }; expiry.Start();
@@ -94,15 +105,19 @@ internal sealed class AppController : IDisposable
         if (result is null || exitRequested || Exiting) return;
         var ready = Stopwatch.StartNew();
         var png = await Task.Run(() => ImageService.Png(result.Image));
-        try { Repository.Add(png, result.Image.PixelWidth, result.Image.PixelHeight, string.Join(",", Forms.Screen.AllScreens.Where(screen => !result.Bounds.Intersect(new PixelRect(screen.Bounds.X, screen.Bounds.Y, screen.Bounds.Width, screen.Bounds.Height)).IsEmpty).Select(screen => screen.DeviceName))); Dock.Refresh(newCapture: true); }
+        await PreserveCaptureAsync(result.Image, png, string.Join(",", Forms.Screen.AllScreens.Where(screen => !result.Bounds.Intersect(new PixelRect(screen.Bounds.X, screen.Bounds.Y, screen.Bounds.Width, screen.Bounds.Height)).IsEmpty).Select(screen => screen.DeviceName)), () => Dock.Refresh(newCapture: true));
+        Log($"capture_ready_ms={ready.ElapsedMilliseconds}; capture_total_ms={result.ElapsedMilliseconds + ready.ElapsedMilliseconds}");
+    }
+    internal async Task PreserveCaptureAsync(BitmapSource image, byte[] png, string monitor, Action refreshDock)
+    {
+        try { Repository.Add(png, image.PixelWidth, image.PixelHeight, monitor); refreshDock(); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
         {
-            if (Settings.AutoCopy && await Clipboard.ImageAsync(result.Image, Settings.ClipboardPng, png)) Notify("Capture copied, but cache storage failed. Paste it now; check cache permissions/free space before retrying capture.");
+            if (Settings.AutoCopy && await Clipboard.ImageAsync(image, Settings.ClipboardPng, png)) Notify("Capture copied, but cache storage failed. Paste it now; check cache permissions/free space before retrying capture.");
             else Notify("Capture storage and clipboard could not preserve this image. Check cache permissions/free space and retry capture.");
             return;
         }
-        if (Settings.AutoCopy) await CopyImageCore(result.Image, png);
-        Log($"capture_ready_ms={ready.ElapsedMilliseconds}; capture_total_ms={result.ElapsedMilliseconds + ready.ElapsedMilliseconds}");
+        if (Settings.AutoCopy) await CopyImageCore(image, png);
     }
     public Task<bool> CopyImage(BitmapSource image) => CopyImageCore(image);
     private async Task<bool> CopyImageCore(BitmapSource image, byte[]? encoded = null)
@@ -175,7 +190,7 @@ internal sealed class AppController : IDisposable
         }
         catch (Exception ex)
         {
-            Failure(ex); return new(ExportStatus.Failed, Message: ex.Message);
+            Failure(ex); return new(ExportStatus.Failed, Message: OperationFailure.From(ex).Message);
         }
     }
     public void OpenExportFolder(string path) => Try(() =>
@@ -208,16 +223,16 @@ internal sealed class AppController : IDisposable
     public void ClearTemporary() => Try(() => { if (Repository.CleanupBlocked) { Notify("Cleanup is disabled because history is unreadable. Original metadata is preserved; recover it before deleting captures."); return; } var count = Repository.Cleanup(DateTimeOffset.UtcNow, Settings.RetentionHours, clear: true); Dock.Refresh(); Notify($"Cleared {count} temporary capture(s). Pins and transfers are protected."); });
     private void ShowWelcome()
     {
-        Hotkeys.Configure(Settings, hotkeyPause.Enter(Hotkeys.Paused));
-        welcomeWindow = new(this); welcomeWindow.Closed += (_, _) => { welcomeWindow = null; Hotkeys.Configure(Settings, hotkeyPause.Exit()); BuildTray(); }; welcomeWindow.Show();
+        ConfigureHotkeys(hotkeyPause.Enter(Hotkeys.Paused));
+        welcomeWindow = new(this); welcomeWindow.Closed += (_, _) => { welcomeWindow = null; ConfigureHotkeys(hotkeyPause.Exit()); BuildTray(); }; welcomeWindow.Show();
     }
     public void FinishSetup() => welcomeWindow?.Close();
     public void ShowSettings() => ShowSettings(false);
     private void ShowSettings(bool welcome)
     {
         if (settingsWindow is not null) { settingsWindow.Activate(); return; }
-        Hotkeys.Configure(Settings, hotkeyPause.Enter(Hotkeys.Paused));
-        settingsWindow = new(this, welcome); settingsWindow.Closed += (_, _) => { settingsWindow = null; Hotkeys.Configure(Settings, hotkeyPause.Exit()); BuildTray(); }; settingsWindow.Show();
+        ConfigureHotkeys(hotkeyPause.Enter(Hotkeys.Paused));
+        settingsWindow = new(this, welcome); settingsWindow.Closed += (_, _) => { settingsWindow = null; ConfigureHotkeys(hotkeyPause.Exit()); BuildTray(); }; settingsWindow.Show();
     }
     public void ShowHistory()
     {
@@ -226,15 +241,19 @@ internal sealed class AppController : IDisposable
     }
     public void ApplySettings(Settings settings)
     {
+        if (Diagnostic && settings.CachePath.Length > 0) throw new InvalidDataException("Isolated checks use their temporary cache only.");
         if (settings.DockMonitor < 0) settings.DockMonitorIdentity = "";
         else if (settings.DockMonitorIdentity.Length == 0 || (settings.DockMonitor != Settings.DockMonitor && settings.DockMonitorIdentity == Settings.DockMonitorIdentity))
             settings.DockMonitorIdentity = MonitorService.All().ElementAtOrDefault(settings.DockMonitor)?.Identity ?? "";
-        StartupService.Apply(settings, settingsService.Save); Settings = settings;
+        if (Diagnostic) { settings.LaunchOnStartup = false; settingsService.Save(settings); }
+        else StartupService.Apply(settings, settingsService.Save);
+        Settings = settings;
         Repository.HistoryEnabled = settings.HistoryEnabled; Try(Repository.Persist);
-        Ui.Theme(settings.Theme); Hotkeys.Configure(settings, Hotkeys.Paused); cleanup.Interval = TimeSpan.FromMinutes(settings.CleanupMinutes); Dock.Refresh(); BuildTray();
+        Ui.Theme(settings.Theme); ConfigureHotkeys(Hotkeys.Paused); cleanup.Interval = TimeSpan.FromMinutes(settings.CleanupMinutes); Dock.Refresh(); BuildTray();
         SettingsChanged?.Invoke();
         if (Hotkeys.Warnings.Count > 0) Notify(string.Join("\n", Hotkeys.Warnings));
     }
+    internal void ConfigureHotkeys(bool paused) => Hotkeys.Configure(Settings, Diagnostic || paused);
     private void BuildTray()
     {
         var menu = new Forms.ContextMenuStrip();
@@ -246,16 +265,16 @@ internal sealed class AppController : IDisposable
         menu.Items.Add(new Forms.ToolStripSeparator());
         Item("Show screenshot shelf", Dock.Reveal); Item("Focus screenshot shelf (keyboard)", Dock.FocusShelf); Item("Open recent captures", ShowHistory); Item("Hotkey help / conflicts", () => MessageBox.Show(HotkeyRegistration.Guidance(Settings) + "\n\n" + string.Join("\n", Hotkeys.Warnings), "SnippyGrab · Hotkey help")); Item("Open settings", ShowSettings);
         Item("Restore pins", () => { foreach (var pin in pins.Values) pin.RestoreInteraction(); });
-        Item("Pause hotkeys", () => { Hotkeys.Configure(Settings, hotkeyPause.Toggle(Hotkeys.Paused)); BuildTray(); }, Hotkeys.Paused);
+        Item("Pause hotkeys", () => { ConfigureHotkeys(hotkeyPause.Toggle(Hotkeys.Paused)); BuildTray(); }, Hotkeys.Paused);
         Item("Clear temporary screenshots", ClearTemporary); Item("Retry history save", () => { Repository.Persist(); Notify("History saved. Cleanup can resume."); });
-        Item("Launch at Windows login", () => { var draft = System.Text.Json.JsonSerializer.Deserialize<Settings>(System.Text.Json.JsonSerializer.Serialize(Settings))!; draft.LaunchOnStartup = !StartupService.Enabled; ApplySettings(draft); }, StartupService.Enabled);
+        if (!Diagnostic) Item("Launch at Windows login", () => { var draft = System.Text.Json.JsonSerializer.Deserialize<Settings>(System.Text.Json.JsonSerializer.Serialize(Settings))!; draft.LaunchOnStartup = !StartupService.Enabled; ApplySettings(draft); }, StartupService.Enabled);
         Item("Last operation details", () => MessageBox.Show(lastNotice, "SnippyGrab · Operation details"));
         Item("About", () => MessageBox.Show("SnippyGrab " + BuildVersion.Display + "\nNative, local screenshot shelf. MIT licensed.\nNo uploads, accounts, analytics or update polling.\n\nPrint Screen: region · Ctrl+Shift+S: fallback\nCtrl-click: select several · Drag: attach files\nClick: edit · Alt-drag: reorder\n\nUnsigned build. See README for verification and limitations.", "SnippyGrab"));
         menu.Items.Add(new Forms.ToolStripSeparator()); Item("Exit", Exit);
         var old = tray.ContextMenuStrip; tray.ContextMenuStrip = menu; old?.Dispose();
     }
     private void DisplayChanged(object? sender, EventArgs e) => lifecycle.Post(() => Try(Dock.TopologyChanged));
-    private void PowerChanged(object sender, PowerModeChangedEventArgs e) { if (e.Mode == PowerModes.Resume) lifecycle.Post(() => Try(() => { Hotkeys.Configure(Settings, Hotkeys.Paused); Repository.Cleanup(DateTimeOffset.UtcNow, Settings.RetentionHours); Dock.TopologyChanged(); BuildTray(); if (Hotkeys.Warnings.Count > 0) Notify(string.Join("\n", Hotkeys.Warnings)); })); }
+    private void PowerChanged(object sender, PowerModeChangedEventArgs e) { if (e.Mode == PowerModes.Resume) lifecycle.Post(() => Try(() => { ConfigureHotkeys(Hotkeys.Paused); Repository.Cleanup(DateTimeOffset.UtcNow, Settings.RetentionHours); Dock.TopologyChanged(); BuildTray(); if (Hotkeys.Warnings.Count > 0) Notify(string.Join("\n", Hotkeys.Warnings)); })); }
     private void PreferencesChanged(object sender, UserPreferenceChangedEventArgs e) => lifecycle.Post(() => Ui.Theme(Settings.Theme));
     public async void Run(Func<Task> action) { try { await action(); } catch (Exception ex) { Failure(ex); } }
     public void Try(Action action) { try { action(); } catch (Exception ex) { Failure(ex); } }
@@ -287,7 +306,7 @@ internal sealed class AppController : IDisposable
     {
         exitRequested = true;
         var wasPaused = Hotkeys.Paused;
-        Hotkeys.Configure(Settings, true);
+        ConfigureHotkeys(true);
         try
         {
             foreach (var editor in editors.Values.ToArray())
@@ -300,7 +319,7 @@ internal sealed class AppController : IDisposable
         finally
         {
             exitRequested = false;
-            if (!Exiting) Hotkeys.Configure(Settings, wasPaused);
+            if (!Exiting) ConfigureHotkeys(wasPaused);
         }
     }
     public void Dispose()

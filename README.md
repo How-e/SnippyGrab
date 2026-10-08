@@ -2,15 +2,17 @@
 
 A native Windows screenshot shelf for AI and developer workflows.
 
+Current acceptance: **2 required gates open / 49 checked** after owner receiver acceptance and waiver of version details; see [the current acceptance record](docs/FINAL-FOUR-ACCEPTANCE-20261007.md). Stable remains blocked by Q01/Q44.
+
 **Print Screen → select → release → paste or drag.** Captures land on the clipboard and a small transparent shelf. Click to annotate, Ctrl-click several images to attach together, or copy terminal errors with local OCR.
 
 .NET 10, WPF and Win32. No Electron, account, telemetry or cloud dependency.
 
-**0.1.0 alpha:** runnable implementation with unit, integration and interactive synthetic checks. Real Codex/ChatGPT receiver acceptance and the full hardware matrix remain release gates. [Verification](docs/VALIDATION.md) · [Architecture](docs/ARCHITECTURE.md) · [Desktop acceptance](docs/ACCEPTANCE.md)
+**0.1.0 alpha:** runnable implementation with unit, integration and interactive synthetic checks. Receiver acceptance and available hardware scope are accepted by the owner; exact receiver versions and wider hardware coverage remain limitations. [Verification](docs/VALIDATION.md) · [Architecture](docs/ARCHITECTURE.md) · [Desktop acceptance](docs/ACCEPTANCE.md)
 
-The [latest local acceptance record](docs/TAKEOVER-ACCEPTANCE.md) separates short automated checks and real isolated WPF interaction from unperformed receiver/hardware tests. There are still 37 open acceptance gates; stable readiness is not established.
+The [historical hosted review](docs/REMAINING-WORK.md) records GitHub checks/protection and the first alpha publication. [Current acceptance](docs/FINAL-FOUR-ACCEPTANCE-20261007.md) records remaining performance/release gates and current startup/OCR measurements. Stable readiness is not established. Earlier reviews retain their own historical counts and verification boundaries.
 
-[Remaining work queue](TASK_QUEUE.md) tracks incomplete requirements and review findings. [User testing checklist](docs/USER-TESTING.md) explains the interactive checks requested from contributors; start with immediate Codex paste and single/multiple-image drag.
+[Remaining work queue](TASK_QUEUE.md) tracks incomplete requirements and review findings. [User testing checklist](docs/USER-TESTING.md) records accepted interaction behavior. The next owner step is the same-machine capture/clipboard timing comparison in the current acceptance record.
 
 ## Preview
 
@@ -22,7 +24,9 @@ Synthetic content rendered by the actual WPF interface; no private captures.
 
 ![Minimal first-run setup](docs/images/welcome.png)
 
-A capture-to-Codex GIF will be added after external receiver acceptance.
+Illustrated capture-to-Codex workflow, using synthetic content. This animation is a diagram, not a recording of an acceptance test.
+
+![Illustrated capture-to-Codex workflow](docs/images/capture-to-codex.gif)
 
 ## Installation
 
@@ -36,7 +40,7 @@ Initial builds are unsigned; SmartScreen may prompt. Compare `Get-FileHash <down
 
 ## Usage
 
-The app lives in the tray. Closing a window keeps it running; **Exit** stops it. Double-click the tray icon to capture. First run offers a brief introduction and optional login startup.
+The app lives in the tray. Closing a window keeps it running; **Exit** stops it. Double-click the tray icon to capture. First run explains the Windows Print Screen prerequisite, opens Keyboard settings on request, and lets you choose a Pictures / PNG export folder and optional login startup. The export folder defaults to your Windows Pictures folder; Browse chooses another location. Captures remain in the temporary cache until explicitly exported.
 
 - Capture and immediately **Ctrl+V** into an application accepting clipboard images.
 - Drag a thumbnail to attach its temporary PNG file.
@@ -102,14 +106,14 @@ OCR provisioning pins model commit and SHA-256; NuGet versions/hashes are locked
 
 On an idle interactive desktop, run the executable with `--self-test C:/absolute/checks.json` or `--benchmark C:/absolute/benchmarks.json`. These temporarily show synthetic windows and move the pointer; ordinary tests need no interactive desktop.
 
-CI builds/tests, verifies formatting and audits dependencies. CodeQL runs separately. Tags publish ZIP + SHA-256 once a remote exists. [Release guide](docs/RELEASING.md)
+CI builds/tests, verifies formatting and audits dependencies. CodeQL runs separately. The configured GitHub repository protects main and version tags. Tag workflows build and publish ZIP/setup + SHA-256; the initial upload required manual recovery and its correction is merged. [Release guide](docs/RELEASING.md)
 
 ## Known limitations
 
-- Alpha: actual Codex/ChatGPT/VS Code/browser drop and paste acceptance is pending; receiver support varies.
+- Alpha: the owner reported successful Codex/ChatGPT/VS Code/browser drop and paste. Exact-version, selection/order and delayed-read acceptance remains incomplete; receiver support varies.
 - GDI produces SDR; HDR colors can differ. Window capture uses visible pixels, without reconstructing occluded/minimized/protected windows.
-- Physical selections passed at 100% and 150% on the connected mixed-DPI layout. 125/175/200%, vertical/HDR screens, Explorer restart, sleep/resume, text scaling and prolonged stress need acceptance.
-- A short fresh-process sample measured about 128 MB tray working set. Long-term resources and startup latency need more benchmarking; .NET packaging is larger than a C++ utility. The user-run [two-hour resource test instructions](docs/RESOURCE-TESTING.md) provide the packaged command and reporting criteria.
+- Physical selections passed at 100% and 150% on the connected mixed-DPI layout. Owner acceptance covers the available layout and current accessibility configuration. 125/175/200%, vertical/HDR screens and other text-scale/assistive-technology configurations remain unverified compatibility limits; the owner accepted this narrower scope. Explorer restart, sleep/resume and all-day behavior remain unverified.
+- A short fresh-process sample measured about 128 MB tray working set. The [two-hour synthetic resource test](docs/RESOURCE-REVIEW-20261007.md) passes; all-day use and startup latency need more benchmarking; .NET packaging is larger than a C++ utility. The user-run [two-hour resource test instructions](docs/RESOURCE-TESTING.md) provide the packaged command and reporting criteria.
 - Undo is bounded to 20 states; large crop/effect histories can consume substantial memory. Annotation counts and imported sizes are bounded.
 - Transfers protect sources for 24 hours. Session-only cleans on normal exit while preserving pins/transfers; crashes fall back to retention.
 - User-profile ACLs protect normal cache access. Files are not encrypted or securely erased.

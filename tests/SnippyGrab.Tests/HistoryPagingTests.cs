@@ -46,5 +46,35 @@ public sealed class HistoryPagingTests : IDisposable
         record.DimensionsPending = true; BinaryPrimitives.WriteInt32BigEndian(header.AsSpan(16), int.MaxValue); File.WriteAllBytes(path, header);
         Assert.Throws<InvalidDataException>(() => repository.ResolveDimensions(record));
     }
+    [Fact]
+    public void FailedManifestReplacementKeepsPinsAndCompactsOnlyAbandonedPages()
+    {
+        var fail = false;
+        var repository = new CaptureRepository(root, (path, bytes) =>
+        {
+            if (fail && path.EndsWith("history.json", StringComparison.Ordinal)) throw new IOException("injected manifest replacement failure");
+            AtomicFile.Write(path, bytes);
+        });
+        for (var i = 0; i < 1025; i++) File.WriteAllBytes(Path.Combine(root, "capture-" + Guid.NewGuid().ToString("N") + ".png"), [1]);
+        repository.Load(); var pin = repository.Captures[700]; repository.SetPinned(pin, true);
+        var manifestPath = Path.Combine(root, "history.json"); var manifest = File.ReadAllBytes(manifestPath);
+        var referenced = JsonSerializer.Deserialize<RepositoryState>(manifest)!.Pages;
+        fail = true;
+        Assert.Throws<IOException>(() => repository.SetPinned(repository.Captures[0], true));
+        Assert.Equal(manifest, File.ReadAllBytes(manifestPath));
+        var reopened = new CaptureRepository(root); reopened.Load();
+        Assert.False(reopened.CleanupBlocked); Assert.Equal(1025, reopened.Captures.Count);
+        Assert.Contains(reopened.Captures, c => c.Id == pin.Id && c.Pinned);
+        Assert.Single(reopened.Captures, c => c.Pinned);
+        var abandoned = Directory.GetFiles(root, "history-page-*.json").Where(p => !referenced.Contains(Path.GetFileName(p))).ToArray();
+        Assert.NotEmpty(abandoned);
+        foreach (var page in Directory.GetFiles(root, "history-page-*.json")) File.SetLastWriteTimeUtc(page, DateTime.UtcNow.AddDays(-2));
+        Assert.Equal(0, reopened.Cleanup(DateTimeOffset.UtcNow, -1));
+        Assert.All(abandoned, path => Assert.False(File.Exists(path)));
+        Assert.All(referenced, name => Assert.True(File.Exists(Path.Combine(root, name))));
+        var final = new CaptureRepository(root); final.Load();
+        Assert.False(final.CleanupBlocked); Assert.Equal(1025, final.Captures.Count);
+        Assert.Contains(final.Captures, c => c.Id == pin.Id && c.Pinned);
+    }
     public void Dispose() { if (Directory.Exists(root)) Directory.Delete(root, true); }
 }

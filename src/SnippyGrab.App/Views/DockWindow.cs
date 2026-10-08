@@ -33,6 +33,10 @@ internal sealed class DockWindow : Window
     internal int RebuildCount { get; private set; }
     internal int CardBuildCount { get; private set; }
     internal int ThumbnailDecodeCount { get; private set; }
+    internal void ResetPreviewCachesForCheck()
+    {
+        cards.RemoveWhere(_ => true); thumbnails.RemoveWhere(_ => true);
+    }
     internal bool Expanded => expanded;
     internal int SelectionCount => selected.Count;
     internal int CachedThumbnailCount => thumbnails.Count;
@@ -261,7 +265,7 @@ internal sealed class DockWindow : Window
                     controller.DragDrop.Drag(border, visible.Where(c => selected.Contains(c.Id)).ToList());
                 }
             }
-            catch (Exception ex) { controller.Notify("Drag could not complete: " + ex.Message); }
+            catch (Exception ex) { controller.Failure(ex); }
             finally { pressed = null; dragging = false; Rebuild(); collapseTimer.Start(); }
         };
         border.MouseLeftButtonUp += (_, e) =>

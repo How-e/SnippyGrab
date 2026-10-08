@@ -9,6 +9,14 @@ internal sealed class HotkeyService : IDisposable
     private readonly Dictionary<int, CaptureMode> active = [];
     public List<string> Warnings { get; } = [];
     public bool Paused { get; private set; }
+    internal static bool WindowsPrintScreenCaptureEnabled
+    {
+        get
+        {
+            using var keyboard = Registry.CurrentUser.OpenSubKey(@"Control Panel\Keyboard");
+            return keyboard?.GetValue("PrintScreenKeyForSnippingEnabled", 0) is int enabled && enabled == 1;
+        }
+    }
     public event Action<CaptureMode>? Capture;
     public event Action? TaskbarRestored;
     [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
@@ -23,8 +31,7 @@ internal sealed class HotkeyService : IDisposable
         Warnings.Clear();
         foreach (var entry in HotkeyRegistration.Register(settings, (id, key) => Native.RegisterHotKey(source.Handle, id, key.Modifiers, key.Key), Warnings))
             active[entry.Key] = entry.Value;
-        using var keyboard = Registry.CurrentUser.OpenSubKey(@"Control Panel\Keyboard");
-        if (Convert.ToInt32(keyboard?.GetValue("PrintScreenKeyForSnippingEnabled", 0)) == 1)
+        if (WindowsPrintScreenCaptureEnabled)
             Warnings.Add(HotkeyRegistration.Guidance(settings));
     }
     private nint Hook(nint hwnd, int message, nint wParam, nint lParam, ref bool handled)

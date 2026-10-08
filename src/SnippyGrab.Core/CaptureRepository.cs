@@ -181,21 +181,33 @@ public sealed partial class CaptureRepository
         if (!state.Captures.Contains(record) || (expectedRevision is not null && record.FileName != expectedRevision)) throw new InvalidOperationException("Capture changed in another view. Reopen the editor before applying changes.");
         // Immutable file identity keeps existing receiver/clipboard payloads intact after editing.
         var name = "capture-" + Guid.NewGuid().ToString("N") + ".png";
-        write(PathForName(name), png);
+        var revisionPath = PathForName(name);
+        write(revisionPath, png);
         sessionFiles.Add(name);
         var previous = (record.FileName, record.Width, record.Height, record.Edited, record.DimensionsPending);
         state.Superseded[record.FileName] = clock();
         record.FileName = name; record.Width = width; record.Height = height; record.Edited = true; record.DimensionsPending = false;
-        try { Persist(); }
+        try { PersistState(); }
         catch
         {
             state.Superseded.Remove(previous.FileName);
             (record.FileName, record.Width, record.Height, record.Edited, record.DimensionsPending) = previous;
+            // This revision was never committed or published to views/transfers. Do not recover
+            // its failed edit as a separate capture on the next launch.
+            try { if (SafeFile(revisionPath)) File.Delete(revisionPath); }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
             throw;
         }
         RevisionChanged?.Invoke(record);
+        Changed?.Invoke();
     }
     public void Persist()
+    {
+        PersistState();
+        Changed?.Invoke();
+    }
+    private void PersistState()
     {
         ManagedPath.RejectRedirects(root);
         try
@@ -210,7 +222,6 @@ public sealed partial class CaptureRepository
             write(metadata, SerializeState()); PersistencePending = false;
         }
         catch { PersistencePending = true; throw; }
-        Changed?.Invoke();
     }
     public void ProbeWritable()
     {

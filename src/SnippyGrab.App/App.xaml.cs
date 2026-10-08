@@ -11,6 +11,28 @@ public partial class App : Application
     {
         base.OnStartup(e);
         Native.SetDefaultDllDirectories(0x1000); // Default safe locations; never the working directory.
+        if (e.Args.Contains("--check-startup-latency"))
+        {
+            var report = e.Args.SkipWhile(a => a != "--check-startup-latency").Skip(1).FirstOrDefault();
+            if (report is null) { Shutdown(1); return; }
+            try { await StartupLatencyChecks.Run(report); Shutdown(0); }
+            catch (Exception ex) { File.WriteAllText(report, "FAILED: " + ex); Shutdown(1); }
+            return;
+        }
+        if (e.Args.Contains("--check-transfer-crash"))
+        {
+            var args = e.Args.SkipWhile(a => a != "--check-transfer-crash").Skip(1).ToArray();
+            if (args.Length < 2) { Shutdown(1); return; }
+            try
+            {
+                if (args[0] == "hold") await TransferCrashChecks.Hold(args[1]);
+                else if (args[0] == "verify" && args.Length == 3) TransferCrashChecks.Verify(args[1], args[2]);
+                else throw new ArgumentException("Expected hold root or verify root report.");
+                Shutdown(0);
+            }
+            catch (Exception ex) { if (args.Length == 3) File.WriteAllText(args[2], "FAILED: " + ex); Shutdown(1); }
+            return;
+        }
         if (e.Args.Contains("--check-resource-stress"))
         {
             var args = e.Args.SkipWhile(a => a != "--check-resource-stress").Skip(1).ToArray();
@@ -34,6 +56,12 @@ public partial class App : Application
             try { await EditorPerformanceChecks.Run(report); Shutdown(0); }
             catch (Exception ex) { File.WriteAllText(report, "FAILED: " + ex); Shutdown(1); }
             return;
+        }
+        if (e.Args.Contains("--p0-acceptance"))
+        {
+            var args = e.Args.SkipWhile(a => a != "--p0-acceptance").Skip(1).ToArray();
+            if (args.Length is < 1 or > 2) { Shutdown(1); return; }
+            controller = P0AcceptanceChecks.Open(args[0], args.Length == 2 ? args[1] : null); return;
         }
         if (e.Args.Contains("--interactive-check"))
         {
@@ -68,7 +96,7 @@ public partial class App : Application
         if (!created) { Shutdown(); return; }
         DispatcherUnhandledException += OnUnhandled;
         try { controller = new(e.Args.Contains("--background")); }
-        catch (Exception ex) { MessageBox.Show("SnippyGrab could not start: " + ex.Message, "SnippyGrab"); Shutdown(1); }
+        catch (Exception ex) { MessageBox.Show("SnippyGrab could not start. " + OperationFailure.From(ex).Message, "SnippyGrab"); Shutdown(1); }
     }
     private void OnUnhandled(object sender, DispatcherUnhandledExceptionEventArgs e)
     {

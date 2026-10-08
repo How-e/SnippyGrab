@@ -77,6 +77,8 @@ internal sealed class EditorWindow : Window
         surface.MouseLeftButtonDown += (_, e) =>
         {
             if (commits.Busy || documentWork is not null) return;
+            // Canvas gestures must leave text-input focus so document shortcuts work.
+            surface.Focus();
             var point = Clamp(e.GetPosition(surface));
             if (Tool == EditTool.ColorPicker) { controller.Run(() => PickColorAsync(point)); e.Handled = true; return; }
             if (Tool == EditTool.Magnify)
@@ -268,7 +270,8 @@ internal sealed class EditorWindow : Window
         }
         catch (Exception ex)
         {
-            controller.Notify("Editor remains open: " + ex.Message + " Retry close/Copy or choose Discard.");
+            status.Text = "Editor remains open. " + OperationFailure.From(ex).Message + " Retry close/Apply + copy or choose Discard.";
+            controller.Failure(ex);
             return false;
         }
     }

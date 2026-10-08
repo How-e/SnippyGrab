@@ -48,6 +48,18 @@ internal static class RuntimeChecks
         try
         {
             using var controller = new AppController(true, root, diagnostic: true);
+            var startupCommand = StartupService.Command;
+            var diagnosticSettings = JsonSerializer.Deserialize<Settings>(JsonSerializer.Serialize(controller.Settings))!;
+            diagnosticSettings.LaunchOnStartup = true;
+            controller.ApplySettings(diagnosticSettings);
+            Assert(!controller.Settings.LaunchOnStartup && StartupService.Command == startupCommand, "Diagnostic settings cannot change Windows startup registration");
+            controller.ConfigureHotkeys(false);
+            Assert(controller.Hotkeys.Paused, "Diagnostic hotkeys remain paused after settings/pause restoration");
+            diagnosticSettings = JsonSerializer.Deserialize<Settings>(JsonSerializer.Serialize(controller.Settings))!;
+            diagnosticSettings.CachePath = Path.Combine(root, "other-cache");
+            var cacheRejected = false;
+            try { controller.ApplySettings(diagnosticSettings); } catch (InvalidDataException) { cacheRejected = true; }
+            Assert(cacheRejected && controller.Settings.CachePath.Length == 0 && !Directory.Exists(diagnosticSettings.CachePath), "Diagnostic cache changes cannot escape the isolated root");
             var image = SyntheticCode(320, 160); var png = ImageService.Png(image);
             var record = controller.Repository.Add(png, 320, 160);
             var history = new HistoryWindow(controller) { ShowActivated = false, WindowStartupLocation = WindowStartupLocation.Manual, Left = -30000, Top = -30000 };
@@ -72,8 +84,18 @@ internal static class RuntimeChecks
                     Assert(File.ReadAllBytes(controller.Repository.PathFor(record)).SequenceEqual(large), "Preview quality preserves original PNG bytes");
                 }
                 controller.Settings.PreviewQuality = PreviewQuality.Sharp;
-                pin.Width = 1900; pin.Height = 900; pin.UpdateLayout(); await Task.Delay(250);
-                Assert(((BitmapSource)pinImage.Source).PixelWidth == 2240, "Resizing a pin decodes detail beyond the old fixed 800-pixel cap");
+                // Deliberately constrain the requested size so this regression also
+                // exercises monitor-style limits on larger local desktops.
+                pin.MaxWidth = 1000;
+                pin.Width = 1900; pin.Height = 900; pin.UpdateLayout();
+                // Windows can constrain the realized HWND to the runner's monitor.
+                // Verify detail for that physical width, rather than the requested DIP width.
+                var resizedWidth = (int)Math.Ceiling(Math.Max(800, pin.ActualWidth * VisualTreeHelper.GetDpi(pin).DpiScaleX));
+                var expectedResizedPreview = Math.Min(2240, ImageService.PreviewPixels(resizedWidth, PreviewQuality.Sharp));
+                var resizeDeadline = Stopwatch.StartNew();
+                while (((BitmapSource)pinImage.Source).PixelWidth != expectedResizedPreview && resizeDeadline.Elapsed < TimeSpan.FromSeconds(2)) await Task.Delay(50);
+                Assert(expectedResizedPreview > ImageService.PreviewPixels(800, PreviewQuality.Sharp) && ((BitmapSource)pinImage.Source).PixelWidth == expectedResizedPreview,
+                    $"Resizing a pin decodes detail beyond the old fixed 800-pixel cap (physical width={resizedWidth}, expected={expectedResizedPreview}, actual={((BitmapSource)pinImage.Source).PixelWidth})");
                 controller.Repository.SetPinned(record, false); controller.Repository.Cleanup(DateTimeOffset.UtcNow, 1, true);
                 Assert(File.Exists(controller.Repository.PathFor(record)), "Unpinned open view protects current source");
                 pin.Close(); controller.Repository.Cleanup(DateTimeOffset.UtcNow, 1, true); Assert(list.Items.Count == 0, "Pin close releases source and history removes cleaned rows");
@@ -91,6 +113,14 @@ internal static class RuntimeChecks
                 var work = editor.StartDocumentEdit(new(EditTool.Blur, new Point(20, 20), new Point(300, 140), Colors.Red, 3, 24, "", []));
                 var close = editor.RequestCloseAsync();
                 await work; Assert(await close && editedRecord.Edited && writes.Count == 2, "Close during worker effect waits and applies/copies final document");
+                await CheckFailedEditorClose(controller, png);
+                controller.Failure(new IOException("private-path-and-OCR-sentinel"));
+                Assert(!controller.LastOperationDetails.Contains("sentinel", StringComparison.Ordinal) && controller.LastOperationDetails.Contains("retry", StringComparison.OrdinalIgnoreCase), "Failure details are actionable without private exception payload");
+                Assert(!File.ReadAllText(Path.Combine(root, "diagnostics.log")).Contains("sentinel", StringComparison.Ordinal), "Diagnostics contain category/type instead of private exception payload");
+                var previousNotice = controller.LastOperationDetails;
+                controller.Failure(new OperationCanceledException("private-path-and-OCR-sentinel"));
+                Assert(controller.LastOperationDetails == previousNotice, "Cancellation does not replace the useful failure notice");
+                await CheckCapturePersistenceFailures(root, image, png);
                 Assert(Native.GetForegroundWindow() == foreground, "Reliability probe preserves foreground");
             }
             finally { pin.Close(); history.Close(); controller.Dock.Close(); }
@@ -101,6 +131,67 @@ internal static class RuntimeChecks
             var absolute = Path.GetFullPath(root);
             if (!absolute.StartsWith(Path.GetFullPath(Path.GetTempPath()), StringComparison.OrdinalIgnoreCase) || !Path.GetFileName(absolute).StartsWith("SnippyGrab-reliability-", StringComparison.Ordinal)) throw new InvalidOperationException("Unexpected reliability probe path.");
             Directory.Delete(absolute, true);
+        }
+    }
+    private static async Task CheckFailedEditorClose(AppController controller, byte[] png)
+    {
+        var record = controller.Repository.Add(png, 320, 160);
+        var otherRecord = controller.Repository.Add(png, 320, 160);
+        var editor = new EditorWindow(controller, record) { ShowActivated = false, Left = -30000, Top = -30000 };
+        var other = new EditorWindow(controller, otherRecord) { ShowActivated = false, Left = -30000, Top = -30000 };
+        var writes = 0;
+        controller.Clipboard = new ClipboardService(_ => writes++, _ => Task.CompletedTask);
+        editor.Show(); other.Show();
+        try
+        {
+            var original = record.FileName;
+            await editor.StartDocumentEdit(new(EditTool.Redact, new Point(20, 20), new Point(100, 100), Colors.Black, 3, 24, "", []));
+            using (var locked = new FileStream(Path.Combine(controller.Repository.Root, "history.json"), FileMode.Open, FileAccess.Read, FileShare.Read))
+            {
+                Assert(!await editor.RequestCloseAsync() && editor.IsVisible, "Failed metadata apply retains actual WPF editor");
+                Assert(record.FileName == original && !record.Edited && writes == 0, "Failed close preserves original revision and does not announce a copy");
+                Assert(await other.RequestCloseAsync(), "Separate clean editor can close during failed apply");
+            }
+            controller.Clipboard = new ClipboardService(_ => throw new COMException("Injected clipboard contention"), _ => Task.CompletedTask);
+            Assert(!await editor.RequestCloseAsync() && editor.IsVisible && record.Edited, "Exhausted clipboard retries retain saved edits and the editor");
+            var applied = record.FileName;
+            controller.Clipboard = new ClipboardService(_ => writes++, _ => Task.CompletedTask);
+            Assert(await editor.RequestCloseAsync() && record.FileName == applied && writes == 1, "Retry closes without duplicating the applied revision");
+        }
+        finally
+        {
+            foreach (var window in new[] { editor, other }.Where(w => w.IsVisible))
+                ((DockPanel)window.Content).Children.OfType<WrapPanel>().First().Children.OfType<Button>().Single(b => Equals(b.Content, "Discard")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        }
+    }
+    private static async Task CheckCapturePersistenceFailures(string parent, BitmapSource image, byte[] png)
+    {
+        foreach (var boundary in new[] { "png", "metadata" })
+        {
+            var root = Path.Combine(parent, "storage-" + boundary);
+            new SettingsService(Path.Combine(root, "settings.json")).Save(new Settings { FirstRunComplete = true, Animate = false, AutoCopy = true });
+            var fail = false;
+            using var controller = new AppController(true, root, diagnostic: true, storageWriter: (path, bytes) =>
+            {
+                if (fail && (boundary == "png" ? path.EndsWith(".png", StringComparison.Ordinal) : path.EndsWith("history.json", StringComparison.Ordinal))) throw new IOException("injected storage failure");
+                AtomicFile.Write(path, bytes);
+            });
+            var copies = 0; var refreshes = 0;
+            controller.Clipboard = new ClipboardService(data => { Assert(data.GetDataPresent(DataFormats.Bitmap) && data.GetDataPresent("PNG"), "Fallback retains image and PNG clipboard formats"); copies++; }, _ => Task.CompletedTask);
+            fail = true;
+            await controller.PreserveCaptureAsync(image, png, "synthetic", () => refreshes++);
+            Assert(copies == 1, "Capture reaches clipboard despite PNG or metadata storage failure");
+            if (boundary == "png") Assert(controller.Repository.Captures.Count == 0 && refreshes == 0, "Failed PNG creates no misleading shelf record");
+            else
+            {
+                Assert(controller.Repository.Captures.Count == 1 && refreshes == 1 && controller.Repository.PersistencePending, "Metadata failure preserves shelf pixels with cleanup paused");
+                Assert(controller.Repository.Cleanup(DateTimeOffset.UtcNow, 1, true) == 0, "Pending history cannot authorize cleanup");
+            }
+            fail = false; controller.Repository.Persist();
+            Assert(!controller.Repository.PersistencePending, "History retry clears persistence warning state");
+            await controller.PreserveCaptureAsync(image, png, "synthetic", () => refreshes++);
+            Assert(copies == 2 && refreshes > 0, "Capture can be retried after storage recovers");
+            controller.Dispose(); controller.Dock.Close();
         }
     }
     public static async Task CheckEditorLayout(string destination)
@@ -189,6 +280,7 @@ internal static class RuntimeChecks
                     foreach (var orientation in Enum.GetValues<DockOrientation>())
                     {
                         controller.Settings.Corner = corner; controller.Settings.Orientation = orientation;
+                        dock.ResetPreviewCachesForCheck();
                         dock.SetExpanded(false); dock.Reveal(); await Task.Delay(35); dock.UpdateLayout();
                         var panel = (StackPanel)((Border)dock.Content).Child;
                         var id = controller.Repository.Captures[0].Id;
@@ -198,6 +290,19 @@ internal static class RuntimeChecks
                         dock.SetExpanded(true); await Task.Delay(35); dock.UpdateLayout();
                         var after = Primary().PointToScreen(new Point(Primary().ActualWidth / 2, Primary().ActualHeight / 2));
                         Assert(Math.Abs(before.X - after.X) <= 1 && Math.Abs(before.Y - after.Y) <= 1, "Primary card anchor survives expansion");
+                        var samples = new List<Point>();
+                        for (var cycle = 0; cycle < 3; cycle++)
+                        {
+                            dock.SetExpanded(false); await Task.Delay(20);
+                            dock.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = Mouse.MouseEnterEvent });
+                            for (var sample = 0; sample < 4; sample++)
+                            {
+                                await Task.Delay(20); dock.UpdateLayout();
+                                var center = Primary().PointToScreen(new Point(Primary().ActualWidth / 2, Primary().ActualHeight / 2));
+                                Assert(Math.Abs(center.X - before.X) <= 1 && Math.Abs(center.Y - before.Y) <= 1, "Repeated cold/warm hover samples keep primary anchor stable");
+                                samples.Add(center);
+                            }
+                        }
                         Native.GetWindowRect(new WindowInteropHelper(dock).Handle, out var rect);
                         Assert(((SolidColorBrush)((Border)dock.Content).Background).Color.A > 0 && panel.Background == Brushes.Transparent, "Continuous nonzero-alpha hover surface");
                         Assert(dock.InputHitTest(new Point(1, 1)) is not null, "Hover route includes window padding");
@@ -212,6 +317,7 @@ internal static class RuntimeChecks
                             Assert(dock.InputHitTest(local) is not null, "Card is reachable through the hover surface");
                         }
                         var rebuilds = dock.RebuildCount;
+                        var warmBuilds = dock.CardBuildCount; var warmDecodes = dock.ThumbnailDecodeCount;
                         for (var i = 0; i < 5; i++) dock.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = Mouse.MouseEnterEvent });
                         Assert(dock.RebuildCount == rebuilds, "Repeated enter does not rebuild expanded cards");
                         dock.ToggleSelection(id);
@@ -220,9 +326,10 @@ internal static class RuntimeChecks
                         Assert(!dock.Expanded && dock.SelectionCount == 1, "Pointer leave collapses without losing selection");
                         dock.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = Mouse.MouseEnterEvent });
                         Assert(dock.Expanded && dock.SelectionCount == 1, "Re-entry preserves expansion and selection");
+                        Assert(dock.CardBuildCount == warmBuilds && dock.ThumbnailDecodeCount == warmDecodes, "Warm hover and selection reuse cards and decoded thumbnails");
                         Assert(dock.CachedCardCount <= 5 && dock.CachedThumbnailCount <= 12, "Bounded dock caches");
                         dock.ToggleSelection(id);
-                        results.Add(new { count, corner, orientation, PrimaryAnchorStable = true, WarmCycleCardBuilds = dock.CardBuildCount - buildsBefore, ThumbnailDecodes = dock.ThumbnailDecodeCount - decodesBefore });
+                        results.Add(new { count, corner, orientation, Animate = controller.Settings.Animate, controller.Settings.DockOpacity, ColdCachesReset = true, AnchorSamples = samples, PrimaryAnchorStable = true, WarmCycleCardBuilds = dock.CardBuildCount - buildsBefore, ThumbnailDecodes = dock.ThumbnailDecodeCount - decodesBefore });
                     }
             }
             var hoverBuilds = results.ToArray();
@@ -251,6 +358,11 @@ internal static class RuntimeChecks
             dock.HandleKey(Key.Space, ModifierKeys.None); Assert(dock.SelectionCount == 3, "Keyboard multiple selection survives scrolling");
             dock.HandleKey(Key.Escape, ModifierKeys.None); Assert(dock.SelectionCount == 0 && !dock.Expanded, "Escape clears selection and collapses");
             dock.HandleKey(Key.Home, ModifierKeys.None);
+            actions.Clear();
+            Assert(!dock.HandleKey(Key.Delete, ModifierKeys.Control) && !dock.HandleKey(Key.Enter, ModifierKeys.Alt) && !dock.HandleKey(Key.C, ModifierKeys.None) && actions.Count == 0, "Unassigned key modifiers cannot invoke unrelated actions");
+            var focusedBeforeHover = dock.FocusedCapture;
+            dock.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = Mouse.MouseEnterEvent });
+            Assert(dock.FocusedCapture == focusedBeforeHover && !dock.IsKeyboardFocusWithin, "Raised hover does not acquire keyboard focus");
             dock.CommandSinkOverride = null;
             foreach (var thumbnailSize in new[] { 120, 180, 224 })
             {
@@ -263,6 +375,7 @@ internal static class RuntimeChecks
                 }
             }
             Snapshot(dock, Path.Combine(Path.GetDirectoryName(Path.GetFullPath(destination))!, "dock-layout-synthetic.png"));
+            AtomicFile.Write(destination + ".layout.json", JsonSerializer.SerializeToUtf8Bytes(new { Result = "LAYOUT_PASS_ENVIRONMENT_PENDING", Layouts = hoverBuilds, ScrolledItems = 20, RevisionInvalidation = true, KeyboardCommandRouting = true, CachedCards = dock.CachedCardCount, CachedThumbnails = dock.CachedThumbnailCount, Scope = "All structural assertions passed; final foreground/pointer preservation has not yet been checked. This checkpoint is not an overall probe PASS." }, new JsonSerializerOptions { WriteIndented = true }));
             Assert(Native.GetForegroundWindow() == foreground, "Dock probe preserves foreground");
             Native.GetCursorPos(out var afterPointer); Assert(afterPointer.X == pointer.X && afterPointer.Y == pointer.Y, "Dock probe never moves pointer");
             controller.Dispose(); dock.Close();
@@ -438,7 +551,7 @@ internal static class RuntimeChecks
         var thumb = ImageService.Load(repository.PathFor(record), 448);
         return new { Width = width, Height = height, PngBytes = png.Length, EncodeMs = encoded, EncodeAndStorageMs = stored, EncodeStorageThumbnailMs = watch.ElapsedMilliseconds, ThumbnailWidth = thumb.PixelWidth };
     }
-    private static BitmapSource SyntheticCode(int width, int height)
+    internal static BitmapSource SyntheticCode(int width, int height)
     {
         var visual = new DrawingVisual();
         using (var dc = visual.RenderOpen())

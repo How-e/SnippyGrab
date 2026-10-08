@@ -369,3 +369,9 @@ Keep the current app running; no rebuild/restart. Use a synthetic screenshot wit
 4. Export as tools-after.png (do not overwrite tools-before.png), then Apply + copy and paste into an unsent draft. Open the exported PNG outside SnippyGrab: all marks/effects/crop must be flattened correctly and match shelf/pasted output. Reopen tools-before.png: unchanged original pixels. Close the applied editor normally.
 
 Report PASS/FAIL for steps 1–4, naming any failed tool/gesture or pixel/coordinate mismatch. Broader performance/accessibility/hardware remain separate gates; no external file transfer or prolonged stress repetition is needed.
+
+## Q20 — complete required editor tool acceptance
+
+Owner reports steps 1–4 PASS on the current running acceptance application: all required Arrow/Rectangle/Ellipse/Line/Freehand/Text/Highlighter/Numbered marker tools with both drag directions; Undo/Redo and replacement undo branch; zoomed point alignment and reversed crop plus later annotation; Blur/Pixelate/Solid redaction with reversed effects and undo/redo; flattened PNG matches shelf/pasted output and prior tools-before.png remains unchanged. Exact package version was not separately restated; source was unchanged throughout these owner checks.
+
+**Q20 PASS / CLOSED** for required tool/document/flattened-output criteria, combining owner gestures with 15 EditorDocumentTests PASS (recorded focused rerun), including opaque redaction pixels, crop coordinates, undo branches and immutable old transferred/exported revisions. Broader accessibility/performance/hardware remain Q19/Q23/Q31/Q32/Q34. Queue: **21 required gates open; 30 entries checked**. No source change or rebuild. Owner requests multiple independent acceptance gates together; subsequent handoffs should batch compatible tests and preserve PASS/FAIL/NOT AVAILABLE per gate.

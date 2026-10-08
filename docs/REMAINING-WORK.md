@@ -1,3 +1,5 @@
+Latest owner editor-tool steps 1–4 PASS closes Q20 with document/render regressions. **21 required gates open / 30 checked**. Batch multiple independent next gates as requested; preserve running build. See [closure evidence](NEXT-GATE-ACCEPTANCE-20261007.md).
+
 Latest owner expiry/restoration steps 1–4 PASS closes Q05. **22 required gates open / 29 checked**. Preserve running build; no rebuild. See [closure evidence](NEXT-GATE-ACCEPTANCE-20261007.md).
 
 Latest owner pin steps 1–4 PASS closes Q04/Q22 with recorded lease/revision regressions; Q29 interaction subset PASS. **23 required gates open / 28 checked**. Broader pin persistence/hardware and Q05 expiry restoration remain OPEN. No rebuild. See [closure evidence](NEXT-GATE-ACCEPTANCE-20261007.md).

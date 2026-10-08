@@ -213,6 +213,30 @@ public sealed class ImageIntegrationTests
         });
     }
     [Fact]
+    public void SingleImageDragPreservesStoredPngBytesAndMetadata()
+    {
+        Sta(() =>
+        {
+            var root = Path.Combine(Path.GetTempPath(), "SnippyGrab-drag-bytes-" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                var metadata = new BitmapMetadata("png"); metadata.SetQuery("/tEXt/{str=Description}", "Synthetic transfer fixture");
+                var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(Synthetic(), null, metadata, null));
+                using var encoded = new MemoryStream(); encoder.Save(encoded); var bytes = encoded.ToArray();
+                var repository = new CaptureRepository(root); var record = repository.Add(bytes, 160, 100);
+                var data = new DragDropService(repository).BuildData([record]);
+                Assert.Equal(new[] { repository.PathFor(record) }, Assert.IsType<string[]>(data.GetData(DataFormats.FileDrop)));
+                Assert.True(data.GetDataPresent(DataFormats.Bitmap));
+                var png = Assert.IsType<MemoryStream>(data.GetData("PNG")); Assert.Equal(bytes, png.ToArray());
+                var originalPath = repository.PathFor(record);
+                repository.Replace(record, ImageService.Png(Synthetic()), 160, 100);
+                Assert.Equal(bytes, png.ToArray()); Assert.Equal(bytes, File.ReadAllBytes(originalPath));
+            }
+            finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+            return true;
+        });
+    }
+    [Fact]
     public async Task OcrRecognizesSyntheticErrorWithoutDesktop()
     {
         var bytes = Sta(() =>

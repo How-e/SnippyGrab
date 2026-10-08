@@ -1,3 +1,5 @@
+Latest owner expiry/restoration steps 1–4 PASS closes Q05. **22 required gates open / 29 checked**. Preserve running build; no rebuild. See [closure evidence](NEXT-GATE-ACCEPTANCE-20261007.md).
+
 Latest owner pin steps 1–4 PASS closes Q04/Q22 with recorded lease/revision regressions; Q29 interaction subset PASS. **23 required gates open / 28 checked**. Broader pin persistence/hardware and Q05 expiry restoration remain OPEN. No rebuild. See [closure evidence](NEXT-GATE-ACCEPTANCE-20261007.md).
 
 Latest owner Q09/Q19 fallback/help, capture/copy, pause preservation and held-key/tray steps 1–3 PASS. Q09 actual conflict/first-run and Q19/Q32 broader accessibility remain OPEN; **25 required gates open / 26 checked**. Preserve the running build. See [owner evidence](USER-TESTING.md).

@@ -114,7 +114,7 @@ Agent work: Added isolated fake-clock batch-restore failure/restart/retry and re
 
 Checks: CaptureRestoreTests plus existing expired-restore test 3/3 PASS: immediate visibility, exact 30-minute expiry, storage-age reset, full batch rollback and persistence across restart.
 
-Status / remaining acceptance: OPEN: actual Recent captures Restore and detached Return to shelf interaction shows expired image immediately; verify configured shelf lifetime in the rendered workflow. Data/lifetime behavior passes.
+Status / remaining acceptance: CLOSED for Q05 after owner steps 1–4 PASS on 2026-10-07 for History To shelf and detached Return to shelf after actual one-minute expiry, immediate correct-image restoration, original timestamp preservation and fresh shelf lifetime. Original settings restored. Combine with the rollback/restart/lifetime regressions above; see NEXT-GATE-ACCEPTANCE-20261007.md.
 
 ## Q06
 

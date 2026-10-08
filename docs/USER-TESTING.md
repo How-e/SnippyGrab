@@ -352,3 +352,9 @@ Keep the existing acceptance app open; no build/restart. Allow about four minute
 4. Restore your original Shelf lifetime minutes and Remember unpinned capture history settings; ensure EXPIRE TEST is unpinned and no floating test view remains. Normal capture and History remain usable.
 
 Report PASS/FAIL for steps 1–4 and any missing/restored-wrong image, changed original timestamp or early/failed expiry. Existing fake-clock/rollback/restart regressions cover storage behavior; these checks establish the actual rendered History/Return-to-shelf restoration path.
+
+## Q05 — actual expired restore and fresh lifetime closure
+
+Owner reports steps 1–4 PASS on the existing running acceptance app: unpinned EXPIRE TEST disappears after a one-minute lifetime when revealed/refreshed but remains in History; History To shelf restores the correct image immediately with original capture timestamp, stays visible after 20 seconds and expires again after 70 seconds; detached/unpinned expired capture remains usable and Return to shelf closes its floating view and immediately restores the correct image without changing original timestamp; original history/lifetime settings are restored and normal capture/history remains usable. Exact running version was not separately restated; preserve the running tested package.
+
+**Q05 PASS / CLOSED**, combining these owner rendered workflows with CaptureRestoreTests/expired-restore regressions for exact fresh visibility lifetime, retention/storage-age reset, original capture-time order, batch rollback/retry and restart persistence. Focused CaptureRestoreTests rerun PASS (2 tests). Current queue: **22 required gates open; 29 entries checked**. No application source changes or rebuild. Q29 broader history/pin persistence and hardware, Q13 retention during external transfers and Q19/Q32 broader accessibility stay separate.

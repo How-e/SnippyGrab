@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.0-alpha.acceptance.20261007.8 — 2026-10-07
+
+- Added an explicitly illustrated, privacy-safe capture-to-Codex workflow animation at the owner's request.
+- Recorded owner native receiver acceptance with receiver/version details waived, and accepted the measured region/clipboard performance scope. SnippyGrab median/p95 was 48.6/81.3 ms over ten captures; Snipping Tool was 62.6/1585.3 ms on the same host with varied regions.
+- Added a passive timing collector that saves timing and clipboard format availability without reading image contents or injecting input. Exact hotkey-overlay distributions, cold boot and physical 4K/8K workflow remain unmeasured.
+- Two required gates remain: final release-upload acceptance and milestone reconciliation. Stable readiness is not yet claimed.
+
 ## 0.1.0-alpha.acceptance.20261007.7 — 2026-10-07
 
 - First-run setup prominently prompts users to disable Windows Print Screen screen capture and offers a button to open Keyboard settings.

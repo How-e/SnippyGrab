@@ -1,3 +1,5 @@
+Current acceptance: **2 required gates open / 49 checked**. Q12 CLOSED by owner native receiver PASS and explicit receiver/version-detail waiver. Q34 CLOSED by owner performance acceptance; Q44/Q01 remain OPEN. Workflow animation replaces the real-recording requirement at owner request. See [current evidence](FINAL-FOUR-ACCEPTANCE-20261007.md). Earlier counts below are historical.
+
 # Acceptance continuation — 2026-10-07
 
 Latest status: **4 required gates OPEN / 47 checked** after owner fresh-Windows-11 VM acceptance and explicit closure of Q07/Q09/Q13/Q25/Q27/Q41. No extra programs/extensions were required in the reported fresh environment. See [VM acceptance and setup changes](VM-ACCEPTANCE-20261007.md) for evidence boundaries and the two requested first-run improvements. Counts below describe earlier snapshots.

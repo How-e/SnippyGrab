@@ -2,17 +2,17 @@
 
 A native Windows screenshot shelf for AI and developer workflows.
 
-Current acceptance: **4 required gates open / 47 checked** after owner fresh-Windows-11 VM acceptance; see [the VM acceptance record](docs/VM-ACCEPTANCE-20261007.md). Earlier dated counts below are historical. Stable remains blocked by Q01/Q12/Q34/Q44.
+Current acceptance: **2 required gates open / 49 checked** after owner receiver acceptance and waiver of version details; see [the current acceptance record](docs/FINAL-FOUR-ACCEPTANCE-20261007.md). Stable remains blocked by Q01/Q44.
 
 **Print Screen → select → release → paste or drag.** Captures land on the clipboard and a small transparent shelf. Click to annotate, Ctrl-click several images to attach together, or copy terminal errors with local OCR.
 
 .NET 10, WPF and Win32. No Electron, account, telemetry or cloud dependency.
 
-**0.1.0 alpha:** runnable implementation with unit, integration and interactive synthetic checks. Real Codex/ChatGPT receiver acceptance and the full hardware matrix remain release gates. [Verification](docs/VALIDATION.md) · [Architecture](docs/ARCHITECTURE.md) · [Desktop acceptance](docs/ACCEPTANCE.md)
+**0.1.0 alpha:** runnable implementation with unit, integration and interactive synthetic checks. Receiver acceptance and available hardware scope are accepted by the owner; exact receiver versions and wider hardware coverage remain limitations. [Verification](docs/VALIDATION.md) · [Architecture](docs/ARCHITECTURE.md) · [Desktop acceptance](docs/ACCEPTANCE.md)
 
-The [current remaining-work review](docs/REMAINING-WORK.md) verifies GitHub checks/protection and alpha publication. There are still 34 open acceptance gates; stable readiness is not established. The [latest agent completion review](docs/AGENT-COMPLETION-20261007.md) records current verification, startup/OCR measurements and the exact next dock retest. The [earlier local acceptance record](docs/TAKEOVER-ACCEPTANCE.md) separates short automated checks and real isolated WPF interaction from unperformed receiver/hardware tests.
+The [historical hosted review](docs/REMAINING-WORK.md) records GitHub checks/protection and the first alpha publication. [Current acceptance](docs/FINAL-FOUR-ACCEPTANCE-20261007.md) records remaining performance/release gates and current startup/OCR measurements. Stable readiness is not established. Earlier reviews retain their own historical counts and verification boundaries.
 
-[Remaining work queue](TASK_QUEUE.md) tracks incomplete requirements and review findings. [User testing checklist](docs/USER-TESTING.md) records the current dock passes and accepted insertion behavior; the current next step is targeted real-receiver membership/order/delayed-paste verification.
+[Remaining work queue](TASK_QUEUE.md) tracks incomplete requirements and review findings. [User testing checklist](docs/USER-TESTING.md) records accepted interaction behavior. The next owner step is the same-machine capture/clipboard timing comparison in the current acceptance record.
 
 ## Preview
 
@@ -24,7 +24,9 @@ Synthetic content rendered by the actual WPF interface; no private captures.
 
 ![Minimal first-run setup](docs/images/welcome.png)
 
-A capture-to-Codex GIF will be added after external receiver acceptance.
+Illustrated capture-to-Codex workflow, using synthetic content. This animation is a diagram, not a recording of an acceptance test.
+
+![Illustrated capture-to-Codex workflow](docs/images/capture-to-codex.gif)
 
 ## Installation
 

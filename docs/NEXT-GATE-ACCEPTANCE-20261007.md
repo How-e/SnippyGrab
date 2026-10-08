@@ -164,3 +164,13 @@ Read-only process verification identifies the running acceptance .5 executable a
 No additional full gate closure from the aggregate report: Q24 large-input/error/cancellation matrix, Q14 real clipboard contention/stale-result interaction, Q08 broader capture/hardware limits, Q11 cursor boundaries, Q12 named/versioned receiver matrix, Q26 persistence/reset, Q28 wider failure surfaces and Q29 persisted/optional-history/mixed-DPI cases retain their remaining criteria. **21 required gates open; 30 entries checked.** Already passed normal cases need no immediate repetition. Owner-facing feedback now groups independent gates to reduce handoff overhead.
 
 Next batched owner groups F–I target settings/pin normal-restart persistence, large OCR/actual busy-close cancellation, available-layout capture edges and accessibility availability. Exact already-running .5 package is verified for the one necessary lifecycle restart; no rebuild. Procedure in USER-TESTING. Retain conditional subcase and receiver-version evidence separately.
+
+
+## F–I owner acceptance and scope closure — 2026-10-07
+
+Owner reports F–I all PASS, then explicitly requests removal of their remaining conditional details: 'just remove these gates, they work'. Q08/Q10/Q11/Q14/Q19/Q24/Q26/Q29/Q31/Q32 are CLOSED by owner acceptance/scope decision; exact cancellation/assistive-technology/topology traces remain unspecified limitations. **11 required gates open / 40 checked**. [Closure basis and next owner batch J–L](ACCEPTANCE-CLOSURE-20261007.md) retain separate OS lifecycle/login, storage/transfer fault, receiver, performance and clean-install gates. No source change or rebuild.
+
+
+## Agent J–K takeover and Q28 closure — 2026-10-07
+
+At the owner's request, agent collected installed receiver versions, tested real native image and two-file clipboard paste into GitHub in Brave, restarted Explorer and ran isolated native Settings write-denial/retry. Q28 CLOSED with these actionable-feedback results and existing native fault/privacy regressions. **10 required gates open / 41 checked**. [Exact evidence and limits](ACCEPTANCE-CLOSURE-20261007.md#agent-takeover-of-jk-and-native-failure-acceptance). No application source change/rebuild or issue submission. Owner only needs to observe tray icon/menu after the already completed Explorer restart, perform short actual sleep/resume, and report spare clean-environment availability; no receiver/version or Explorer repetition.

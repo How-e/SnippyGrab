@@ -108,7 +108,7 @@ CI builds/tests, verifies formatting and audits dependencies. CodeQL runs separa
 
 - Alpha: the owner reported successful Codex/ChatGPT/VS Code/browser drop and paste. Exact-version, selection/order and delayed-read acceptance remains incomplete; receiver support varies.
 - GDI produces SDR; HDR colors can differ. Window capture uses visible pixels, without reconstructing occluded/minimized/protected windows.
-- Physical selections passed at 100% and 150% on the connected mixed-DPI layout. 125/175/200%, vertical/HDR screens, Explorer restart, sleep/resume, text scaling and all-day use need acceptance.
+- Physical selections passed at 100% and 150% on the connected mixed-DPI layout. Owner acceptance covers the available layout and current accessibility configuration. 125/175/200%, vertical/HDR screens and other text-scale/assistive-technology configurations remain unverified compatibility limits; the owner accepted this narrower scope. Explorer restart, sleep/resume and all-day behavior remain unverified.
 - A short fresh-process sample measured about 128 MB tray working set. The [two-hour synthetic resource test](docs/RESOURCE-REVIEW-20261007.md) passes; all-day use and startup latency need more benchmarking; .NET packaging is larger than a C++ utility. The user-run [two-hour resource test instructions](docs/RESOURCE-TESTING.md) provide the packaged command and reporting criteria.
 - Undo is bounded to 20 states; large crop/effect histories can consume substantial memory. Annotation counts and imported sizes are bounded.
 - Transfers protect sources for 24 hours. Session-only cleans on normal exit while preserving pins/transfers; crashes fall back to retention.

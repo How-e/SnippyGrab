@@ -413,3 +413,13 @@ H — Q08/Q10/Q11/Q31 available-layout capture edges. Report actual monitor reso
 I — Q19/Q32 accessibility coverage. Report Windows Text size percentage and whether contrast theme/screen reader is available. At the existing text scale check History/settings/editor/pin menus through keyboard with visible focus/readable names; prior normal Light/Dark/System results need not be repeated. If comfortable using an existing Contrast theme/Narrator, enable it manually, apply System application theme to refresh resources, test named controls/selected state and keyboard entry in shelf/history/settings/editor, then restore original Windows and application preferences. If not available or not appropriate now, report NOT AVAILABLE rather than PASS. No OS text-scale change or assistive software installation is required.
 
 Receiver evidence completion for E: supply versions of ChatGPT, VS Code, Discord (if visible) and Explorer/Windows build, plus GitHub NOT TESTED/NOT AVAILABLE or a separate unsent composer test. No repeat required for passed receiver contents/counts.
+
+
+## F–I owner acceptance and scope closure — 2026-10-07
+
+Owner reports F–I all PASS, then explicitly requests removal of their remaining conditional details: 'just remove these gates, they work'. Q08/Q10/Q11/Q14/Q19/Q24/Q26/Q29/Q31/Q32 are CLOSED by owner acceptance/scope decision; exact cancellation/assistive-technology/topology traces remain unspecified limitations. **11 required gates open / 40 checked**. [Closure basis and next owner batch J–L](ACCEPTANCE-CLOSURE-20261007.md) retain separate OS lifecycle/login, storage/transfer fault, receiver, performance and clean-install gates. No source change or rebuild.
+
+
+## Agent J–K takeover and Q28 closure — 2026-10-07
+
+At the owner's request, agent collected installed receiver versions, tested real native image and two-file clipboard paste into GitHub in Brave, restarted Explorer and ran isolated native Settings write-denial/retry. Q28 CLOSED with these actionable-feedback results and existing native fault/privacy regressions. **10 required gates open / 41 checked**. [Exact evidence and limits](ACCEPTANCE-CLOSURE-20261007.md#agent-takeover-of-jk-and-native-failure-acceptance). No application source change/rebuild or issue submission. Owner only needs to observe tray icon/menu after the already completed Explorer restart, perform short actual sleep/resume, and report spare clean-environment availability; no receiver/version or Explorer repetition.

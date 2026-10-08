@@ -1,3 +1,5 @@
+Current acceptance: **10 required gates open / 41 checked**. Q28 failure-feedback criteria now CLOSED with native Settings write-denial/retry, earlier editor/recovery/OS-clipboard fault interaction, and category/privacy regressions. F–I gates retain owner acceptance/scope closure. Agent independently tested real GitHub image/file paste in Brave and restarted Explorer; shell icon/sleep/login and other remaining criteria stay explicit. Earlier dated counts below are historical. See [current evidence](ACCEPTANCE-CLOSURE-20261007.md).
+
 Latest owner batch A–E PASS; receivers confirmed ChatGPT/VS Code/Discord/Explorer. Conditional cancellation/hardware and receiver-version details remain unreported. **21 required gates open / 30 checked**. Running acceptance .5 source and bundle verified; no rebuild. See [owner evidence](USER-TESTING.md).
 
 Latest owner editor-tool steps 1–4 PASS closes Q20 with document/render regressions. **21 required gates open / 30 checked**. Batch multiple independent next gates as requested; preserve running build. See [closure evidence](NEXT-GATE-ACCEPTANCE-20261007.md).

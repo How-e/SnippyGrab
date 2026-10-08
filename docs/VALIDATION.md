@@ -1,3 +1,5 @@
+Current acceptance: **10 required gates open / 41 checked**. Q28 failure-feedback criteria now CLOSED with native Settings write-denial/retry, earlier editor/recovery/OS-clipboard fault interaction, and category/privacy regressions. F–I gates retain owner acceptance/scope closure. Agent independently tested real GitHub image/file paste in Brave and restarted Explorer; shell icon/sleep/login and other remaining criteria stay explicit. Earlier dated counts below are historical. See [current evidence](ACCEPTANCE-CLOSURE-20261007.md).
+
 # Validation — updated 2026-10-07
 
 Latest [P0 acceptance](P0-ACCEPTANCE-20261007.md): Q02/Q03 CLOSED with native isolated storage/editor/recovery gestures, actual OS clipboard contention/retry, owner tray Exit/Discard and restart evidence. Zero-warning Release build, 170 core + 61 Windows tests and full formatting PASS. **32 required gates remain open; 19 entries checked.** Older counts and scope statements below are historical.

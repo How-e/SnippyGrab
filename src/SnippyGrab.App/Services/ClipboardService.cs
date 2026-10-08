@@ -35,7 +35,9 @@ internal sealed class DragDropService(CaptureRepository repository)
         if (ordered.Count == 1)
         {
             var image = ImageService.Load(paths[0]); data.SetImage(image);
-            data.SetData("PNG", new MemoryStream(ImageService.Png(image)));
+            // Managed revisions are already lossless PNGs. Keep the same bytes as the
+            // file-drop payload instead of encoding the full image again on the UI thread.
+            data.SetData("PNG", new MemoryStream(File.ReadAllBytes(paths[0])));
         }
         return data;
     }

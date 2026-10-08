@@ -10,7 +10,15 @@ try {
     $deadline = [DateTime]::UtcNow.AddMinutes(3)
     while (!$process.WaitForExit(1000)) { if ([DateTime]::UtcNow -gt $deadline) { throw "Native $Check timed out." } }
     $process.Refresh()
-    if ($process.ExitCode -ne 0) { throw "Native $Check failed; inspect $reportPath" }
+    if ($process.ExitCode -ne 0) {
+        # Hosted runners discard this local report after the job. Expose the first
+        # diagnostic line for isolated synthetic CI probes, without a stack dump.
+        if ($env:GITHUB_ACTIONS -eq 'true' -and (Test-Path -LiteralPath $reportPath)) {
+            $firstLine = Get-Content -LiteralPath $reportPath -TotalCount 1
+            Write-Output "Synthetic native failure: $firstLine"
+        }
+        throw "Native $Check failed; inspect $reportPath"
+    }
     $probe = Get-Content -LiteralPath $reportPath -Raw | ConvertFrom-Json
     if ($probe.Result -ne 'PASS') { throw "Native $Check did not report PASS." }
     Write-Output "PASS: $Check; $($probe.Scope)"

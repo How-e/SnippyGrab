@@ -1,4 +1,4 @@
-Current acceptance: **2 required gates open / 49 checked**. Q12 CLOSED by owner native receiver PASS and explicit receiver/version-detail waiver. Q34 CLOSED by owner performance acceptance; Q44/Q01 remain OPEN. Workflow animation replaces the real-recording requirement at owner request. See [current evidence](FINAL-FOUR-ACCEPTANCE-20261007.md). Earlier counts below are historical.
+Current acceptance: **0 required gates open / 51 checked**. Q12 CLOSED by owner native receiver PASS and explicit receiver/version-detail waiver. Q34 CLOSED by owner performance acceptance; Q44/Q01 CLOSED by verified hosted publication and final reconciliation. Workflow animation replaces the real-recording requirement at owner request. See [current evidence](FINAL-FOUR-ACCEPTANCE-20261007.md). Earlier counts below are historical.
 
 # Acceptance continuation — 2026-10-07
 

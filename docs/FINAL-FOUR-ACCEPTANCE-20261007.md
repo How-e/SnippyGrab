@@ -1,6 +1,6 @@
 # Final four acceptance gates — 2026-10-07
 
-Current acceptance: **2 required gates OPEN / 49 checked**. Q12 is CLOSED; Q34 is CLOSED by owner performance acceptance; Q44 and Q01 remain OPEN. Stable packaging remains blocked.
+Current acceptance: **0 required gates OPEN / 51 checked**. Q12 is CLOSED; Q34, Q44 and Q01 are CLOSED. All acceptance closure is within the documented owner-approved scope; the published build remains an unsigned prerelease.
 
 ## Receiver acceptance — Q12 CLOSED
 
@@ -14,7 +14,7 @@ The owner requests **“create an animation rather than me making a manual recor
 
 Generation: `scripts/create-workflow-animation.py`, Pillow; 960×540, 27 encoded frames, 271,716 bytes. All encoded frames decode; the final frame was visually inspected. No private pixels, drafts or screen recordings were read. README embeds the GIF and distinguishes it from the real WPF preview images.
 
-Q44 stays OPEN for performance-dependent stable acceptance and the corrected hosted upload's end-to-end verification. Local package validation does not establish a GitHub release upload. No remote publication is performed by this record.
+Q44 is CLOSED after the accepted performance scope and corrected hosted upload's end-to-end verification below. Local package validation alone did not satisfy the upload criterion.
 
 ## Performance — Q34 CLOSED
 
@@ -40,20 +40,35 @@ pwsh -File scripts/measure-region-clipboard.ps1 -Receiver SnippingTool
 
 Each command collects ten captures or ends after five minutes. Invoke the normal region shortcut for each capture; Snipping Tool uses Win+Shift+S. Reports remain ignored under `artifacts/region-clipboard/`. Passive Win32 entry points were loaded and checked with `-ValidateOnly`; both owner batches then exercised actual gesture/clipboard correlation. No numerical service-level guarantee is inferred from these ten samples. The owner's responsiveness acceptance is the subjective performance criterion.
 
-## Independent verification and milestone reconciliation — Q01 OPEN
+## Independent verification and milestone reconciliation — Q01 CLOSED
 
 At application source `0ece501`: locked restore, warnings-as-errors Release build (zero warnings/errors), **170 core + 61 Windows tests**, formatting, dependency audit, native OCR integrity, installer/rollback/data-retention fixtures, signing fixtures without certificate access, resource-review fixtures, milestone-map and release-gate fixtures all PASS. Ignored report: `artifacts/final-four-verification/20261007-233858-216/summary.json`. Prolonged resource acceptance was not rerun.
 
-M0–M8 retain their recorded implementation and accepted scope. M9 is accepted within the recorded Q34 scope; M10 remains conditional on Q44. Q01 must stay OPEN until those required criteria are satisfied or explicitly scoped by the owner. No checked milestone or stable label is inferred from an illustration, owner-version waiver, or successful local build alone.
+M0–M8 retain their recorded implementation and accepted scope. M9 is accepted within the recorded Q34 scope; verified hosted publication completes M10/Q44. Q01 is CLOSED after all 51 queue entries receive closure evidence and the executable milestone/release-policy checks admit the completed ledger. No universal compatibility, certified cold boot, physical 4K/8K, all-day workload or signed-publisher claim is inferred from this scoped acceptance.
 
 ## Hosted reliability diagnostic correction — 2026-10-08
 
 Initial hosted CI at `add12d1` failed its offscreen pin-resize assertion after build, tests, formatting and policy fixtures passed. A diagnostic-only wrapper change at `124c693` exposes the synthetic report's first line in hosted logs; the repeat establishes the failure as **“Resizing a pin decodes detail beyond the old fixed 800-pixel cap failed.”** Initial CodeQL passed. Failed runs remain available: CI `37724522154` and diagnostic repeat `37724965052`.
 
-The probe requested a 1900-DIP window and assumed the decoder must return all 2240 source pixels. Windows can constrain the actual HWND on a smaller runner desktop. The probe now calculates the expected decode detail from realized width/DPI, explicitly constrains its requested width to 1000 DIPs to reproduce this case on larger local monitors, and waits for the resize preview to match. It still requires detail beyond the old fixed cap. Production `PinWindow`/capture/clipboard behavior is unchanged. The constrained native probe, warnings-as-errors build and formatting pass locally. Hosted confirmation remains required before publication.
+The probe requested a 1900-DIP window and assumed the decoder must return all 2240 source pixels. Windows can constrain the actual HWND on a smaller runner desktop. The probe now calculates the expected decode detail from realized width/DPI, explicitly constrains its requested width to 1000 DIPs to reproduce this case on larger local monitors, and waits for the resize preview to match. It still requires detail beyond the old fixed cap. Production `PinWindow`/capture/clipboard behavior is unchanged. The constrained native probe, warnings-as-errors build and formatting pass locally; hosted CI at the final source also passes.
 
 ## Editor commit reentrancy correction — 2026-10-08
 
 Hosted CI `37725561889` and `37725564618` exposed `ReentrantCloseJoinsApplyBeforeItsFirstAwait`: the nested close task differed from the outer apply task. `Task.Yield()` did not guarantee that `pending = ExecuteAsync(...)` finished before dispatching the apply callback outside WPF's single-threaded synchronization context. A deterministic inline-dispatch regression reproduces the same failure locally before the fix; its failing TRX remains ignored under `artifacts/reentrant-before-fix/`.
 
-The coordinator now assigns a shared TaskCompletionSource task before invoking apply, preserving success, cancellation, failure propagation and retry. Reentrant close joins this task even when apply dispatch runs immediately. Full **171 core + 61 Windows tests**, zero-warning Release build, formatting and the actual offscreen failed-editor-close/retry reliability probe PASS locally. Reports remain ignored under `artifacts/reentrant-after-fix/` and `artifacts/final-four-reliability-coordinator-fixed.json`. This is a production coordinator correction with a failing-before/passing-after regression; hosted confirmation is still required. The unpublished .8 candidate must be refreshed from this final source before tagging.
+The coordinator now assigns a shared TaskCompletionSource task before invoking apply, preserving success, cancellation, failure propagation and retry. Reentrant close joins this task even when apply dispatch runs immediately. Full **171 core + 61 Windows tests**, zero-warning Release build, formatting and the actual offscreen failed-editor-close/retry reliability probe PASS locally. Reports remain ignored under `artifacts/reentrant-after-fix/` and `artifacts/final-four-reliability-coordinator-fixed.json`. This is a production coordinator correction with a failing-before/passing-after regression; final hosted CI/CodeQL passes at `08c8309`, and the .8 candidate was refreshed from that exact source before tagging.
+
+## Verified publication and final gate closure — 2026-10-08
+
+The owner explicitly authorizes **“Publish the validated prerelease and verify hosted upload”**. [PR #13](https://github.com/How-e/SnippyGrab/pull/13) merges the validated work as `6de3977`. Both hosted CI jobs (`37726236803`, `37726241770`) and CodeQL (`37726241764`) PASS at final candidate source `08c830952a68cfb162abf4198f320f8eeac30e34`. Fresh Gitleaks 8.30.1 scans all 135 reachable candidate commits with zero findings; GitHub reports zero open CodeQL, Dependabot and secret-scanning alerts.
+
+The approved tag points to that tested clean source. [Release workflow 37726837608](https://github.com/How-e/SnippyGrab/actions/runs/37726837608) completes tagged build, **171 core + 61 Windows tests**, policy/security fixtures, audit, packaging, bundle/setup checks and automated upload without manual recovery. [The public prerelease](https://github.com/How-e/SnippyGrab/releases/tag/v0.1.0-alpha.acceptance.20261007.8) contains exactly four assets: ZIP, ZIP checksum, setup executable and setup checksum.
+
+Independent downloaded-artifact verification PASS: complete bundle inventory, both outer SHA-256 files, independently decoded embedded installer payload, version/commit/Dirty=false provenance, native offscreen reliability and native OCR corpus/error/cancellation. Local downloaded evidence remains ignored under `artifacts/hosted-release-20261008/`.
+
+| Published asset | SHA-256 |
+|---|---|
+| ZIP | `DD2C195B416A5E01D02598465C8E5AB28FF5465E5DACC5CDC177DF1A95E8AF85` |
+| Setup | `67347602A7413F5D0F3FAFCB82DCABFC7681FDC53C496CE5C91C183E88859BF2` |
+
+**Q44 CLOSED** with owner-requested illustrated animation, accepted receiver/performance scope, current support limits and actual corrected hosted upload verification. **Q01 CLOSED** after final milestone/closure reconciliation. All 51 entries are checked; zero required gates remain open. The build remains unsigned and published as a prerelease. The source package's ledger reflects its pre-upload checkpoint; this final record documents the subsequent verification rather than changing an already published artifact or tag.

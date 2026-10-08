@@ -1,3 +1,7 @@
+# Final acceptance — 2026-10-08
+
+All 51 queue entries are closed within the owner-approved scope; zero required gates remain. Published source `08c8309` passes **171 core + 61 Windows tests**, zero-warning Release build, formatting, native reliability/OCR, hosted CI/CodeQL, policy/security fixtures and corrected automatic release upload. The downloaded public ZIP/setup/checksums, complete inventory, embedded installer payload and clean source provenance independently verify. See [final acceptance](FINAL-FOUR-ACCEPTANCE-20261007.md) and [publication](PUBLICATION.md). Earlier counts and timings below are historical snapshots, with their original evidence boundaries. The published build remains an unsigned prerelease with the accepted compatibility/performance limits.
+
 Current acceptance: **10 required gates open / 41 checked**. Q28 failure-feedback criteria now CLOSED with native Settings write-denial/retry, earlier editor/recovery/OS-clipboard fault interaction, and category/privacy regressions. F–I gates retain owner acceptance/scope closure. Agent independently tested real GitHub image/file paste in Brave and restarted Explorer; shell icon/sleep/login and other remaining criteria stay explicit. Earlier dated counts below are historical. See [current evidence](ACCEPTANCE-CLOSURE-20261007.md).
 
 # Validation — updated 2026-10-07

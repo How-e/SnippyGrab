@@ -1,3 +1,5 @@
+Current acceptance — 2026-10-08: **zero required gates open / all 51 checked**. Q01 and Q44 are CLOSED with final milestone reconciliation and independently verified corrected hosted publication. [Final evidence and scope limits](FINAL-FOUR-ACCEPTANCE-20261007.md). This review's per-gate states and counts below are historical checkpoints.
+
 # Agent gate review — 2026-10-07
 
 Historical 15-gate pass. The later [P0 native acceptance](P0-ACCEPTANCE-20261007.md) closes Q02/Q03 and leaves 32 required gates open, 19 entries checked. Their OPEN statements below describe this earlier pass, not current acceptance.

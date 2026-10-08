@@ -281,7 +281,7 @@ public sealed partial class CaptureRepository
         foreach (var name in names)
         {
             leases[name] = leases.GetValueOrDefault(name) + 1;
-            if (transfer) state.ProtectedUntil[name] = clock().AddHours(24);
+            if (transfer) ExtendTransferGrace(name);
         }
         void Release() { foreach (var name in names) { var count = leases.GetValueOrDefault(name); if (count <= 1) leases.Remove(name); else leases[name] = count - 1; } }
         if (transfer)
@@ -296,10 +296,17 @@ public sealed partial class CaptureRepository
         {
             Release();
             if (!transfer) return;
-            foreach (var name in names) state.ProtectedUntil[name] = clock().AddHours(24);
+            foreach (var name in names) ExtendTransferGrace(name);
             try { Persist(); }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException) { PersistenceFailed?.Invoke(); }
         });
+    }
+    private void ExtendTransferGrace(string name)
+    {
+        var deadline = clock().AddHours(24);
+        // A new transfer or release must preserve an already promised durable deadline,
+        // including when Windows corrects its clock backwards while the app is running.
+        if (deadline > state.ProtectedUntil.GetValueOrDefault(name)) state.ProtectedUntil[name] = deadline;
     }
     public int CleanupSession(DateTimeOffset now) => Cleanup(now, -1, clear: true, sessionOnly: true);
     public int Cleanup(DateTimeOffset now, int retentionHours, bool clear = false, bool sessionOnly = false)

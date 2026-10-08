@@ -298,3 +298,9 @@ Use acceptance `.6` after exiting older SnippyGrab through its tray and running 
 3. In Settings choose System theme and Apply. Check shelf focus/selection/pin cues plus Settings, History and Editor at your current Windows text scale: readable contrast, visible focus, reachable controls and no clipping. Restore your original application theme. No Windows preference changes are required.
 
 Report PASS/FAIL for steps 1–3, and separately whether high contrast or a screen reader is already available. These tests do not establish unavailable accessibility configurations or keyboard global-hotkey capture behavior; those remain open.
+
+## Q19/Q32 — shelf copy/export/pin and System theme PASS (2026-10-07)
+
+Owner reports steps 1–3 PASS: keyboard copy uses selected A rather than newer B; Ctrl+P pin state is visible in History and can be restored; shelf Ctrl+S exports the focused A and repeat-export cancellation creates no extra file/false success; System theme has readable contrast, focus/state cues and reachable unclipped shelf/Settings/History/Editor controls at the current text scale, with original theme restored. The existing acceptance application remains running; owner explicitly requests no further build unless necessary. Exact running version was not separately restated; the handoff named `.6`, whose application source is identical to `.5`.
+
+Q19/Q32 remain OPEN for the unverified keyboard global-capture path and broader text-scale/high-contrast/assistive-technology coverage. High contrast/screen-reader availability was not separately reported. This closes the prescribed workflow/theme subset, not the complete gates. Current queue is **25 required gates open; 26 entries checked**. No application source change or package rebuild is needed. Use the existing running build for the next checks; the strict current-HEAD launcher will require a fresh matching package if a future restart is needed after these documentation commits.

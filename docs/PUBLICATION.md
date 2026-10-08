@@ -1,4 +1,14 @@
-# Initial GitHub publication
+# Latest verified GitHub publication
+
+Published unsigned prerelease: [0.1.0-alpha.acceptance.20261007.8](https://github.com/How-e/SnippyGrab/releases/tag/v0.1.0-alpha.acceptance.20261007.8), 2026-10-08, clean source `08c830952a68cfb162abf4198f320f8eeac30e34`. All **51 acceptance entries are closed / zero required gates open** within the recorded owner-approved scope. See [final acceptance and limits](FINAL-FOUR-ACCEPTANCE-20261007.md).
+
+Both final-source CI jobs and CodeQL passed. [Release workflow 37726837608](https://github.com/How-e/SnippyGrab/actions/runs/37726837608) passed tagged build, all **171 core + 61 Windows tests**, boundary/security fixtures, audit, packaging, embedded installer verification and corrected automated upload without manual recovery. Exactly four public assets were independently downloaded and verified: ZIP, setup and their SHA-256 files. Native reliability and OCR corpus/error/cancellation also passed against the downloaded executable; source/version/Dirty=false provenance matches the approved tag.
+
+Gitleaks scanned all 135 reachable candidate commits without findings. GitHub reported zero open CodeQL, Dependabot and secret-scanning alerts before publication. ZIP SHA-256: `DD2C195B416A5E01D02598465C8E5AB28FF5465E5DACC5CDC177DF1A95E8AF85`; setup SHA-256: `67347602A7413F5D0F3FAFCB82DCABFC7681FDC53C496CE5C91C183E88859BF2`. The earlier alpha and failed CI runs retain their historical identities. No existing artifact or tag was rewritten.
+
+Windows 10, exact hotkey-overlay distributions, certified cold boot, physical 4K/8K workflow, all-day workload and signed-publisher acceptance remain unmeasured/unsupported claims. Closure uses the owner's explicit scope decisions; only an unsigned prerelease is published. The GIF is an explicitly labeled illustration substituted at owner request.
+
+## Initial GitHub publication — historical snapshot
 
 Published prerelease: **0.1.0-alpha.queue.20261006.3**. Repository: [How-e/SnippyGrab](https://github.com/How-e/SnippyGrab). This remains an unsigned alpha: 34 acceptance gates remain open after Q36/Q35/Q06 closure, including full receiver/hardware coverage. The [two-hour synthetic resource review](RESOURCE-REVIEW-20261007.md) passes; all-day use remains unverified. See [current reconciliation](REMAINING-WORK.md) for recorded protection/security/check evidence and the upload recovery limitation. No stable readiness claim is made.
 

@@ -2,7 +2,7 @@
 
 A native Windows screenshot shelf for AI and developer workflows.
 
-Current acceptance: **2 required gates open / 49 checked** after owner receiver acceptance and waiver of version details; see [the current acceptance record](docs/FINAL-FOUR-ACCEPTANCE-20261007.md). Stable remains blocked by Q01/Q44.
+Current acceptance: **0 required gates open / 51 checked** after verified hosted publication and final reconciliation; see [the current acceptance record](docs/FINAL-FOUR-ACCEPTANCE-20261007.md). All required gates are closed within the recorded scope; the published build remains an unsigned prerelease.
 
 **Print Screen → select → release → paste or drag.** Captures land on the clipboard and a small transparent shelf. Click to annotate, Ctrl-click several images to attach together, or copy terminal errors with local OCR.
 
@@ -10,9 +10,9 @@ Current acceptance: **2 required gates open / 49 checked** after owner receiver 
 
 **0.1.0 alpha:** runnable implementation with unit, integration and interactive synthetic checks. Receiver acceptance and available hardware scope are accepted by the owner; exact receiver versions and wider hardware coverage remain limitations. [Verification](docs/VALIDATION.md) · [Architecture](docs/ARCHITECTURE.md) · [Desktop acceptance](docs/ACCEPTANCE.md)
 
-The [historical hosted review](docs/REMAINING-WORK.md) records GitHub checks/protection and the first alpha publication. [Current acceptance](docs/FINAL-FOUR-ACCEPTANCE-20261007.md) records remaining performance/release gates and current startup/OCR measurements. Stable readiness is not established. Earlier reviews retain their own historical counts and verification boundaries.
+The [historical hosted review](docs/REMAINING-WORK.md) records GitHub checks/protection and the first alpha publication. [Current acceptance](docs/FINAL-FOUR-ACCEPTANCE-20261007.md) records completed acceptance and current startup/OCR measurements. All 51 queue entries are now closed within the recorded scope. Earlier reviews retain their own historical counts and verification boundaries.
 
-[Remaining work queue](TASK_QUEUE.md) tracks incomplete requirements and review findings. [User testing checklist](docs/USER-TESTING.md) records accepted interaction behavior. The next owner step is the same-machine capture/clipboard timing comparison in the current acceptance record.
+[Acceptance queue](TASK_QUEUE.md) records implemented requirements, review findings and their closure evidence. [User testing checklist](docs/USER-TESTING.md) records accepted interaction behavior. The timing comparison and final hosted publication are complete within the current acceptance record.
 
 ## Preview
 
@@ -36,7 +36,7 @@ Extract the complete release ZIP, then run `SnippyGrab.exe`. Keep `Tesseract.dll
 
 For per-user installation without elevation, run `powershell -NoProfile -File .\install.ps1` from the extracted bundle; add `-Startup` to enable login startup. Local script execution must be permitted by your PowerShell policy. The installer adds a Start menu shortcut and Apps uninstall entry. Exit from the tray before upgrading/uninstalling. Uninstall removes its startup registration and application files; captures/settings remain in `%LOCALAPPDATA%\SnippyGrab` for recovery. Portable removal: disable login startup, exit, then delete the extracted directory. Remove user data separately when no longer needed.
 
-Initial builds are unsigned; SmartScreen may prompt. Compare `Get-FileHash <download.zip> -Algorithm SHA256` with the release `.sha256`. Bundles include `SHA256SUMS.txt`. Hashes verify integrity, not publisher identity. Published builds are available under [GitHub releases](https://github.com/How-e/SnippyGrab/releases); only the latest evaluated alpha is being published initially. See [publication checks](docs/PUBLICATION.md) for verification scope.
+Initial builds are unsigned; SmartScreen may prompt. Compare `Get-FileHash <download.zip> -Algorithm SHA256` with the release `.sha256`. Bundles include `SHA256SUMS.txt`. Hashes verify integrity, not publisher identity. Published builds are available under [GitHub releases](https://github.com/How-e/SnippyGrab/releases); the latest validated prerelease is [0.1.0-alpha.acceptance.20261007.8](https://github.com/How-e/SnippyGrab/releases/tag/v0.1.0-alpha.acceptance.20261007.8). See [publication checks](docs/PUBLICATION.md) for verification scope.
 
 ## Usage
 

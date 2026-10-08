@@ -34,7 +34,8 @@ foreach ($id in @(2,3,49,18,15,21,7,14,28,4,5,6,13,22,1)) {
     $name = 'Q{0:D2}' -f $id
     if ([regex]::Matches($review, "(?m)^## $name\r?$").Count -ne 1) { throw "Missing or duplicate current closure record: $name" }
 }
-Write-Output "PASS: 11 milestone rows, mapped test files/commits, $($open.Count) open required gates with owners, 15 current closure records; Q01 stays open."
+$q01Status = if ($q01.Groups['done'].Value -eq 'x') { 'CLOSED' } else { 'OPEN' }
+Write-Output "PASS: 11 milestone rows, mapped test files/commits, $($open.Count) open required gates with owners, 15 current closure records; Q01 $q01Status."
 if ($SelfTest) {
     $fixtures = @(
         @{ LedgerText = $ledger -replace '(?m)^\| M4 Native[^\r\n]+\r?\n', '' },

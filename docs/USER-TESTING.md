@@ -331,3 +331,9 @@ Keep the current acceptance application running; no new build, restart or OS cha
 4. Detach PIN TEST again, context menu → Click-through. Confirm the floating view lets a click reach a harmless underlying local window. Tray → Restore pins must restore pin interaction; its context menu must work again. Choose Close pin window: only that floating window closes, with the capture still available in shelf/history. Unpin the disposable capture if needed to restore its original state.
 
 Report PASS/FAIL for steps 1–4 and identify any stale/blank view or lost image. These are actual pin/revision/return/interaction cases under Q04/Q22/Q29; persistence after restart, expiry timing and mixed-DPI/hardware cases remain separate. Do not repeat broader editor tools or external multi-image delivery for this batch.
+
+## Q04 — detached pin lease/revision and actual gesture closure
+
+Owner reports all four prescribed pin steps PASS on the existing running acceptance application: detach/move/resize/opacity/topmost; edited image refresh in detached pin/shelf/open History/pasted output; unpin while floating remains usable and copies edited pixels; Return to shelf closes floating view and reveals image; click-through is recoverable through Restore pins and Close pin window preserves the capture. Exact package version was not separately restated; the prior handoff used .6 (same application source as .5).
+
+**Q04 PASS / CLOSED** for its stated lease/revision/lifetime criteria, combining actual owner gestures with recorded CaptureViewLeaseTests and q04-reliability.json PASS for offscreen unpin/clear preservation, two-view revision lease handover and close release. Real cache clearing was deliberately not requested; storage fault/expiry proof remains isolated regression evidence. Q29 mixed-DPI/persisted history/pin matrix remains separate. Queue: **24 required gates open; 27 entries checked**. No source change or rebuild.

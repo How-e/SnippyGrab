@@ -104,7 +104,7 @@ Agent work: Added two-view/multiple-revision regression proving one close cannot
 
 Checks: CaptureViewLeaseTests 2/2 PASS; q04-reliability.json PASS for actual offscreen pin/history revision refresh, preview-quality/resize refresh, unpin/clear preservation and close release.
 
-Status / remaining acceptance: OPEN: actual detach, edit, Return to shelf and close gestures; visibility/topmost/click-through and mixed-DPI hardware remain broader pin acceptance. Native programmatic refresh and storage lease invariants pass.
+Status / remaining acceptance: CLOSED for Q04 after owner detach/edit/unpin/Return/close gestures PASS on 2026-10-07, combined with the isolated lease/clear/revision evidence above. Opacity/topmost/click-through recovery also owner PASS; wider persistence/mixed-DPI hardware stays Q29/Q31. See NEXT-GATE-ACCEPTANCE-20261007.md for closure scope.
 
 ## Q05
 

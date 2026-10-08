@@ -84,8 +84,18 @@ internal static class RuntimeChecks
                     Assert(File.ReadAllBytes(controller.Repository.PathFor(record)).SequenceEqual(large), "Preview quality preserves original PNG bytes");
                 }
                 controller.Settings.PreviewQuality = PreviewQuality.Sharp;
-                pin.Width = 1900; pin.Height = 900; pin.UpdateLayout(); await Task.Delay(250);
-                Assert(((BitmapSource)pinImage.Source).PixelWidth == 2240, "Resizing a pin decodes detail beyond the old fixed 800-pixel cap");
+                // Deliberately constrain the requested size so this regression also
+                // exercises monitor-style limits on larger local desktops.
+                pin.MaxWidth = 1000;
+                pin.Width = 1900; pin.Height = 900; pin.UpdateLayout();
+                // Windows can constrain the realized HWND to the runner's monitor.
+                // Verify detail for that physical width, rather than the requested DIP width.
+                var resizedWidth = (int)Math.Ceiling(Math.Max(800, pin.ActualWidth * VisualTreeHelper.GetDpi(pin).DpiScaleX));
+                var expectedResizedPreview = Math.Min(2240, ImageService.PreviewPixels(resizedWidth, PreviewQuality.Sharp));
+                var resizeDeadline = Stopwatch.StartNew();
+                while (((BitmapSource)pinImage.Source).PixelWidth != expectedResizedPreview && resizeDeadline.Elapsed < TimeSpan.FromSeconds(2)) await Task.Delay(50);
+                Assert(expectedResizedPreview > ImageService.PreviewPixels(800, PreviewQuality.Sharp) && ((BitmapSource)pinImage.Source).PixelWidth == expectedResizedPreview,
+                    $"Resizing a pin decodes detail beyond the old fixed 800-pixel cap (physical width={resizedWidth}, expected={expectedResizedPreview}, actual={((BitmapSource)pinImage.Source).PixelWidth})");
                 controller.Repository.SetPinned(record, false); controller.Repository.Cleanup(DateTimeOffset.UtcNow, 1, true);
                 Assert(File.Exists(controller.Repository.PathFor(record)), "Unpinned open view protects current source");
                 pin.Close(); controller.Repository.Cleanup(DateTimeOffset.UtcNow, 1, true); Assert(list.Items.Count == 0, "Pin close releases source and history removes cleaned rows");

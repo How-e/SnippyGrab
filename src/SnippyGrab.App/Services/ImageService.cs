@@ -8,6 +8,21 @@ namespace SnippyGrab.App.Services;
 internal static class ImageService
 {
     public const long MaxPixels = 80_000_000;
+    internal static byte[] Jpeg(BitmapSource image, int quality)
+    {
+        if (quality is < 1 or > 100 || (long)image.PixelWidth * image.PixelHeight > MaxPixels) throw new InvalidDataException("Invalid JPEG quality or dimensions.");
+        var visual = new DrawingVisual();
+        using (var drawing = visual.RenderOpen())
+        {
+            var bounds = new Rect(0, 0, image.PixelWidth, image.PixelHeight);
+            drawing.DrawRectangle(System.Windows.Media.Brushes.White, null, bounds); drawing.DrawImage(image, bounds);
+        }
+        var opaque = new RenderTargetBitmap(image.PixelWidth, image.PixelHeight, 96, 96, WpfPixelFormats.Pbgra32); opaque.Render(visual); opaque.Freeze();
+        var pixels = new FormatConvertedBitmap(opaque, WpfPixelFormats.Bgr24, null, 0); pixels.Freeze();
+        var encoder = new JpegBitmapEncoder { QualityLevel = quality };
+        encoder.Frames.Add(BitmapFrame.Create(pixels)); // No source metadata is carried into a converted export.
+        using var stream = new MemoryStream(); encoder.Save(stream); return stream.ToArray();
+    }
     internal static int PreviewPixels(int pixels, PreviewQuality quality) => quality switch
     {
         PreviewQuality.Original => 0,

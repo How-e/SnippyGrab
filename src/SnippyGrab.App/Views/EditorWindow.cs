@@ -49,10 +49,10 @@ internal sealed class EditorWindow : Window
         actions.Children.Add(Ui.IconButton("undo", "Undo (Ctrl+Z)", Undo));
         actions.Children.Add(Ui.IconButton("redo", "Redo (Ctrl+Y)", Redo));
         actions.Children.Add(Ui.ActionButton("Apply + copy", "copy", "Update the managed shelf image and copy it (Ctrl+C)", () => controller.Run(ApplyCopy), "PrimaryButton"));
-        actions.Children.Add(Ui.ActionButton("Export PNG…", "export", "Apply edits and export a PNG outside the cache (Ctrl+S)", () => controller.Run(ExportPng)));
+        actions.Children.Add(Ui.ActionButton("Export image…", "export", "Apply edits and export PNG or JPEG outside the cache (Ctrl+S)", () => controller.Run(ExportImage)));
         openExportFolder = Ui.Button("Open export folder", "Open the last successful export directory", () => controller.OpenExportFolder(record.ExportPath));
         openExportFolder.IsEnabled = !string.IsNullOrWhiteSpace(record.ExportPath);
-        openExportFolder.ToolTip = string.IsNullOrWhiteSpace(record.ExportPath) ? "Export a PNG first" : "Last PNG export: " + record.ExportPath;
+        openExportFolder.ToolTip = string.IsNullOrWhiteSpace(record.ExportPath) ? "Export an image first" : "Last image export: " + record.ExportPath;
         var menu = new ContextMenu();
         var more = Ui.IconButton("more", "More editor actions", () => menu.IsOpen = true);
         var openFolderItem = Ui.Menu("Open export folder", "folder", () => controller.OpenExportFolder(record.ExportPath));
@@ -88,7 +88,7 @@ internal sealed class EditorWindow : Window
         var properties = new Border { Child = toolbar, BorderThickness = new Thickness(0, 1, 0, 1) };
         properties.SetResourceReference(Border.BorderBrushProperty, "Border"); properties.SetResourceReference(Border.BackgroundProperty, "Raised");
         DockPanel.SetDock(properties, Dock.Top); root.Children.Add(properties);
-        status = Ui.Text(string.IsNullOrWhiteSpace(record.ExportPath) ? "Apply + copy updates the managed shelf image. Export PNG writes a separate file. Closing applies edits; Discard leaves pending edits unapplied." : "Last PNG export: " + record.ExportPath, 12, true);
+        status = Ui.Text(string.IsNullOrWhiteSpace(record.ExportPath) ? "Apply + copy updates the managed shelf image. Export image writes a separate file. Closing applies edits; Discard leaves pending edits unapplied." : "Last image export: " + record.ExportPath, 12, true);
         status.TextWrapping = TextWrapping.Wrap;
         var footer = new Grid { Margin = new Thickness(14, 8, 14, 8) }; footer.ColumnDefinitions.Add(new() { Width = new GridLength(1, GridUnitType.Star) }); footer.ColumnDefinitions.Add(new() { Width = GridLength.Auto }); footer.RowDefinitions.Add(new() { Height = GridLength.Auto }); footer.RowDefinitions.Add(new() { Height = GridLength.Auto });
         var zoomActions = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right };
@@ -163,7 +163,7 @@ internal sealed class EditorWindow : Window
             if (e.Key == Key.Escape) { if (drawing) { drawing = false; surface.ReleaseMouseCapture(); surface.Preview = null; surface.InvalidateVisual(); } else Close(); e.Handled = true; }
             if (commits.Busy || documentWork is not null) { e.Handled = true; return; }
             if (Keyboard.Modifiers != ModifierKeys.Control || Keyboard.FocusedElement is TextBox) return;
-            if (e.Key == Key.Z) Undo(); else if (e.Key == Key.Y) Redo(); else if (e.Key == Key.C) controller.Run(ApplyCopy); else if (e.Key == Key.S) controller.Run(ExportPng); else return;
+            if (e.Key == Key.Z) Undo(); else if (e.Key == Key.Y) Redo(); else if (e.Key == Key.C) controller.Run(ApplyCopy); else if (e.Key == Key.S) controller.Run(ExportImage); else return;
             e.Handled = true;
         };
         Loaded += (_, _) => Fit();
@@ -257,7 +257,7 @@ internal sealed class EditorWindow : Window
     private void Redo() { if (!journal.CanRedo) return; journal.Redo(); dirty = true; Refresh(); }
     private void Refresh() { surface.State = journal.Current; surface.Width = journal.Current.Base.PixelWidth; surface.Height = journal.Current.Base.PixelHeight; surface.InvalidateVisual(); }
     private void Fit() => Zoom(Math.Min(1, Math.Min(Math.Max(200, viewport.ActualWidth - 24) / journal.Current.Base.PixelWidth, Math.Max(200, viewport.ActualHeight - 24) / journal.Current.Base.PixelHeight)));
-    private void Zoom(double value) { scale.ScaleX = scale.ScaleY = Math.Clamp(value, 0.03, 8); status.Text = $"{scale.ScaleX:P0} · {journal.Current.Base.PixelWidth} × {journal.Current.Base.PixelHeight} · Esc closes and applies" + (string.IsNullOrWhiteSpace(record.ExportPath) ? "" : " · Last PNG export: " + record.ExportPath); }
+    private void Zoom(double value) { scale.ScaleX = scale.ScaleY = Math.Clamp(value, 0.03, 8); status.Text = $"{scale.ScaleX:P0} · {journal.Current.Base.PixelWidth} × {journal.Current.Base.PixelHeight} · Esc closes and applies" + (string.IsNullOrWhiteSpace(record.ExportPath) ? "" : " · Last image export: " + record.ExportPath); }
     private async Task<BitmapSource> ApplyAsync()
     {
         var image = await RenderAsync(journal.Current);
@@ -274,7 +274,7 @@ internal sealed class EditorWindow : Window
         {
             var image = dirty ? await ApplyAsync() : await Task.Run(() => ImageService.Load(controller.Repository.PathFor(record)));
             copyRetryNeeded = !await controller.CopyImage(image);
-            status.Text = copyRetryNeeded ? "Edits are saved to the shelf. Clipboard is busy; retry Apply + copy or close again, or Discard to close." : "Applied to the managed shelf image and copied to clipboard. Use Export PNG for a separate file.";
+            status.Text = copyRetryNeeded ? "Edits are saved to the shelf. Clipboard is busy; retry Apply + copy or close again, or Discard to close." : "Applied to the managed shelf image and copied to clipboard. Use Export image for a separate file.";
             return !copyRetryNeeded;
         }
         catch
@@ -285,27 +285,27 @@ internal sealed class EditorWindow : Window
         finally { content.IsEnabled = true; }
     });
 
-    private Task<bool> ExportPng() => commits.RunAsync(async () =>
+    private Task<bool> ExportImage() => commits.RunAsync(async () =>
     {
         var content = (UIElement)Content; content.IsEnabled = false;
         try
         {
             if (dirty) await ApplyAsync();
-            var outcome = controller.Save(record, this);
+            var outcome = await controller.Save(record, this);
             status.Text = outcome.Status switch
             {
-                ExportStatus.Exported => "PNG exported: " + outcome.Path + (outcome.Message is null ? "" : " · " + outcome.Message),
+                ExportStatus.Exported => "Image exported: " + outcome.Path + (outcome.Message is null ? "" : " · " + outcome.Message),
                 ExportStatus.Cancelled => "Export cancelled. No file was written; applied edits remain in the managed shelf image.",
-                _ => "Export failed: " + outcome.Message + ". Applied edits remain in the shelf; retry Export PNG."
+                _ => "Export failed: " + outcome.Message + ". Applied edits remain in the shelf; retry Export image."
             };
             openExportFolder.IsEnabled = !string.IsNullOrWhiteSpace(record.ExportPath);
-            openExportFolder.ToolTip = string.IsNullOrWhiteSpace(record.ExportPath) ? "Export a PNG first" : "Last PNG export: " + record.ExportPath;
+            openExportFolder.ToolTip = string.IsNullOrWhiteSpace(record.ExportPath) ? "Export an image first" : "Last image export: " + record.ExportPath;
             await Task.CompletedTask;
             return outcome.Status == ExportStatus.Exported;
         }
         catch
         {
-            status.Text = "Could not apply edits for export. This editor stays open; retry Export PNG or choose Discard.";
+            status.Text = "Could not apply edits for export. This editor stays open; retry Export image or choose Discard.";
             throw;
         }
         finally { content.IsEnabled = true; }

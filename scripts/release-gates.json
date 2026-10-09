@@ -165,7 +165,7 @@
       "id": "Q21",
       "priority": 1,
       "owner": "Agent",
-      "closed": true,
+      "closed": false,
       "milestone": 5,
       "title": "Resolve Save destination and misleading labels"
     },
@@ -460,6 +460,7 @@
       "tests": [
         "tests/SnippyGrab.Tests/EditorCommitTests.cs",
         "tests/SnippyGrab.Tests/CaptureExportTests.cs",
+        "tests/SnippyGrab.IntegrationTests/JpegExportTests.cs",
         "tests/SnippyGrab.Tests/CrossViewRevisionTests.cs",
         "tests/SnippyGrab.IntegrationTests/EditorDocumentTests.cs",
         "tests/SnippyGrab.IntegrationTests/UiRedesignTests.cs"

@@ -1,6 +1,6 @@
 # Capabilities and evidence
 
-Reviewed 2026-10-09 against source `df652d6` (0.1.0 alpha), before F02–F05 changes. The latest documented UI prerelease is `0.1.0-alpha.design.20261008.1`; earlier acceptance does not automatically cover changed behavior. The current [gate manifest](../scripts/release-gates.json) has **39 closed / 12 open** gates. This record describes evidence scope, not a universal compatibility promise.
+Reviewed 2026-10-09 against source `df652d6` (0.1.0 alpha), before F02–F05 changes. The latest documented UI prerelease is `0.1.0-alpha.design.20261008.1`; earlier acceptance does not automatically cover changed behavior. The baseline [gate manifest](../scripts/release-gates.json) had **39 closed / 12 open** gates. See [local implementation status](IMPLEMENTATION-STATUS.md) for subsequent changes and reopened gates. This record describes evidence scope, not a universal compatibility promise.
 
 | Area | Implemented / automated evidence | Observed build/environment and limits | Remaining acceptance |
 |---|---|---|---|
@@ -16,6 +16,6 @@ Reviewed 2026-10-09 against source `df652d6` (0.1.0 alpha), before F02–F05 cha
 | Resources | Q35 closed; recovered two-hour report dated 2026-10-07: PASS, 7201.09 s, 7279 cycles, 72 OCR runs | Synthetic 640×360, retention=never, periodic OCR/pins; local report has no Version/Build fields. Historical instructions identify queue.20261006.3 but exact executable identity is NOT AVAILABLE in that report | Report completion confirmed; prior trend review documented in RESOURCE-TESTING. No current-build/all-day/leak-free claim |
 | Export/future work | PNG exact-byte export; bounded PNG/JPEG/BMP import | Internal images remain PNG | JPEG export, batch export, composition and scrolling planned; recording excluded |
 
-Q1/Q9/Q16/Q19/Q20/Q25/Q26/Q27/Q29/Q32/Q41/Q44 are currently open. Q34/Q35/Q48 closure has narrower workload/scope meaning; Q48 does not establish actual signed artifacts. No gates were changed by this reconciliation. Older 51/51 reports are historical accepted-build records and do not supersede the current JSON.
+Q1/Q9/Q16/Q19/Q20/Q25/Q26/Q27/Q29/Q32/Q41/Q44 were open at the baseline. Q34/Q35/Q48 closure has narrower workload/scope meaning; Q48 does not establish actual signed artifacts. No gates were changed by this reconciliation. Older 51/51 reports are historical accepted-build records and do not supersede the current JSON.
 
 The recovered resource report remains outside Git at `Documents/SnippyGrab-test-results/resources-2h-20261007-121914.json`. Detailed reports stay local. Unavailable identities and observations are recorded explicitly rather than reconstructed. [Acceptance matrix](ACCEPTANCE.md), [desktop checklist](USER-TESTING.md), [resource workload](RESOURCE-TESTING.md), [release process](RELEASING.md).

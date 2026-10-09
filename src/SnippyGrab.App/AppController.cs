@@ -47,6 +47,8 @@ internal sealed class AppController : IDisposable
     private readonly LatestOperation ocr = new();
     private bool exitRequested;
     private bool choosingMonitor;
+    private bool exporting;
+    private readonly CancellationTokenSource exportLifetime = new();
     private string? cacheWarning;
     private string lastNotice = "No recent notification.";
     internal string LastOperationDetails => lastNotice;
@@ -105,6 +107,7 @@ internal sealed class AppController : IDisposable
             try { var picker = new MonitorCaptureWindow(); if (picker.ShowDialog() != true) return; target = picker.Target; }
             finally { choosingMonitor = false; if (foreground != 0) Native.SetForegroundWindow(foreground); }
         }
+        if (exitRequested || Exiting) return;
         ocr.Cancel(); Clipboard.Invalidate();
         CaptureResult? result;
         try
@@ -187,24 +190,32 @@ internal sealed class AppController : IDisposable
         var editor = new EditorWindow(this, record); editors[record.Id] = editor;
         editor.Closed += (_, _) => editors.Remove(record.Id); editor.Show();
     });
-    public ExportOutcome Save(CaptureRecord record, Window? owner = null)
+    public async Task<ExportOutcome> Save(CaptureRecord record, Window? owner = null)
     {
+        if (exporting || exitRequested || Exiting) return new(ExportStatus.Cancelled);
+        exporting = true;
         try
         {
+            var revision = record.FileName;
+            if (!Repository.Captures.Contains(record)) throw new InvalidOperationException("Capture is no longer current.");
+            using var lease = Repository.Lease([record]);
             var priorDirectory = string.IsNullOrWhiteSpace(record.ExportPath) ? null : Path.GetDirectoryName(record.ExportPath);
             var directory = Directory.Exists(priorDirectory) ? priorDirectory! : Directory.Exists(Settings.SaveDirectory) ? Settings.SaveDirectory : "";
-            var dialog = new SaveFileDialog { Title = "Export PNG outside the managed cache", Filter = "PNG image|*.png", FileName = string.IsNullOrWhiteSpace(record.ExportPath) ? $"SnippyGrab-{record.CreatedUtc.LocalDateTime:yyyyMMdd-HHmmss}.png" : Path.GetFileName(record.ExportPath), DefaultExt = ".png", AddExtension = true, OverwritePrompt = true, InitialDirectory = directory };
-            if ((owner is null ? dialog.ShowDialog() : dialog.ShowDialog(owner)) != true) return new(ExportStatus.Cancelled);
-            var result = CaptureExport.Write(Repository, record, dialog.FileName);
-            var warning = result.MetadataSaved ? null : "PNG exported, but capture history could not be updated. The file is safe; retry later to remember its destination.";
-            Notify(warning ?? "PNG exported to: " + result.Path);
-            Try(() => Dock.Refresh());
+            var dialog = new ExportWindow(record, directory, Repository.Root, owner);
+            if (dialog.ShowDialog() != true || dialog.Request is not { } request) return new(ExportStatus.Cancelled);
+            if (record.FileName != revision) throw new InvalidOperationException("Capture changed while choosing export options. Retry export.");
+            var result = await CaptureExport.WriteAsync(Repository, record, request.Path, request.Format, request.Quality,
+                (source, quality) => ImageService.Jpeg(ImageService.Load(source), quality), exportLifetime.Token);
+            var warning = result.MetadataSaved ? null : "Image exported, but capture history could not be updated. The file is safe; retry later to remember its destination.";
+            if (!disposed) { Notify(warning ?? request.Format + " exported to: " + result.Path); Try(() => Dock.Refresh()); }
             return new(ExportStatus.Exported, result.Path, warning);
         }
+        catch (OperationCanceledException) { return new(ExportStatus.Cancelled); }
         catch (Exception ex)
         {
-            Failure(ex); return new(ExportStatus.Failed, Message: OperationFailure.From(ex).Message);
+            if (!disposed) Failure(ex); return new(ExportStatus.Failed, Message: OperationFailure.From(ex).Message);
         }
+        finally { exporting = false; }
     }
     public void OpenExportFolder(string path) => Try(() =>
     {
@@ -372,6 +383,6 @@ internal sealed class AppController : IDisposable
         if (disposed) return; disposed = true;
         Exiting = true; lifecycle.Dispose(); cleanup.Stop(); expiry.Stop();
         SystemEvents.DisplaySettingsChanged -= DisplayChanged; SystemEvents.PowerModeChanged -= PowerChanged; SystemEvents.UserPreferenceChanged -= PreferencesChanged;
-        Ui.FailureHandler = null; ocr.Dispose(); Clipboard.Invalidate(); Hotkeys.Dispose(); tray.Visible = false; tray.ContextMenuStrip?.Dispose(); tray.Icon?.Dispose(); tray.Dispose();
+        exportLifetime.Cancel(); Ui.FailureHandler = null; ocr.Dispose(); Clipboard.Invalidate(); Hotkeys.Dispose(); tray.Visible = false; tray.ContextMenuStrip?.Dispose(); tray.Icon?.Dispose(); tray.Dispose();
     }
 }

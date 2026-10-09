@@ -225,7 +225,7 @@ internal sealed class DockWindow : Window
                 ("edit", "Edit (Enter)", () => controller.Edit(capture)),
                 ("copy", "Copy image (Ctrl+C)", () => controller.Run(() => controller.Copy(capture))),
                 ("pin", capture.Pinned ? "Unpin" : "Pin indefinitely", () => controller.Pin(capture)),
-                ("export", "Save as (Ctrl+S)", () => controller.Save(capture)),
+                ("export", "Save as (Ctrl+S)", () => controller.Run(() => controller.Save(capture))),
                 ("ocr", "OCR and copy text", () => controller.Run(() => controller.Ocr(capture)))
         };
         foreach (var (icon, hint, action) in actions.Take(size < 210 ? 2 : actions.Length))
@@ -304,7 +304,7 @@ internal sealed class DockWindow : Window
         copy.Items.Add(Ui.Menu("Filename", "image", () => controller.Run(() => controller.CopyPath(record, filename: true))));
         menu.Items.Add(copy);
         menu.Items.Add(Ui.Menu("Copy OCR text", "ocr", () => controller.Run(() => controller.Ocr(record))));
-        menu.Items.Add(Ui.Menu("Export PNG…", "export", () => controller.Save(record), "Ctrl+S"));
+        menu.Items.Add(Ui.Menu("Export image…", "export", () => controller.Run(() => controller.Save(record)), "Ctrl+S"));
         var folder = Ui.Menu("Open export folder", "folder", () => controller.OpenExportFolder(record.ExportPath)); folder.IsEnabled = !string.IsNullOrWhiteSpace(record.ExportPath); menu.Items.Add(folder);
         menu.Items.Add(new Separator());
         menu.Items.Add(Ui.Menu(record.Pinned ? "Unpin" : "Pin", "pin", () => controller.Pin(record), "Ctrl+P"));
@@ -360,7 +360,7 @@ internal sealed class DockWindow : Window
             case ShelfAction.Copy: controller.Run(() => targets.Count == 1 ? controller.Copy(targets[0]) : controller.CopyFiles(targets)); break;
             case ShelfAction.Dismiss: controller.Dismiss(targets); break;
             case ShelfAction.Edit: controller.Edit(targets[0]); break;
-            case ShelfAction.Export: controller.Save(targets[0]); break;
+            case ShelfAction.Export: controller.Run(() => controller.Save(targets[0])); break;
             case ShelfAction.Pin: controller.Pin(targets[0]); break;
             case ShelfAction.History: controller.ShowHistory(); break;
             case ShelfAction.Settings: controller.ShowSettings(); break;

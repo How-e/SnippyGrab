@@ -11,9 +11,9 @@ For step-by-step user checks, see [USER-TESTING.md](USER-TESTING.md). Release re
 | Hotkeys | Every mode, fallback, changed keys, collision, Windows capture setting on/off, pause/resume; no repeat on hold. |
 | Region | Esc cancel, click without drag, backwards selection, cross-monitor spans, negative origins, vertical displays. |
 | DPI | 100%, 125%, 150%, 175%, 200%, mixed scaling. Exact physical crop and sensible shelf placement in every corner. |
-| Capture modes | Desktop, window picker and active window; partly offscreen/maximized windows, cursor on/off, protected/secure desktop. |
+| Capture modes | Desktop, monitor picker/tray/optional hotkey (full physical bounds, disconnect cancellation), window picker and active window; partly offscreen/maximized windows, cursor on/off, protected/secure desktop. |
 | Dock | 1/5/20 captures; bounded footprint and expansion; wheel traverses all; Ctrl-click selections visible; drag threshold avoids editor opening; Alt-drag reorder; keyboard operations. |
-| Editor | All tools, reversed drags, zoom, undo/redo branches, save/copy/close/discard; exported redaction pixels opaque; original transfer file unchanged after edit. |
+| Editor | All tools, reversed drags, zoom, undo/redo branches, save/copy/close/discard; shared PNG/JPEG options from shelf/history/editor, quality and white alpha background, overwrite/cancel; exported redaction pixels opaque; original transfer file unchanged after edit. |
 | OCR | Error/stack trace/dialog/log, entire image and selected area. Missing model and VC++ runtime leave capture working. Review text for character errors. |
 | Cache | 1h/24h/7d/never, session-only, clear during drag/editor, pins after restart, disabled history, corrupt JSON, abnormal termination between image/metadata writes. |
 | Tray | Close UI keeps tray; Exit saves pending editor changes. Explorer restart, startup, sleep/resume, display disconnect/reconnect. |

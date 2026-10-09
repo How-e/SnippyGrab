@@ -213,6 +213,22 @@ internal static class RuntimeChecks
             using var controller = new AppController(true, root, diagnostic: true);
             var image = SyntheticCode(720, 360); var record = controller.Repository.Add(ImageService.Png(image), 720, 360);
             CaptureExport.Write(controller.Repository, record, Path.Combine(root, "exports", "synthetic.png"));
+            var export = new ExportWindow(record, root, controller.Repository.Root, null) { ShowActivated = false, WindowStartupLocation = WindowStartupLocation.Manual, Left = -30000, Top = -30000 };
+            try
+            {
+                export.Show(); await Task.Delay(50); export.UpdateLayout();
+                var content = (FrameworkElement)export.Content;
+                var png = new RenderTargetBitmap((int)export.Width, (int)export.Height, 96, 96, PixelFormats.Pbgra32); png.Render(content);
+                File.WriteAllBytes(destination + ".export.png", ImageService.Png(png));
+                Assert(Descendants<ComboBox>(content).Single().SelectedIndex == 0, "Export defaults to PNG");
+                foreach (var scale in new[] { 1.0, 1.5, 2.25 })
+                {
+                    Ui.Theme(AppTheme.Dark, scale); export.UpdateLayout();
+                    Assert(Descendants<Slider>(content).Single().Value == 90, "JPEG default quality stays 90");
+                    Assert(((ScrollViewer)content).VerticalScrollBarVisibility == ScrollBarVisibility.Auto, "Export options scroll at larger text scales");
+                }
+            }
+            finally { export.Close(); Ui.Theme(AppTheme.Dark, 1); }
             var editor = new EditorWindow(controller, record) { ShowActivated = false, WindowStartupLocation = WindowStartupLocation.Manual, Left = -30000, Top = -30000 };
             try
             {
@@ -226,7 +242,7 @@ internal static class RuntimeChecks
                         var rootPanel = (DockPanel)editor.Content;
                         var buttons = Descendants<Button>(rootPanel).ToArray();
                         string Id(DependencyObject element) => System.Windows.Automation.AutomationProperties.GetAutomationId(element);
-                        Assert(buttons.Any(b => Id(b) == "Apply + copy") && buttons.Any(b => Id(b) == "Export PNG…"), "Explicit apply/export actions");
+                        Assert(buttons.Any(b => Id(b) == "Apply + copy") && buttons.Any(b => Id(b) == "Export image…"), "Explicit apply/export actions");
                         Assert(editor.ExportFolderAction.IsEnabled, "Successful export exposes folder action");
                         foreach (var input in Descendants<Control>(rootPanel).Where(c => c is TextBox or ComboBox))
                             Assert(!string.IsNullOrWhiteSpace(System.Windows.Automation.AutomationProperties.GetName(input)), "Editor input exposes an accessible name");

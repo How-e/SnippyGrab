@@ -96,6 +96,20 @@ public sealed class UiRedesignTests
                 }
                 finally { history.Close(); }
                 var editor = new EditorWindow(controller, controller.Repository.Captures[0]);
+                var exportRecord = controller.Repository.Captures[0]; exportRecord.ExportPath = Path.Combine(root, "previous.jpg");
+                Assert.EndsWith(".png", ExportWindow.SuggestedFileName(exportRecord, ExportFormat.Png));
+                var exportWindow = new ExportWindow(exportRecord, root, controller.Repository.Root, null);
+                try
+                {
+                    var form = (StackPanel)((ScrollViewer)exportWindow.Content).Content;
+                    var format = form.Children.OfType<ComboBox>().Single(); var quality = form.Children.OfType<Slider>().Single();
+                    Assert.Equal(0, format.SelectedIndex); Assert.Equal(90, quality.Value); Assert.False(quality.IsEnabled);
+                    format.SelectedIndex = 1; Assert.True(quality.IsEnabled); quality.Value = 75;
+                    Assert.Contains(form.Children.OfType<TextBlock>(), text => text.Text == "JPEG quality: 75");
+                    Assert.Null(exportWindow.Request);
+                    exportWindow.Measure(new Size(560, 360)); exportWindow.Arrange(new Rect(0, 0, 560, 360)); exportWindow.UpdateLayout();
+                }
+                finally { exportWindow.Close(); }
                 foreach (var tool in Enum.GetValues<EditTool>()) { editor.ToolPicker.SelectedValue = tool; Assert.Equal(tool, editor.ToolPicker.SelectedValue); }
                 var closed = false; editor.Closed += (_, _) => closed = true;
                 editor.Close();

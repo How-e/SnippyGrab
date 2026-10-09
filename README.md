@@ -16,7 +16,7 @@ Release requirements and regression ownership are maintained in `scripts/release
 
 The interface uses consistent line icons, neutral surfaces and a restrained blue accent. System, Light and Dark themes share the same controls. Settings are grouped into seven categories; the editor keeps all sixteen tools in a scrollable rail with contextual properties, and Recent captures pairs a virtualized list with a large preview. Narrow windows use compact navigation and wrapping actions.
 
-Synthetic content rendered by the current WPF interface; no private captures. These previews show the source design; the release linked below predates this redesign.
+Synthetic content rendered by the current WPF interface; no private captures. These previews show the redesigned interface included in the latest prerelease.
 
 ![Compact shelf with twenty captures, showing three visible cards](docs/images/dock.png)
 
@@ -40,7 +40,7 @@ Extract the complete release ZIP, then run `SnippyGrab.exe`. Keep `Tesseract.dll
 
 For per-user installation without elevation, run `powershell -NoProfile -File .\install.ps1` from the extracted bundle; add `-Startup` to enable login startup. Local script execution must be permitted by your PowerShell policy. The installer adds a Start menu shortcut and Apps uninstall entry. Exit from the tray before upgrading/uninstalling. Uninstall removes its startup registration and application files; captures/settings remain in `%LOCALAPPDATA%\SnippyGrab` for recovery. Portable removal: disable login startup, exit, then delete the extracted directory. Remove user data separately when no longer needed.
 
-Initial builds are unsigned; SmartScreen may prompt. Compare `Get-FileHash <download.zip> -Algorithm SHA256` with the release `.sha256`. Bundles include `SHA256SUMS.txt`. Hashes verify integrity, not publisher identity. Published builds are available under [GitHub releases](https://github.com/How-e/SnippyGrab/releases); the latest validated prerelease is [0.1.0-alpha.acceptance.20261007.8](https://github.com/How-e/SnippyGrab/releases/tag/v0.1.0-alpha.acceptance.20261007.8). Verify both the archive hash and the included file checksums before use.
+Initial builds are unsigned; SmartScreen may prompt. Compare `Get-FileHash <download.zip> -Algorithm SHA256` with the release `.sha256`. Bundles include `SHA256SUMS.txt`. Hashes verify integrity, not publisher identity. Published builds are available under [GitHub releases](https://github.com/How-e/SnippyGrab/releases); the latest validated prerelease is [0.1.0-alpha.design.20261008.1](https://github.com/How-e/SnippyGrab/releases/tag/v0.1.0-alpha.design.20261008.1). Verify both the archive hash and the included file checksums before use.
 
 ## Usage
 

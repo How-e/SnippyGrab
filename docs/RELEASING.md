@@ -4,7 +4,7 @@
 2. Complete docs/ACCEPTANCE.md and update scripts/release-gates.json. Keep detailed results outside Git. Keep incomplete builds prerelease.
 3. Update CHANGELOG.md; run `pwsh ./scripts/package.ps1 -Version 0.1.0-alpha`.
 4. Run the bundle executable with `--self-test` on an interactive desktop; test install/removal in a disposable user profile.
-5. For the configured How-e/SnippyGrab remote, push an authorized reviewed version tag. The tag workflow builds/tests and publishes ZIP/setup + SHA-256 using the ephemeral GitHub token. Ordinary PR builds need no signing credentials or application secrets. The initial alpha upload required manual recovery; verify the corrected upload end to end on the next authorized release.
+5. For the configured How-e/SnippyGrab remote, push an authorized reviewed version tag. The tag workflow builds/tests and publishes ZIP/setup + SHA-256 using the ephemeral GitHub token. Ordinary PR builds need no signing credentials or application secrets. The corrected upload was verified for the acceptance prerelease; independently download and verify every new release before announcing it.
 
 .NET is bundled. OCR native DLLs and English model must stay beside the executable. OCR may additionally require Microsoft VC++ 2015–2022 x64 redistributable. No binaries/models in Git; provisioning pins model commit and SHA-256. Full dependency licenses accompany releases.
 

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Installation, usage, and known limitations
+    url: https://github.com/How-e/SnippyGrab/blob/main/README.md
+    about: Check setup, shortcuts, supported Windows versions, and current limitations.
+  - name: Report a security vulnerability privately
+    url: https://github.com/How-e/SnippyGrab/security/advisories/new
+    about: Use private vulnerability reporting; do not disclose vulnerabilities in public issues.

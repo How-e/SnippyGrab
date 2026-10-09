@@ -306,6 +306,7 @@ internal sealed class DockWindow : Window
         menu.Items.Add(Ui.Menu("Copy OCR text", "ocr", () => controller.Run(() => controller.Ocr(record))));
         menu.Items.Add(Ui.Menu("Export image…", "export", () => controller.Run(() => controller.Save(record)), "Ctrl+S"));
         menu.Items.Add(Ui.Menu("Export selected…", "export", () => controller.Run(() => controller.ExportSelected(selected.Contains(record.Id) ? controller.Repository.Captures.Where(c => selected.Contains(c.Id)).ToArray() : [record]))));
+        menu.Items.Add(Ui.Menu("Combine selected…", "image", () => controller.Run(() => controller.CombineSelected(controller.Repository.Captures.Where(c => selected.Contains(c.Id)).ToArray()))));
         var folder = Ui.Menu("Open export folder", "folder", () => controller.OpenExportFolder(record.ExportPath)); folder.IsEnabled = !string.IsNullOrWhiteSpace(record.ExportPath); menu.Items.Add(folder);
         menu.Items.Add(new Separator());
         menu.Items.Add(Ui.Menu(record.Pinned ? "Unpin" : "Pin", "pin", () => controller.Pin(record), "Ctrl+P"));

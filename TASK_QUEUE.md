@@ -12,7 +12,7 @@ The former task queue is absent from this checkout. New work uses F identifiers 
 | 4 | F04 | P1 | Add dedicated monitor capture | S–M | Agent + physical monitor acceptance | Implemented; physical monitor acceptance NOT RUN |
 | 5 | F05 | P1 | Add JPEG export with shared safe export boundary | M | Agent | Implemented; shared dialog desktop acceptance NOT RUN |
 | 6 | F06 | P1 | Add ordered batch export from shelf and history | M | F05; Agent + receiver/file workflow acceptance | Implemented; desktop workflow acceptance NOT RUN |
-| 7 | F07 | P1 | Combine selected captures into strip/grid | M | Agent + editor/shelf acceptance | Planned |
+| 7 | F07 | P1 | Combine selected captures into strip/grid | M | Agent + editor/shelf acceptance | Implemented; native gesture acceptance NOT RUN |
 | 8 | F08 | P1 | Specify scrolling capture feasibility and supported first-release targets | M | Agent research; F07 informs composition | Planned; design decision |
 | 9 | F09 | P1 | Implement bounded, assisted scrolling capture after feasibility decision | L | F08 go decision; F07 composition conventions; Shared | Planned; conditional |
 | 10 | F10 | P2 | Add WebP export after explicit codec admission | M | F05; dependency/security review | Planned; codec decision |

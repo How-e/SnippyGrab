@@ -243,6 +243,28 @@ internal sealed class AppController : IDisposable
         catch (Exception ex) { if (progress is not null) progress.Complete(OperationFailure.From(ex).Message); if (!disposed) Failure(ex); }
         finally { exporting = false; }
     }
+    public async Task CombineSelected(IReadOnlyList<CaptureRecord> selected, Window? owner = null)
+    {
+        if (exporting || exitRequested || Exiting) return;
+        exporting = true; OperationWindow? progress = null;
+        try
+        {
+            var ordered = TransferPayload.Ordered(Repository, selected);
+            using var leases = Repository.Lease(ordered);
+            var dialog = new CompositionWindow(ordered.Select(c => new CompositionInput(Repository.PathFor(c), c.Width, c.Height)).ToArray(), owner);
+            if (dialog.ShowDialog() != true || dialog.Layout is not { } layout) return;
+            progress = new OperationWindow("Combining captures", owner); progress.Show();
+            using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(progress.Cancellation, exportLifetime.Token);
+            var paths = dialog.Inputs.Select(i => i.Path).ToArray(); var background = dialog.BackgroundColor;
+            var image = await Task.Run(() => CompositionService.Render(paths, layout, background, lifetime.Token), lifetime.Token);
+            var png = await Task.Run(() => ImageService.Png(image), lifetime.Token); lifetime.Token.ThrowIfCancellationRequested();
+            var combined = Repository.Add(png, image.PixelWidth, image.PixelHeight); Dock.Refresh(newCapture: true);
+            progress.Complete("Created a new managed PNG. Original captures are unchanged."); Edit(combined);
+        }
+        catch (OperationCanceledException) { progress?.Complete("Combination cancelled. Original captures are unchanged."); }
+        catch (Exception ex) { progress?.Complete(OperationFailure.From(ex).Message); if (!disposed) Failure(ex); }
+        finally { exporting = false; }
+    }
     public void Pin(CaptureRecord record) => Try(() => { Repository.SetPinned(record, !record.Pinned); Dock.Refresh(); });
     public void Detach(CaptureRecord record) => Try(() =>
     {

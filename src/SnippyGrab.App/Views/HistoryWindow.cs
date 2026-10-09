@@ -63,6 +63,7 @@ internal sealed class HistoryWindow : Window
         copy = Action("Copy image", "copy", "Copy image or selected PNG files", () => controller.Run(async () => { var selected = Selected(); if (selected.Count == 1) await controller.Copy(selected[0]); else if (selected.Count > 1) await controller.CopyFiles(selected); }));
         Action("Pin", "pin", "Toggle pins on selected captures", () => { foreach (var capture in Selected()) controller.Pin(capture); Refresh(); });
         Action("Export selected…", "export", "Export selected captures in shelf order", () => controller.Run(() => controller.ExportSelected(Selected(), this)));
+        Action("Combine selected…", "image", "Combine 2–20 selected captures into a new image", () => controller.Run(() => controller.CombineSelected(Selected(), this)));
         Action("More", "more", "More selected capture actions", () =>
         {
             var menu = new ContextMenu(); menu.Items.Add(Ui.Menu("Edit", "edit", () => { if (Selected().FirstOrDefault() is { } c) controller.Edit(c); }, "Enter")); menu.Items.Add(Ui.Menu("Dismiss", "close", () => { controller.Dismiss(Selected()); Refresh(); }, "Delete")); menu.Items.Add(Ui.Menu("Export image…", "export", () => { if (Selected().FirstOrDefault() is { } c) controller.Run(() => controller.Save(c)); }, "Ctrl+S")); menu.Items.Add(Ui.Menu("Copy OCR text", "ocr", () => { if (Selected().FirstOrDefault() is { } c) controller.Run(() => controller.Ocr(c)); })); menu.PlacementTarget = toolbar; menu.IsOpen = true;

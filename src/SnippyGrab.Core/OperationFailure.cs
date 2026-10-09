@@ -27,7 +27,7 @@ public sealed record OperationFailure(FailureKind Kind, string Message)
             FailureKind.Storage => "Storage could not be updated. Check free space and file locks, then retry. Existing captures remain available.",
             FailureKind.InvalidInput => "This input is invalid or unsupported. Review the image, path or settings and retry.",
             FailureKind.Clipboard => "Clipboard is unavailable. Close the app holding it and retry Copy.",
-            FailureKind.Ocr => "Local OCR could not load. Use the complete package and install the Microsoft Visual C++ 2015–2022 x64 runtime.",
+            FailureKind.Ocr => "Local OCR could not load. Use the complete x64 package; Settings → Editor & OCR → Check OCR readiness provides model and dependency guidance.",
             _ => "This operation failed. Retry the action; if it repeats, restart SnippyGrab. Existing capture files are retained."
         });
     }

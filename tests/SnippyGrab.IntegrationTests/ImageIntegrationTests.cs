@@ -247,7 +247,7 @@ public sealed class ImageIntegrationTests
         var text = await new OcrService().ReadAsync(bytes); Assert.Contains("CS1002", text);
     }
     [Fact] public async Task OcrHonorsCancellation() { using var token = new CancellationTokenSource(); token.Cancel(); await Assert.ThrowsAnyAsync<OperationCanceledException>(() => new OcrService().ReadAsync([], token.Token)); }
-    [Fact] public async Task MissingModelReturnsActionableError() { var error = await Assert.ThrowsAsync<InvalidOperationException>(() => new OcrService(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString())).ReadAsync([])); Assert.Contains("model is missing", error.Message); }
+    [Fact] public async Task MissingModelReturnsActionableError() { var error = await Assert.ThrowsAsync<OcrUnavailableException>(() => new OcrService(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString())).ReadAsync([])); Assert.Contains("model is missing", error.Message); }
     [Fact]
     public void CorruptImportIsRejectedWithoutDesktop()
     {

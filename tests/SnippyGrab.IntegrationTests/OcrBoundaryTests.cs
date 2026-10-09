@@ -127,8 +127,8 @@ public sealed class OcrBoundaryTests
         try
         {
             File.WriteAllText(Path.Combine(directory, "eng.traineddata"), "untrusted fixture");
-            var error = await Assert.ThrowsAsync<InvalidOperationException>(() => new OcrService(directory).ReadAsync(new byte[30]));
-            Assert.Contains("checksum failed", error.Message);
+            var error = await Assert.ThrowsAsync<OcrUnavailableException>(() => new OcrService(directory).ReadAsync(new byte[30]));
+            Assert.Equal(OcrReadinessStatus.ModifiedModel, error.Readiness.Status);
         }
         finally { Directory.Delete(directory, true); }
     }

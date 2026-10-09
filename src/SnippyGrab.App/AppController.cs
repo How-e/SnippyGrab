@@ -160,7 +160,7 @@ internal sealed class AppController : IDisposable
             return await CopyText(text, token) ? "OCR text copied." : "OCR text was not copied. Retry OCR when the clipboard is available.";
         }
         catch (OperationCanceledException) { return "OCR cancelled."; }
-        catch (Exception ex) { Log("failure_category=Ocr; exception_type=" + ex.GetType().Name); return ex is InvalidDataException ? "OCR input is invalid or too large. Use a smaller valid image; capture remains available." : "OCR failed. Check the local English model and complete x64 package/Visual C++ runtime, then retry OCR. Capture remains available."; }
+        catch (Exception ex) { Log("failure_category=Ocr; exception_type=" + ex.GetType().Name); return ex is InvalidDataException ? "OCR input is invalid or too large. Use a smaller valid image; capture remains available." : (ex is OcrUnavailableException unavailable ? unavailable.Readiness.Message : OcrReadiness.From(ex).Message) + " Capture remains available. Settings → Editor & OCR → Check OCR readiness provides guidance."; }
     }
     public async Task Ocr(CaptureRecord record)
     {

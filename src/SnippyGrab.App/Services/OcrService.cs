@@ -3,10 +3,57 @@ using Tesseract;
 
 namespace SnippyGrab.App.Services;
 
-internal interface IOcrService { Task<string> ReadAsync(byte[] png, CancellationToken cancellation = default); }
+internal interface IOcrService
+{
+    Task<string> ReadAsync(byte[] png, CancellationToken cancellation = default);
+    Task<OcrReadiness> CheckReadinessAsync(CancellationToken cancellation = default) => Task.FromResult(new OcrReadiness(OcrReadinessStatus.Inconclusive));
+}
 internal sealed class OcrService(string? modelDirectory = null, Func<Settings>? settingsProvider = null) : IOcrService
 {
     private readonly SemaphoreSlim serial = new(1);
+    internal static OcrReadiness InspectPackage(string directory, string package)
+    {
+        var model = Path.Combine(directory, "eng.traineddata");
+        try
+        {
+            ManagedPath.RejectRedirects(model);
+            if (!File.Exists(model)) return new(OcrReadinessStatus.MissingModel);
+            try { ValidateModel(model); }
+            catch (InvalidOperationException) { return new(OcrReadinessStatus.ModifiedModel); }
+            foreach (var name in new[] { "Tesseract.dll", "x64/tesseract50.dll", "x64/leptonica-1.82.0.dll" })
+            {
+                var path = Path.Combine(package, name); ManagedPath.RejectRedirects(path);
+                if (!File.Exists(path)) return new(OcrReadinessStatus.MissingLibrary);
+            }
+            return new(OcrReadinessStatus.Ready);
+        }
+        catch (InvalidDataException) { return new(OcrReadinessStatus.ModifiedModel); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return new(OcrReadinessStatus.Inconclusive); }
+    }
+    public async Task<OcrReadiness> CheckReadinessAsync(CancellationToken cancellation = default)
+    {
+        await serial.WaitAsync(cancellation);
+        try
+        {
+            return await Task.Run(() =>
+            {
+                cancellation.ThrowIfCancellationRequested();
+                var directory = modelDirectory ?? Path.Combine(AppContext.BaseDirectory, "tessdata");
+                var admitted = InspectPackage(directory, AppContext.BaseDirectory);
+                if (admitted.Status != OcrReadinessStatus.Ready) return admitted;
+                try
+                {
+                    TesseractEnviornment.CustomSearchPath = AppContext.BaseDirectory;
+                    using var engine = new TesseractEngine(directory, "eng", EngineMode.LstmOnly);
+                    cancellation.ThrowIfCancellationRequested();
+                    return new OcrReadiness(OcrReadinessStatus.Ready);
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex) { return OcrReadiness.From(ex); }
+            }, cancellation);
+        }
+        finally { serial.Release(); }
+    }
     public async Task<string> ReadAsync(byte[] png, CancellationToken cancellation = default)
     {
         var settings = settingsProvider?.Invoke();
@@ -20,8 +67,8 @@ internal sealed class OcrService(string? modelDirectory = null, Func<Settings>? 
                 cancellation.ThrowIfCancellationRequested();
                 var directory = modelDirectory ?? Path.Combine(AppContext.BaseDirectory, "tessdata");
                 if (png.Length > 100 * 1024 * 1024) throw new InvalidDataException("OCR image exceeds 100 MB.");
-                if (!File.Exists(Path.Combine(directory, "eng.traineddata"))) throw new InvalidOperationException("English OCR model is missing. Run scripts/provision-ocr.ps1 and rebuild, or reinstall the complete package.");
-                ValidateModel(Path.Combine(directory, "eng.traineddata"));
+                var admitted = InspectPackage(directory, AppContext.BaseDirectory);
+                if (admitted.Status != OcrReadinessStatus.Ready) throw new OcrUnavailableException(admitted);
                 using (var encoded = new MemoryStream(png, writable: false)) ImageService.ValidateEncoded(encoded);
                 TesseractEnviornment.CustomSearchPath = AppContext.BaseDirectory;
                 using var engine = new TesseractEngine(directory, "eng", EngineMode.LstmOnly);
@@ -60,7 +107,7 @@ internal sealed class OcrService(string? modelDirectory = null, Func<Settings>? 
             }, cancellation);
         }
         catch (Exception ex) when (HasNativeLoaderFailure(ex))
-        { throw new InvalidOperationException("Local OCR native libraries could not load. Reinstall the complete x64 package and its Visual C++ runtime; capture remains available.", ex); }
+        { throw new OcrUnavailableException(OcrReadiness.From(ex)); }
         finally { serial.Release(); }
     }
     internal static float EnhancementScale(int width, int height)

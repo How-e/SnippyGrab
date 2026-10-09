@@ -25,6 +25,7 @@ internal sealed class SettingsWindow : Window
     private int category;
     private int buildingCategory;
     private StackPanel group = new();
+    private readonly CancellationTokenSource readinessLifetime = new();
     internal static readonly (string Title, string Icon, string Description)[] Categories =
     [
         ("Appearance", "appearance", "Choose how SnippyGrab looks on your desktop."),
@@ -65,6 +66,7 @@ internal sealed class SettingsWindow : Window
         right.Children.Add(Ui.Scroll(pageHost));
         SizeChanged += (_, _) => Responsive(); Ui.ThemeChanged += Responsive; Closed += (_, _) => Ui.ThemeChanged -= Responsive;
         Populate(); SelectCategory(0);
+        Closed += (_, _) => readinessLifetime.Cancel();
     }
     private sealed record CategoryChoice(string Title);
     private static Settings Clone(Settings settings) => JsonSerializer.Deserialize<Settings>(JsonSerializer.Serialize(settings))!;
@@ -123,7 +125,7 @@ internal sealed class SettingsWindow : Window
                     page.Children.Add(Ui.ActionButton("Clear temporary captures…", "trash", "Clear eligible unpinned captures", controller.ClearTemporary)); break;
                 case 5:
                     Group("Annotations"); Add(nameof(Settings.AnnotationColor), "Default color", "#RRGGBB or #AARRGGBB"); Add(nameof(Settings.StrokeSize), "Stroke thickness", "1–30 px"); Add(nameof(Settings.TextSize), "Text size", "8–120 px");
-                    Group("Text recognition"); Add(nameof(Settings.OcrEnhanceSmallText), "Enhance small text", "Improves smaller inputs without changing the saved image."); Add(nameof(Settings.OcrLayout), "Text layout"); Note("Recognition is local and English only. Auto retries scattered text when confidence is low. Use OCR selected area in the editor for best accuracy."); break;
+                    Group("Text recognition"); Add(nameof(Settings.OcrEnhanceSmallText), "Enhance small text", "Improves smaller inputs without changing the saved image."); Add(nameof(Settings.OcrLayout), "Text layout"); Note("Recognition is local and English only. Auto retries scattered text when confidence is low. Use OCR selected area in the editor for best accuracy."); AddReadiness(); break;
                 case 6:
                     Group("Startup"); Add(nameof(Settings.LaunchOnStartup), "Launch at Windows login"); Add(nameof(Settings.StartMinimized), "Start silently in tray", "After first-run setup.");
                     Group("About SnippyGrab"); Note("A native, local screenshot shelf. No uploads, accounts, analytics or update polling."); Note("SnippyGrab " + BuildVersion.Display + " · MIT"); Note("Updates are manual through release downloads."); page.Children.Add(Ui.ActionButton("Hotkey help", "keyboard", "Review hotkeys and conflicts", controller.ShowHotkeyHelp)); break;
@@ -148,6 +150,21 @@ internal sealed class SettingsWindow : Window
         fields[name] = (input, buildingCategory, error); group.Children.Add(row);
     }
     private sealed record Choice(object Value, string Label) { public override string ToString() => Label; }
+    private void AddReadiness()
+    {
+        var result = Ui.Text("Checks run only on request. Native engine loading cannot be interrupted; closing ignores its result.", 12, true);
+        AutomationProperties.SetName(result, "OCR readiness result");
+        Button? check = null;
+        check = Ui.ActionButton("Check OCR readiness", "ocr", "Check the local model and load the OCR engine", () => controller.Run(async () =>
+        {
+            check!.IsEnabled = false; result.Text = "Checking local OCR…";
+            try { var readiness = await controller.OcrService.CheckReadinessAsync(readinessLifetime.Token); if (!readinessLifetime.IsCancellationRequested) result.Text = readiness.Message; }
+            catch (OperationCanceledException) { }
+            finally { if (!readinessLifetime.IsCancellationRequested) check.IsEnabled = true; }
+        }));
+        group.Children.Add(check); group.Children.Add(result);
+        group.Children.Add(Ui.ActionButton("Microsoft runtime guidance", "info", "Open Microsoft Visual C++ runtime guidance in your browser", () => Process.Start(new ProcessStartInfo(OcrReadiness.RuntimeUrl) { UseShellExecute = true }), "QuietButton"));
+    }
     private static string Label(object value) => value switch { CaptureMode.ActiveWindow => "Active window", PreviewQuality.Original => "Original (more memory)", OcrLayout.SparseText => "Scattered text", OcrLayout.SingleBlock => "Single paragraph", _ => System.Text.RegularExpressions.Regex.Replace(value.ToString()!, "([a-z])([A-Z])", "$1 $2") };
     private void Add(string name, string label, string? hint = null)
     {

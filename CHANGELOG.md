@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.0-alpha.design.20261008.1 — 2026-10-08
 
 - Unified WPF windows, menus, dialogs and tray icons with shared Light/Dark/System themes, line icons, visible keyboard focus and high-contrast colors; refreshed the installer appearance.
 - Organized settings into seven categories with preserved drafts and field-level validation. Added a scrollable editor tool rail, contextual properties and a responsive history list/preview view.

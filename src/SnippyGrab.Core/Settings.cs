@@ -114,7 +114,8 @@ public sealed class SettingsService(string file)
 
 public static class AtomicFile
 {
-    public static void Write(string path, byte[] data)
+    public static void Write(string path, byte[] data) => Write(path, data, true);
+    public static void Write(string path, byte[] data, bool overwrite)
     {
         ManagedPath.RejectRedirects(path);
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
@@ -124,7 +125,7 @@ public static class AtomicFile
             using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
             { stream.Write(data); stream.Flush(true); }
             ManagedPath.RejectRedirects(path);
-            File.Move(temporary, path, true);
+            File.Move(temporary, path, overwrite);
         }
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }

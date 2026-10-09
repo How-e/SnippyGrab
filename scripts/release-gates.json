@@ -460,6 +460,7 @@
       "tests": [
         "tests/SnippyGrab.Tests/EditorCommitTests.cs",
         "tests/SnippyGrab.Tests/CaptureExportTests.cs",
+        "tests/SnippyGrab.Tests/BatchExportTests.cs",
         "tests/SnippyGrab.IntegrationTests/JpegExportTests.cs",
         "tests/SnippyGrab.Tests/CrossViewRevisionTests.cs",
         "tests/SnippyGrab.IntegrationTests/EditorDocumentTests.cs",

@@ -41,7 +41,7 @@ public static class CaptureExport
     {
         if (!repository.Captures.Contains(capture) || capture.FileName != revision) throw new InvalidOperationException("Capture changed. Select it again before exporting.");
     }
-    private static CaptureExportResult Remember(CaptureRepository repository, CaptureRecord capture, string path)
+    internal static CaptureExportResult Remember(CaptureRepository repository, CaptureRecord capture, string path)
     {
         capture.Saved = true; capture.ExportPath = path;
         try { repository.Persist(); return new(path, true); }

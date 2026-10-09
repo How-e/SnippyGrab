@@ -1,6 +1,6 @@
 # Planned improvements task queue
 
-Researched 2026-10-09 against `df652d6`. Implementation of F01–F05 authorized 2026-10-09; local commits only. Implementation status does not close acceptance gates. Details, source links, integration points and acceptance criteria are in [IMPLEMENTATION-BRIEFS.md](docs/IMPLEMENTATION-BRIEFS.md).
+Researched 2026-10-09 against `df652d6`. Implementation of the remaining backlog authorized 2026-10-09; local commits only. Implementation status does not close acceptance gates. Details, source links, integration points and acceptance criteria are in [IMPLEMENTATION-BRIEFS.md](docs/IMPLEMENTATION-BRIEFS.md).
 
 The former task queue is absent from this checkout. New work uses F identifiers to avoid confusing it with Q1–Q51 in `scripts/release-gates.json`. That file remains the packaging authority. Existing release gates are not superseded by this backlog. Priority reflects user benefit, adoption risk, implementation cost and dependencies; size is relative complexity, not a time estimate.
 
@@ -11,7 +11,7 @@ The former task queue is absent from this checkout. New work uses F identifiers 
 | 3 | F03 | P1 | Establish real publisher signing and downloaded-install evidence | M | F02; owner signing identity/access + Agent | Tooling implemented; real signing/install blocked by external prerequisites |
 | 4 | F04 | P1 | Add dedicated monitor capture | S–M | Agent + physical monitor acceptance | Implemented; physical monitor acceptance NOT RUN |
 | 5 | F05 | P1 | Add JPEG export with shared safe export boundary | M | Agent | Implemented; shared dialog desktop acceptance NOT RUN |
-| 6 | F06 | P1 | Add ordered batch export from shelf and history | M | F05; Agent + receiver/file workflow acceptance | Planned |
+| 6 | F06 | P1 | Add ordered batch export from shelf and history | M | F05; Agent + receiver/file workflow acceptance | Implemented; desktop workflow acceptance NOT RUN |
 | 7 | F07 | P1 | Combine selected captures into strip/grid | M | Agent + editor/shelf acceptance | Planned |
 | 8 | F08 | P1 | Specify scrolling capture feasibility and supported first-release targets | M | Agent research; F07 informs composition | Planned; design decision |
 | 9 | F09 | P1 | Implement bounded, assisted scrolling capture after feasibility decision | L | F08 go decision; F07 composition conventions; Shared | Planned; conditional |

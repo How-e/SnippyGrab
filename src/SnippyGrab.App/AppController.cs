@@ -223,6 +223,26 @@ internal sealed class AppController : IDisposable
         if (!Directory.Exists(directory)) throw new IOException("The export folder is no longer available.");
         Process.Start(new ProcessStartInfo { FileName = directory!, UseShellExecute = true });
     });
+    public async Task ExportSelected(IReadOnlyList<CaptureRecord> selected, Window? owner = null)
+    {
+        if (exporting || selected.Count == 0 || exitRequested || Exiting) return;
+        exporting = true; OperationWindow? progress = null;
+        try
+        {
+            var ordered = TransferPayload.Ordered(Repository, selected);
+            using var leases = Repository.Lease(ordered);
+            var dialog = new ExportWindow(ordered[0], Settings.SaveDirectory, Repository.Root, owner, ordered);
+            if (dialog.ShowDialog() != true || dialog.Request is not { } request) return;
+            var plan = BatchExport.Plan(Repository, ordered, request.Path, request.Format, request.Collision);
+            progress = new OperationWindow("Export selected", owner); progress.Show();
+            using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(progress.Cancellation, exportLifetime.Token);
+            var result = await BatchExport.RunAsync(Repository, plan, request.Format, request.Quality, request.Collision,
+                (source, quality) => ImageService.Jpeg(ImageService.Load(source), quality), new Progress<string>(progress.Report), lifetime.Token);
+            progress.Complete(result.ToString()); if (!disposed) Dock.Refresh();
+        }
+        catch (Exception ex) { if (progress is not null) progress.Complete(OperationFailure.From(ex).Message); if (!disposed) Failure(ex); }
+        finally { exporting = false; }
+    }
     public void Pin(CaptureRecord record) => Try(() => { Repository.SetPinned(record, !record.Pinned); Dock.Refresh(); });
     public void Detach(CaptureRecord record) => Try(() =>
     {

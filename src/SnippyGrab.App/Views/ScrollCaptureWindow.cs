@@ -28,8 +28,9 @@ internal sealed class ScrollCaptureWindow : Window
         int FrameHeight() => frameHeight - trimTop - trimBottom;
         void ReadTrim()
         {
-            trimTop = int.Parse(top.Text); trimBottom = int.Parse(bottom.Text);
-            if (trimTop < 0 || trimBottom < 0 || FrameHeight() < 32) throw new InvalidDataException("Trims must leave at least 32 pixels of viewport height.");
+            var nextTop = int.Parse(top.Text); var nextBottom = int.Parse(bottom.Text);
+            ScrollOverlap.TrimmedHeight(frameHeight, nextTop, nextBottom);
+            trimTop = nextTop; trimBottom = nextBottom;
         }
         void Preview()
         {

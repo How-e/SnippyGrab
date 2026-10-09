@@ -3,6 +3,12 @@ namespace SnippyGrab.Core;
 public sealed record ScrollMatch(int? Overlap, bool Duplicate, double Error);
 public static class ScrollOverlap
 {
+    public static int TrimmedHeight(int height, int top, int bottom)
+    {
+        if (height < 32 || top < 0 || bottom < 0 || (long)top + bottom > height - 32)
+            throw new InvalidDataException("Trims must leave at least 32 pixels of viewport height.");
+        return height - top - bottom;
+    }
     public static ScrollMatch Match(byte[] previous, byte[] next, int width, int height, CancellationToken cancellation = default)
     {
         if (width is < 1 or > 4096 || height is < 32 or > 4096 || (long)width * height > 8_000_000 || previous.Length != (long)width * height * 4 || next.Length != previous.Length) throw new InvalidDataException("Scrolling frames exceed supported dimensions or differ in size.");

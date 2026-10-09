@@ -4,7 +4,7 @@ using SnippyGrab.App.Views;
 
 namespace SnippyGrab.App.Services;
 
-internal sealed record CaptureResult(BitmapSource Image, PixelRect Bounds, long ElapsedMilliseconds);
+internal sealed record CaptureResult(BitmapSource Image, PixelRect Bounds, long ElapsedMilliseconds, nint TargetWindow = 0);
 internal sealed class CaptureService
 {
     public bool Busy { get; private set; }
@@ -48,7 +48,9 @@ internal sealed class CaptureService
             if (overlay.Selection is not { } selection) return null;
             var cropped = ImageService.Crop(frozen, selection.RelativeTo(desktop));
             Timing?.Invoke($"selection_to_crop_ms={selectionWork.ElapsedMilliseconds}");
-            return new(cropped, selection, stopwatch.ElapsedMilliseconds);
+            // Resolve while shelf/pins are still hidden, before restore can cover the viewport.
+            var selectedWindow = Native.GetAncestor(Native.WindowFromPoint(new Native.POINT { X = selection.X + selection.Width / 2, Y = selection.Y + selection.Height / 2 }), 2);
+            return new(cropped, selection, stopwatch.ElapsedMilliseconds, selectedWindow);
         }
         finally
         {

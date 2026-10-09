@@ -26,7 +26,7 @@ internal sealed class ScrollSession : IDisposable
             try
             {
                 ManagedPath.RejectRedirects(folder); if (Directory.EnumerateDirectories(folder).Any()) continue;
-                var files = Directory.GetFiles(folder); if (files.Length > 100 || files.Any(f => Path.GetFileName(f) != "owner.txt" && !Regex.IsMatch(Path.GetFileName(f), "^(frame|part)-[a-f0-9]{32}\\.png$"))) continue;
+                var files = Directory.GetFiles(folder); if (files.Length > 100 || files.Any(f => Path.GetFileName(f) != "owner.txt" && !Regex.IsMatch(Path.GetFileName(f), "^(frame|part)-[a-f0-9]{32}\\.png(\\.[a-f0-9]{32}\\.tmp)?$"))) continue;
                 foreach (var file in files) ManagedPath.RejectRedirects(file);
                 var marker = Path.Combine(folder, "owner.txt"); if (new FileInfo(marker).Length > 64 || File.ReadAllText(marker) != "SnippyGrab-scroll-v1") continue;
                 foreach (var file in files) File.Delete(file); Directory.Delete(folder);
@@ -65,7 +65,8 @@ internal sealed class ScrollSession : IDisposable
             for (var i = 0; i < frames.Count; i++)
             {
                 cancellation.ThrowIfCancellationRequested(); var image = ImageService.Load(frames[i]);
-                var trim = top + overlaps[i]; var height = image.PixelHeight - trim - bottom;
+                var viewportHeight = ScrollOverlap.TrimmedHeight(image.PixelHeight, top, bottom);
+                var trim = checked(top + overlaps[i]); var height = viewportHeight - overlaps[i];
                 if (height <= 0) throw new InvalidDataException("Header/footer and overlap remove the entire frame.");
                 var cropped = ImageService.Crop(image, new(0, trim, image.PixelWidth, height));
                 dimensions.Add((cropped.PixelWidth, cropped.PixelHeight));

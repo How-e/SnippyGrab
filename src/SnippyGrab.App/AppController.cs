@@ -239,7 +239,7 @@ internal sealed class AppController : IDisposable
             () => { if (dockWasVisible) Dock.Reveal(); foreach (var pin in pins.Values) pin.Show(); });
         if (first is null || exitRequested || Exiting) return;
         if (first.Bounds.Width > 4096 || first.Bounds.Height is < 32 or > 4096 || (long)first.Bounds.Width * first.Bounds.Height > 8_000_000) { Notify("Choose a scrolling viewport of at least 32 pixels high, no more than 4096 per axis and 8 MP."); return; }
-        var target = Native.GetAncestor(Native.WindowFromPoint(new Native.POINT { X = first.Bounds.X + first.Bounds.Width / 2, Y = first.Bounds.Y + first.Bounds.Height / 2 }), 2);
+        var target = first.TargetWindow;
         if (!Native.GetWindowRect(target, out var windowBounds) || first.Bounds.Intersect(windowBounds.Pixels) != first.Bounds) { Notify("Select a viewport entirely inside one visible application window."); return; }
         var dpi = Native.GetDpiForWindow(target);
         string Topology() => string.Join(";", MonitorService.All().Select(m => $"{m.Identity}:{m.Bounds}:{m.Dpi}"));

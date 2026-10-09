@@ -46,6 +46,8 @@ public sealed class ScrollSessionTests
                     session.Undo(); Assert.Single(session.Frames); session.Stage(Frame(64)); session.Reject(); Assert.Null(session.Pending);
                     using var cancel = new CancellationTokenSource(); cancel.Cancel(); Assert.ThrowsAny<OperationCanceledException>(() => session.Build(0, 0, cancel.Token));
                     Assert.Equal(118, session.Build(5, 5, default).PixelHeight);
+                    Assert.Throws<InvalidDataException>(() => session.Build(int.MaxValue, int.MaxValue, default));
+                    Assert.Throws<InvalidDataException>(() => session.Build(-1, 0, default));
                 }
                 Assert.Empty(Directory.GetDirectories(root)); return true;
             }
@@ -59,8 +61,12 @@ public sealed class ScrollSessionTests
         try
         {
             var owned = Path.Combine(root, Guid.NewGuid().ToString("N")); Directory.CreateDirectory(owned); File.WriteAllText(Path.Combine(owned, "owner.txt"), "SnippyGrab-scroll-v1"); Directory.SetCreationTimeUtc(owned, DateTime.UtcNow.AddDays(-2));
+            File.WriteAllBytes(Path.Combine(owned, "frame-" + Guid.NewGuid().ToString("N") + ".png." + Guid.NewGuid().ToString("N") + ".tmp"), [1, 2, 3]);
+            var guarded = Path.Combine(root, Guid.NewGuid().ToString("N")); Directory.CreateDirectory(guarded); File.WriteAllText(Path.Combine(guarded, "owner.txt"), "SnippyGrab-scroll-v1"); Directory.SetCreationTimeUtc(guarded, DateTime.UtcNow.AddDays(-2));
+            File.WriteAllText(Path.Combine(guarded, "frame-" + Guid.NewGuid().ToString("N") + ".png.unknown.tmp"), "fixture");
             var unknown = Path.Combine(root, Guid.NewGuid().ToString("N")); Directory.CreateDirectory(unknown); File.WriteAllText(Path.Combine(unknown, "private.txt"), "fixture"); Directory.SetCreationTimeUtc(unknown, DateTime.UtcNow.AddDays(-2));
             ScrollSession.Sweep(root); Assert.False(Directory.Exists(owned)); Assert.True(Directory.Exists(unknown));
+            Assert.True(Directory.Exists(guarded));
         }
         finally { Directory.Delete(root, true); }
     }

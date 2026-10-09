@@ -4,6 +4,13 @@ namespace SnippyGrab.Tests;
 
 public sealed class ScrollOverlapTests
 {
+    [Fact]
+    public void TrimValidationRejectsOverflowAndPreservesAtLeast32Rows()
+    {
+        Assert.Equal(32, ScrollOverlap.TrimmedHeight(128, 48, 48));
+        foreach (var (top, bottom) in new[] { (int.MaxValue, int.MaxValue), (int.MaxValue, 0), (-1, 0), (0, -1), (49, 48) })
+            Assert.Throws<InvalidDataException>(() => ScrollOverlap.TrimmedHeight(128, top, bottom));
+    }
     internal static byte[] Document(int width, int height)
     {
         var pixels = new byte[width * height * 4]; var random = new Random(123);

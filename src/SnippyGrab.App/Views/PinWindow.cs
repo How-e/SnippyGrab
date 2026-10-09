@@ -7,6 +7,7 @@ internal sealed class PinWindow : Window
 {
     private readonly AppController controller;
     private readonly CaptureRecord record;
+    internal Image PreviewImage => preview;
     private readonly Image preview;
     private readonly CaptureViewLease lease;
     private bool clickThrough;
@@ -20,20 +21,37 @@ internal sealed class PinWindow : Window
         ShowInTaskbar = false; ShowActivated = false; Topmost = true; Width = 320; Height = 220; MinWidth = 80; MinHeight = 60; ResizeMode = ResizeMode.CanResizeWithGrip;
         preview = new Image { Source = LoadPreview(), Stretch = Stretch.Uniform };
         RenderOptions.SetBitmapScalingMode(preview, BitmapScalingMode.HighQuality);
-        Content = new Border { Child = preview, CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1), BorderBrush = (Brush)FindResource("Muted"), Background = (Brush)FindResource("Surface") };
-        MouseLeftButtonDown += (_, e) => { if (e.ClickCount == 2) controller.Edit(record); else DragMove(); };
+        var frame = new Grid(); frame.Children.Add(preview);
+        var chrome = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Bottom, Visibility = Visibility.Collapsed };
+        chrome.SetResourceReference(Panel.BackgroundProperty, "Raised");
+        chrome.Children.Add(Ui.ActionButton("Copy", "copy", "Copy pinned image", () => controller.Run(() => controller.Copy(record)), "QuietButton"));
+        chrome.Children.Add(Ui.ActionButton("Edit", "edit", "Edit pinned image", () => controller.Edit(record), "QuietButton"));
+        chrome.Children.Add(Ui.IconButton("more", "Pinned image actions", () => { ContextMenu.PlacementTarget = this; ContextMenu.IsOpen = true; }));
+        frame.Children.Add(chrome);
+        SizeChanged += (_, _) => { foreach (var button in chrome.Children.OfType<Button>().Take(2)) button.Visibility = ActualWidth < 220 * Ui.TextScale ? Visibility.Collapsed : Visibility.Visible; };
+        var border = new Border { Child = frame, CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1) };
+        border.SetResourceReference(Border.BorderBrushProperty, "Border"); border.SetResourceReference(Border.BackgroundProperty, "Surface"); Content = border;
+        MouseEnter += (_, _) => chrome.Visibility = Visibility.Visible;
+        MouseLeave += (_, _) => { if (!ContextMenu.IsOpen) chrome.Visibility = Visibility.Collapsed; };
+        MouseLeftButtonDown += (_, e) => { if (e.OriginalSource is DependencyObject source && FindButton(source)) return; if (e.ClickCount == 2) controller.Edit(record); else DragMove(); };
         var menu = new ContextMenu();
-        foreach (var (label, action) in new (string, Action)[]
-        {
-            ("Copy", () => controller.Run(() => controller.Copy(record))), ("Edit", () => controller.Edit(record)),
-            ("Toggle always on top", () => { Topmost = !Topmost; SaveLayout(); }),
-            ("Click-through (restore via tray → Restore pins)", () => { SetClickThrough(true); SaveLayout(); }),
-            ("Return to shelf", () => { controller.Repository.Restore([record], DateTimeOffset.UtcNow); controller.Dock.Reveal(); Close(); }), ("Close pin window", Close)
-        }) { var item = new MenuItem { Header = label }; item.Click += (_, _) => controller.Try(action); menu.Items.Add(item); }
+        menu.Items.Add(Ui.Menu("Copy", "copy", () => controller.Run(() => controller.Copy(record))));
+        menu.Items.Add(Ui.Menu("Edit", "edit", () => controller.Edit(record)));
+        menu.Items.Add(new Separator());
+        var onTop = Ui.Menu("Always on top", "pin", () => { Topmost = !Topmost; SaveLayout(); }); onTop.IsCheckable = true;
+        menu.Items.Add(onTop);
         var opacity = new Slider { Minimum = 0.25, Maximum = 1, Value = record.PinLayout?.Normalize().Opacity ?? 1, Width = 160, SmallChange = 0.05, LargeChange = 0.1, ToolTip = "Pin opacity (25–100%)" };
         System.Windows.Automation.AutomationProperties.SetName(opacity, "Pin opacity");
         opacity.ValueChanged += (_, _) => { Opacity = opacity.Value; ScheduleLayout(); };
-        menu.Items.Insert(3, new MenuItem { Header = opacity, StaysOpenOnClick = true });
+        var opacityRow = new StackPanel(); var opacityLabel = Ui.Text("Opacity 96%", 12, true); opacityRow.Children.Add(opacityLabel); opacityRow.Children.Add(opacity);
+        opacity.ValueChanged += (_, _) => opacityLabel.Text = $"Opacity {opacity.Value:P0}";
+        menu.Items.Add(new MenuItem { Header = opacityRow, StaysOpenOnClick = true });
+        var through = Ui.Menu("Click-through", "capture", () => { SetClickThrough(!clickThrough); SaveLayout(); }); through.IsCheckable = true; through.ToolTip = "Restore interaction through tray → Restore pins."; menu.Items.Add(through);
+        menu.Items.Add(new Separator());
+        menu.Items.Add(Ui.Menu("Return to shelf", "left", () => { controller.Repository.Restore([record], DateTimeOffset.UtcNow); controller.Dock.Reveal(); Close(); }));
+        menu.Items.Add(Ui.Menu("Close pin window", "close", Close));
+        menu.Opened += (_, _) => { onTop.IsChecked = Topmost; through.IsChecked = clickThrough; opacity.Value = Opacity; opacityLabel.Text = $"Opacity {Opacity:P0}"; };
+        menu.Closed += (_, _) => { if (!IsMouseOver) chrome.Visibility = Visibility.Collapsed; };
         ContextMenu = menu;
         lease = new(controller.Repository, record);
         controller.Repository.RevisionChanged += RevisionChanged;
@@ -46,6 +64,11 @@ internal sealed class PinWindow : Window
         Closing += (_, _) => SaveLayout();
         Closed += (_, _) => { ready = false; resizeTimer.Stop(); controller.SettingsChanged -= RefreshPreview; controller.Repository.RevisionChanged -= RevisionChanged; lease.Dispose(); };
         KeyDown += (_, e) => { if (e.Key == Key.Escape) Close(); };
+    }
+    private static bool FindButton(DependencyObject? source)
+    {
+        while (source is not null) { if (source is Button) return true; source = VisualTreeHelper.GetParent(source); }
+        return false;
     }
     private void RevisionChanged(CaptureRecord changed)
     {

@@ -2,25 +2,29 @@
 
 A native Windows screenshot shelf for AI and developer workflows.
 
-Current acceptance: **0 required gates open / 51 checked** after verified hosted publication and final reconciliation; see [the current acceptance record](docs/FINAL-FOUR-ACCEPTANCE-20261007.md). All required gates are closed within the recorded scope; the published build remains an unsigned prerelease.
 
 **Print Screen → select → release → paste or drag.** Captures land on the clipboard and a small transparent shelf. Click to annotate, Ctrl-click several images to attach together, or copy terminal errors with local OCR.
 
 .NET 10, WPF and Win32. No Electron, account, telemetry or cloud dependency.
 
-**0.1.0 alpha:** runnable implementation with unit, integration and interactive synthetic checks. Receiver acceptance and available hardware scope are accepted by the owner; exact receiver versions and wider hardware coverage remain limitations. [Verification](docs/VALIDATION.md) · [Architecture](docs/ARCHITECTURE.md) · [Desktop acceptance](docs/ACCEPTANCE.md)
+**0.1.0 alpha:** runnable implementation with unit, integration and interactive synthetic checks. Receiver acceptance and available hardware scope are accepted by the owner; exact receiver versions and wider hardware coverage remain limitations. [Architecture](docs/ARCHITECTURE.md) · [Desktop acceptance](docs/ACCEPTANCE.md)
 
-The [historical hosted review](docs/REMAINING-WORK.md) records GitHub checks/protection and the first alpha publication. [Current acceptance](docs/FINAL-FOUR-ACCEPTANCE-20261007.md) records completed acceptance and current startup/OCR measurements. All 51 queue entries are now closed within the recorded scope. Earlier reviews retain their own historical counts and verification boundaries.
 
-[Acceptance queue](TASK_QUEUE.md) records implemented requirements, review findings and their closure evidence. [User testing checklist](docs/USER-TESTING.md) records accepted interaction behavior. The timing comparison and final hosted publication are complete within the current acceptance record.
+Release requirements and regression ownership are maintained in `scripts/release-gates.json`. Use the [desktop checklist](docs/USER-TESTING.md) for interaction changes. Detailed audit and test-result reports are kept outside the repository.
 
 ## Preview
 
-Synthetic content rendered by the actual WPF interface; no private captures.
+The interface uses consistent line icons, neutral surfaces and a restrained blue accent. System, Light and Dark themes share the same controls. Settings are grouped into seven categories; the editor keeps all sixteen tools in a scrollable rail with contextual properties, and Recent captures pairs a virtualized list with a large preview. Narrow windows use compact navigation and wrapping actions.
 
-![Compact shelf with twenty captures](docs/images/dock.png)
+Synthetic content rendered by the current WPF interface; no private captures. These previews show the source design; the release linked below predates this redesign.
+
+![Compact shelf with twenty captures, showing three visible cards](docs/images/dock.png)
 
 ![Quick editor](docs/images/editor.png)
+
+![Categorized appearance settings](docs/images/settings.png)
+
+![Recent captures with a large preview](docs/images/history.png)
 
 ![Minimal first-run setup](docs/images/welcome.png)
 
@@ -36,7 +40,7 @@ Extract the complete release ZIP, then run `SnippyGrab.exe`. Keep `Tesseract.dll
 
 For per-user installation without elevation, run `powershell -NoProfile -File .\install.ps1` from the extracted bundle; add `-Startup` to enable login startup. Local script execution must be permitted by your PowerShell policy. The installer adds a Start menu shortcut and Apps uninstall entry. Exit from the tray before upgrading/uninstalling. Uninstall removes its startup registration and application files; captures/settings remain in `%LOCALAPPDATA%\SnippyGrab` for recovery. Portable removal: disable login startup, exit, then delete the extracted directory. Remove user data separately when no longer needed.
 
-Initial builds are unsigned; SmartScreen may prompt. Compare `Get-FileHash <download.zip> -Algorithm SHA256` with the release `.sha256`. Bundles include `SHA256SUMS.txt`. Hashes verify integrity, not publisher identity. Published builds are available under [GitHub releases](https://github.com/How-e/SnippyGrab/releases); the latest validated prerelease is [0.1.0-alpha.acceptance.20261007.8](https://github.com/How-e/SnippyGrab/releases/tag/v0.1.0-alpha.acceptance.20261007.8). See [publication checks](docs/PUBLICATION.md) for verification scope.
+Initial builds are unsigned; SmartScreen may prompt. Compare `Get-FileHash <download.zip> -Algorithm SHA256` with the release `.sha256`. Bundles include `SHA256SUMS.txt`. Hashes verify integrity, not publisher identity. Published builds are available under [GitHub releases](https://github.com/How-e/SnippyGrab/releases); the latest validated prerelease is [0.1.0-alpha.acceptance.20261007.8](https://github.com/How-e/SnippyGrab/releases/tag/v0.1.0-alpha.acceptance.20261007.8). Verify both the archive hash and the included file checksums before use.
 
 ## Usage
 
@@ -50,7 +54,7 @@ The app lives in the tray. Closing a window keeps it running; **Exit** stops it.
 - Wheel to browse. Hover expands inward from the primary card at the chosen corner and reveals edit/copy/pin/save/OCR/dismiss. Leaving collapses after a brief delay while preserving selections; keyboard use and dragging keep it open. **Alt-drag** onto another shelf image to move to that image's numbered position, in either direction.
 - Click to edit: crop, arrow, rectangle, ellipse, pen, line, text, highlighter, numbered marker, blur, pixelate, solid redaction and spotlight. Ctrl+wheel zooms. **Apply + copy** updates the managed shelf image and clipboard. **Export PNG…** (Ctrl+S) applies edits and opens a file dialog, without writing the clipboard. It starts in the configured directory on first export and remembers the previous destination for later exports; the dialog always confirms the filename/overwrite. Successful export shows the full path and enables **Open export folder**. Closing applies pending edits; **Discard** leaves pending edits unapplied.
 - Captures are full-resolution lossless PNGs. Shelf/history/pin previews shrink images to fit. Settings → Screenshot shelf → **Preview quality** offers Balanced, Sharp (default), or Original; Original uses more memory. **Thumbnail width** changes the shelf size. Open the editor and choose **100%** to inspect detail. Preview settings do not reduce copy/export/OCR resolution.
-- OCR runs locally in English. Settings → Text recognition offers small-text enhancement and Auto, SparseText (dialogs/mixed screenshots), or SingleBlock (one paragraph) layout. Auto can retry scattered text when confidence is low. Choose **OCR selected area** in the editor to isolate a message from surrounding windows/backgrounds. Review extracted text for character errors; enlarging cannot reconstruct missing detail in an already blurry source.
+- OCR runs locally in English. Settings → Editor & OCR → Text recognition offers small-text enhancement and Auto, SparseText (dialogs/mixed screenshots), or SingleBlock (one paragraph) layout. Auto can retry scattered text when confidence is low. Choose **OCR selected area** in the editor to isolate a message from surrounding windows/backgrounds. Review extracted text for character errors; enlarging cannot reconstruct missing detail in an already blurry source.
 - Pin indefinitely. Detach through the context menu for a resizable desktop pin; restore click-through interaction from the tray.
 - Recent captures recovers hidden items; import accepts PNG/JPEG/BMP with size limits.
 
@@ -113,7 +117,7 @@ CI builds/tests, verifies formatting and audits dependencies. CodeQL runs separa
 - Alpha: the owner reported successful Codex/ChatGPT/VS Code/browser drop and paste. Exact-version, selection/order and delayed-read acceptance remains incomplete; receiver support varies.
 - GDI produces SDR; HDR colors can differ. Window capture uses visible pixels, without reconstructing occluded/minimized/protected windows.
 - Physical selections passed at 100% and 150% on the connected mixed-DPI layout. Owner acceptance covers the available layout and current accessibility configuration. 125/175/200%, vertical/HDR screens and other text-scale/assistive-technology configurations remain unverified compatibility limits; the owner accepted this narrower scope. Explorer restart, sleep/resume and all-day behavior remain unverified.
-- A short fresh-process sample measured about 128 MB tray working set. The [two-hour synthetic resource test](docs/RESOURCE-REVIEW-20261007.md) passes; all-day use and startup latency need more benchmarking; .NET packaging is larger than a C++ utility. The user-run [two-hour resource test instructions](docs/RESOURCE-TESTING.md) provide the packaged command and reporting criteria.
+- Resource testing uses synthetic workloads; all-day use and startup latency need desktop acceptance; .NET packaging is larger than a C++ utility. The user-run [two-hour resource test instructions](docs/RESOURCE-TESTING.md) provide the packaged command and reporting criteria.
 - Undo is bounded to 20 states; large crop/effect histories can consume substantial memory. Annotation counts and imported sizes are bounded.
 - Transfers protect sources for 24 hours. Session-only cleans on normal exit while preserving pins/transfers; crashes fall back to retention.
 - User-profile ACLs protect normal cache access. Files are not encrypted or securely erased.

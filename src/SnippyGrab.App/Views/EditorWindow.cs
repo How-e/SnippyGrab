@@ -17,6 +17,8 @@ internal sealed class EditorWindow : Window
     private readonly ScrollViewer viewport;
     private readonly TextBlock status;
     private readonly Button openExportFolder;
+    internal ComboBox ToolPicker => tools;
+    internal Button ExportFolderAction => openExportFolder;
     private readonly ComboBox tools;
     private readonly TextBox color;
     private readonly TextBox stroke;
@@ -41,39 +43,89 @@ internal sealed class EditorWindow : Window
         this.controller = controller; this.record = record;
         expectedRevision = record.FileName;
         journal = new(new EditorState(ImageService.Load(controller.Repository.PathFor(record)), []), 20, RetainedBytes, 256L * 1024 * 1024);
-        Title = $"SnippyGrab · {record.Width} × {record.Height}"; Width = 1000; Height = 700; MinWidth = 660; MinHeight = 440; WindowStartupLocation = WindowStartupLocation.CenterScreen;
-        var root = new DockPanel { Margin = new Thickness(12) }; Content = root;
-        var actions = new WrapPanel();
-        actions.Children.Add(Ui.Button("Apply + copy", "Update the managed shelf image and copy it (Ctrl+C); this does not export a file", () => controller.Run(ApplyCopy)));
-        actions.Children.Add(Ui.Button("Export PNG…", "Apply edits and export a PNG outside the cache (Ctrl+S); clipboard is unchanged", () => controller.Run(ExportPng)));
+        Title = "SnippyGrab · Editor"; Width = 1120; Height = 800; MinWidth = 660; MinHeight = 500; WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        var root = new DockPanel(); Content = root;
+        var actions = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right, MaxWidth = 1000 };
+        actions.Children.Add(Ui.IconButton("undo", "Undo (Ctrl+Z)", Undo));
+        actions.Children.Add(Ui.IconButton("redo", "Redo (Ctrl+Y)", Redo));
+        actions.Children.Add(Ui.ActionButton("Apply + copy", "copy", "Update the managed shelf image and copy it (Ctrl+C)", () => controller.Run(ApplyCopy), "PrimaryButton"));
+        actions.Children.Add(Ui.ActionButton("Export PNG…", "export", "Apply edits and export a PNG outside the cache (Ctrl+S)", () => controller.Run(ExportPng)));
         openExportFolder = Ui.Button("Open export folder", "Open the last successful export directory", () => controller.OpenExportFolder(record.ExportPath));
-        openExportFolder.IsEnabled = !string.IsNullOrWhiteSpace(record.ExportPath); actions.Children.Add(openExportFolder);
+        openExportFolder.IsEnabled = !string.IsNullOrWhiteSpace(record.ExportPath);
         openExportFolder.ToolTip = string.IsNullOrWhiteSpace(record.ExportPath) ? "Export a PNG first" : "Last PNG export: " + record.ExportPath;
-        actions.Children.Add(Ui.Button("Undo", "Undo (Ctrl+Z)", Undo)); actions.Children.Add(Ui.Button("Redo", "Redo (Ctrl+Y)", Redo));
-        actions.Children.Add(Ui.Button("−", "Zoom out", () => Zoom(scale.ScaleX / 1.2))); actions.Children.Add(Ui.Button("+", "Zoom in", () => Zoom(scale.ScaleX * 1.2)));
-        actions.Children.Add(Ui.Button("100%", "Inspect the full-resolution image at 100% zoom", () => Zoom(1)));
-        actions.Children.Add(Ui.Button("Fit", "Fit image", Fit));
-        actions.Children.Add(Ui.Button("OCR", "Copy text from the edited screenshot", () => controller.Run(() => CopyDocumentOcr())));
-        actions.Children.Add(Ui.Button("Discard", "Close without applying unsaved changes", () => { discard = true; Close(); }));
-        DockPanel.SetDock(actions, Dock.Top); root.Children.Add(actions);
-        var toolbar = new WrapPanel { Margin = new Thickness(0, 4, 0, 8) };
+        var menu = new ContextMenu();
+        var more = Ui.IconButton("more", "More editor actions", () => menu.IsOpen = true);
+        var openFolderItem = Ui.Menu("Open export folder", "folder", () => controller.OpenExportFolder(record.ExportPath));
+        menu.Items.Add(openFolderItem);
+        menu.Items.Add(Ui.Menu("Copy OCR text", "ocr", () => controller.Run(() => CopyDocumentOcr())));
+        menu.Items.Add(new Separator());
+        menu.Items.Add(Ui.Menu("Discard changes", "close", () => { discard = true; Close(); }));
+        menu.Opened += (_, _) => openFolderItem.IsEnabled = openExportFolder.IsEnabled;
+        more.ContextMenu = menu; menu.PlacementTarget = more; actions.Children.Add(more);
+        var header = new Grid { Margin = new Thickness(18, 12, 14, 12) };
+        header.ColumnDefinitions.Add(new() { Width = new GridLength(1, GridUnitType.Star) }); header.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
+        var title = Ui.Heading("Screenshot editor", 20); title.VerticalAlignment = VerticalAlignment.Center; header.Children.Add(title);
+        Grid.SetColumn(actions, 1); header.Children.Add(actions);
+        header.SizeChanged += (_, _) => { var compact = header.ActualWidth < 760 * Ui.TextScale; actions.MaxWidth = Math.Max(300, header.ActualWidth); Grid.SetColumn(actions, compact ? 0 : 1); title.Visibility = compact ? Visibility.Collapsed : Visibility.Visible; };
+        DockPanel.SetDock(header, Dock.Top); root.Children.Add(header);
+        var toolbar = new WrapPanel { Margin = new Thickness(14, 8, 14, 8) };
         tools = new ComboBox { MinWidth = 138, ItemsSource = Enum.GetValues<EditTool>().Select(t => new ToolChoice(t, ToolLabel(t))), DisplayMemberPath = nameof(ToolChoice.Label), SelectedValuePath = nameof(ToolChoice.Tool), SelectedValue = EditTool.Arrow, ToolTip = "Annotation tool" };
         toolbar.Children.Add(tools);
-        color = new TextBox { Text = controller.Settings.AnnotationColor, Width = 100, ToolTip = "Color (#RRGGBB or #AARRGGBB)" }; toolbar.Children.Add(color);
-        stroke = new TextBox { Text = controller.Settings.StrokeSize.ToString(CultureInfo.InvariantCulture), Width = 44, ToolTip = "Stroke thickness" }; toolbar.Children.Add(stroke);
-        textSize = new TextBox { Text = controller.Settings.TextSize.ToString(CultureInfo.InvariantCulture), Width = 48, ToolTip = "Text size" }; toolbar.Children.Add(textSize);
-        caption = new TextBox { Text = "Look here", MaxLength = 2000, Width = 220, ToolTip = "Text annotation content" }; toolbar.Children.Add(caption);
+        color = new TextBox { Text = controller.Settings.AnnotationColor, Width = 112, ToolTip = "Color (#RRGGBB or #AARRGGBB)" };
+        stroke = new TextBox { Text = controller.Settings.StrokeSize.ToString(CultureInfo.InvariantCulture), Width = 56, ToolTip = "Stroke thickness" };
+        textSize = new TextBox { Text = controller.Settings.TextSize.ToString(CultureInfo.InvariantCulture), Width = 56, ToolTip = "Text size" };
+        caption = new TextBox { Text = "Look here", MaxLength = 2000, Width = 200, ToolTip = "Text annotation content" };
+        FrameworkElement Property(string label, FrameworkElement input)
+        {
+            var panel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(10, 0, 0, 0) };
+            var text = Ui.Text(label, 12, true); text.VerticalAlignment = VerticalAlignment.Center; text.Margin = new Thickness(0, 0, 6, 0);
+            panel.Children.Add(text); panel.Children.Add(input); toolbar.Children.Add(panel); return panel;
+        }
+        var colorProperty = Property("Color", color); var strokeProperty = Property("Stroke", stroke);
+        var textSizeProperty = Property("Size", textSize); var captionProperty = Property("Text", caption);
         foreach (var input in new FrameworkElement[] { tools, color, stroke, textSize, caption })
             System.Windows.Automation.AutomationProperties.SetName(input, (string)input.ToolTip);
-        toolbar.Children.Add(Ui.Text("  Draw on the image · Ctrl+wheel to zoom", 12, true));
-        DockPanel.SetDock(toolbar, Dock.Top); root.Children.Add(toolbar);
+        var properties = new Border { Child = toolbar, BorderThickness = new Thickness(0, 1, 0, 1) };
+        properties.SetResourceReference(Border.BorderBrushProperty, "Border"); properties.SetResourceReference(Border.BackgroundProperty, "Raised");
+        DockPanel.SetDock(properties, Dock.Top); root.Children.Add(properties);
         status = Ui.Text(string.IsNullOrWhiteSpace(record.ExportPath) ? "Apply + copy updates the managed shelf image. Export PNG writes a separate file. Closing applies edits; Discard leaves pending edits unapplied." : "Last PNG export: " + record.ExportPath, 12, true);
         status.TextWrapping = TextWrapping.Wrap;
-        DockPanel.SetDock(status, Dock.Bottom); root.Children.Add(status);
+        var footer = new Grid { Margin = new Thickness(14, 8, 14, 8) }; footer.ColumnDefinitions.Add(new() { Width = new GridLength(1, GridUnitType.Star) }); footer.ColumnDefinitions.Add(new() { Width = GridLength.Auto }); footer.RowDefinitions.Add(new() { Height = GridLength.Auto }); footer.RowDefinitions.Add(new() { Height = GridLength.Auto });
+        var zoomActions = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right };
+        zoomActions.Children.Add(Ui.Button("−", "Zoom out", () => Zoom(scale.ScaleX / 1.2)));
+        zoomActions.Children.Add(Ui.Button("+", "Zoom in", () => Zoom(scale.ScaleX * 1.2)));
+        zoomActions.Children.Add(Ui.Button("100%", "Inspect the full-resolution image", () => Zoom(1)));
+        zoomActions.Children.Add(Ui.ActionButton("Fit", "fit", "Fit image", Fit, "QuietButton"));
+        zoomActions.Children.Add(Ui.Button("Discard changes", "Close without applying unsaved changes", () => { discard = true; Close(); }));
+        Grid.SetColumn(zoomActions, 1); footer.Children.Add(zoomActions); status.VerticalAlignment = VerticalAlignment.Center; footer.Children.Add(status);
+        footer.SizeChanged += (_, _) => { var compact = footer.ActualWidth < 780 * Ui.TextScale; Grid.SetColumn(zoomActions, compact ? 0 : 1); Grid.SetColumnSpan(zoomActions, compact ? 2 : 1); Grid.SetRow(status, compact ? 1 : 0); Grid.SetColumnSpan(status, compact ? 2 : 1); };
+        DockPanel.SetDock(footer, Dock.Bottom); root.Children.Add(footer);
         surface = new EditorSurface(journal.Current) { LayoutTransform = scale, Cursor = Cursors.Cross, Focusable = true };
         viewport = new ScrollViewer { Content = surface, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Background = new SolidColorBrush(Color.FromRgb(12, 15, 19)) };
-        viewport.SetResourceReference(BackgroundProperty, "Surface");
-        root.Children.Add(viewport);
+        viewport.SetResourceReference(BackgroundProperty, "Canvas");
+        var canvas = new Grid(); canvas.ColumnDefinitions.Add(new() { Width = GridLength.Auto }); canvas.ColumnDefinitions.Add(new() { Width = new GridLength(1, GridUnitType.Star) });
+        var rail = new StackPanel { Margin = new Thickness(8, 4, 8, 4) };
+        var toolButtons = new Dictionary<EditTool, Button>();
+        foreach (var tool in new[] { EditTool.Arrow, EditTool.Rectangle, EditTool.Ellipse, EditTool.Line, EditTool.Pen, EditTool.Text, EditTool.Highlight, EditTool.Number, EditTool.Blur, EditTool.Pixelate, EditTool.Redact, EditTool.Spotlight, EditTool.Crop, EditTool.OcrArea, EditTool.ColorPicker, EditTool.Magnify })
+        {
+            if (tool is EditTool.Blur or EditTool.Crop) { var separator = Ui.Rule(); separator.Margin = new Thickness(0, 4, 0, 4); rail.Children.Add(separator); }
+            var button = Ui.IconButton(ToolIcon(tool), ToolLabel(tool), () => tools.SelectedValue = tool);
+            button.Width = 40; button.Height = 32; button.MinHeight = 32; button.Padding = new Thickness(5); button.Margin = new Thickness(0); button.Tag = tool;
+            toolButtons.Add(tool, button); rail.Children.Add(button);
+        }
+        var railScroll = new ScrollViewer { Content = rail, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+        var railBorder = new Border { Child = railScroll, BorderThickness = new Thickness(0, 0, 1, 0) };
+        railBorder.SetResourceReference(Border.BorderBrushProperty, "Border"); railBorder.SetResourceReference(Border.BackgroundProperty, "Raised"); canvas.Children.Add(railBorder);
+        Grid.SetColumn(viewport, 1); canvas.Children.Add(viewport); root.Children.Add(canvas);
+        void SelectTool()
+        {
+            foreach (var (tool, button) in toolButtons) { button.SetResourceReference(Button.BackgroundProperty, tool == Tool ? "Selected" : "Raised"); button.SetResourceReference(Button.ForegroundProperty, tool == Tool ? "SelectedIcon" : "Ink"); }
+            colorProperty.Visibility = Tool is EditTool.Blur or EditTool.Pixelate or EditTool.Crop or EditTool.OcrArea or EditTool.ColorPicker or EditTool.Magnify ? Visibility.Collapsed : Visibility.Visible;
+            strokeProperty.Visibility = Tool is EditTool.Arrow or EditTool.Rectangle or EditTool.Ellipse or EditTool.Pen or EditTool.Line or EditTool.Highlight ? Visibility.Visible : Visibility.Collapsed;
+            textSizeProperty.Visibility = Tool is EditTool.Text or EditTool.Number ? Visibility.Visible : Visibility.Collapsed;
+            captionProperty.Visibility = Tool == EditTool.Text ? Visibility.Visible : Visibility.Collapsed;
+        }
+        tools.SelectionChanged += (_, _) => SelectTool(); SelectTool();
         surface.MouseLeftButtonDown += (_, e) =>
         {
             if (commits.Busy || documentWork is not null) return;
@@ -119,12 +171,15 @@ internal sealed class EditorWindow : Window
         {
             if (closeApproved) return;
             e.Cancel = true;
-            controller.Run(async () => { await RequestCloseAsync(); });
+            // A clean/discarded document can finish synchronously. Reclose after WPF
+            // has returned from this Closing event, rather than reentering Close().
+            Dispatcher.BeginInvoke(new Action(() => controller.Run(async () => { await RequestCloseAsync(); })));
         };
         lease = new(controller.Repository, record);
         Closed += (_, _) => { ocrLifetime.Cancel(); ocrLifetime.Dispose(); lease.Dispose(); surface.Preview = null; surface.State = null; viewport.Content = null; points.Clear(); journal.Clear(); };
     }
     private sealed record ToolChoice(EditTool Tool, string Label) { public override string ToString() => Label; }
+    internal static string ToolIcon(EditTool tool) => tool switch { EditTool.Pen => "freehand", EditTool.Highlight => "highlight", EditTool.OcrArea => "ocr", EditTool.ColorPicker => "color", EditTool.Magnify => "zoom", _ => tool.ToString().ToLowerInvariant() };
     internal static string ToolLabel(EditTool tool) => tool switch { EditTool.Pen => "Freehand", EditTool.Highlight => "Highlighter", EditTool.Number => "Numbered marker", EditTool.Redact => "Solid redaction", EditTool.OcrArea => "OCR selected area", EditTool.ColorPicker => "Pick image color", EditTool.Magnify => "Magnify (Shift: out)", _ => tool.ToString() };
     private async Task PickColorAsync(Point point)
     {

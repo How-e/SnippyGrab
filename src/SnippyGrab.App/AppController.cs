@@ -220,7 +220,12 @@ internal sealed class AppController : IDisposable
         if (extension is not (".png" or ".jpg" or ".jpeg" or ".bmp")) throw new InvalidDataException("Only PNG, JPEG and BMP images are accepted.");
         var image = ImageService.Load(path); Repository.Add(ImageService.Png(image), image.PixelWidth, image.PixelHeight); Dock.Refresh(true);
     });
-    public void ClearTemporary() => Try(() => { if (Repository.CleanupBlocked) { Notify("Cleanup is disabled because history is unreadable. Original metadata is preserved; recover it before deleting captures."); return; } var count = Repository.Cleanup(DateTimeOffset.UtcNow, Settings.RetentionHours, clear: true); Dock.Refresh(); Notify($"Cleared {count} temporary capture(s). Pins and transfers are protected."); });
+    public void ClearTemporary() => Try(() =>
+    {
+        if (Repository.CleanupBlocked) { Notify("Cleanup is disabled because history is unreadable. Original metadata is preserved; recover it before deleting captures."); return; }
+        if (!DialogWindow.Confirm("Clear temporary captures?", "Remove eligible unpinned captures.\n\nPins, active editors and transfers stay protected. Files in the transfer grace period are kept.", "Clear temporary", danger: true)) return;
+        var count = Repository.Cleanup(DateTimeOffset.UtcNow, Settings.RetentionHours, clear: true); Dock.Refresh(); Notify($"Cleared {count} temporary capture(s). Pins and transfers are protected.");
+    });
     private void ShowWelcome()
     {
         ConfigureHotkeys(hotkeyPause.Enter(Hotkeys.Paused));
@@ -254,28 +259,41 @@ internal sealed class AppController : IDisposable
         if (Hotkeys.Warnings.Count > 0) Notify(string.Join("\n", Hotkeys.Warnings));
     }
     internal void ConfigureHotkeys(bool paused) => Hotkeys.Configure(Settings, Diagnostic || paused);
+    public void ShowHotkeyHelp() => DialogWindow.Information("Hotkey help", HotkeyRegistration.Guidance(Settings) + "\n\n" + string.Join("\n", Hotkeys.Warnings), this);
     private void BuildTray()
     {
-        var menu = new Forms.ContextMenuStrip();
-        void Item(string label, Action action, bool check = false) { var item = new Forms.ToolStripMenuItem(label) { Checked = check }; item.Click += (_, _) => Try(action); menu.Items.Add(item); }
-        Item("Capture region", () => Run(() => Capture(CaptureMode.Region)));
-        Item("Capture window", () => Run(() => Capture(CaptureMode.Window)));
-        Item("Capture active window", () => Run(() => Capture(CaptureMode.ActiveWindow)));
-        Item("Capture entire desktop", () => Run(() => Capture(CaptureMode.Desktop)));
+        var menu = new Forms.ContextMenuStrip { Renderer = new TrayRenderer(), Font = new System.Drawing.Font("Segoe UI", (float)(10.5 * Ui.TextScale)), ShowImageMargin = true, ImageScalingSize = new System.Drawing.Size(18, 18) };
+        Forms.ToolStripMenuItem Item(string label, string icon, Action action, bool check = false, string shortcut = "", Forms.ToolStripItemCollection? target = null)
+        {
+            var item = new Forms.ToolStripMenuItem(label) { Checked = check, Tag = icon, Padding = new Forms.Padding(6, 6, 8, 6), ShortcutKeyDisplayString = shortcut, Image = TrayRenderer.Placeholder };
+            item.Click += (_, _) => Try(action); (target ?? menu.Items).Add(item); return item;
+        }
+        Item("Region", "capture", () => Run(() => Capture(CaptureMode.Region)), shortcut: Settings.PrimaryHotkey.ToString());
+        Item("Window", "window", () => Run(() => Capture(CaptureMode.Window)), shortcut: Settings.WindowHotkey.ToString());
+        Item("Active window", "window", () => Run(() => Capture(CaptureMode.ActiveWindow)), shortcut: Settings.ActiveWindowHotkey.ToString());
+        Item("Entire desktop", "desktop", () => Run(() => Capture(CaptureMode.Desktop)), shortcut: Settings.DesktopHotkey.ToString());
         menu.Items.Add(new Forms.ToolStripSeparator());
-        Item("Show screenshot shelf", Dock.Reveal); Item("Focus screenshot shelf (keyboard)", Dock.FocusShelf); Item("Open recent captures", ShowHistory); Item("Hotkey help / conflicts", () => MessageBox.Show(HotkeyRegistration.Guidance(Settings) + "\n\n" + string.Join("\n", Hotkeys.Warnings), "SnippyGrab · Hotkey help")); Item("Open settings", ShowSettings);
-        Item("Restore pins", () => { foreach (var pin in pins.Values) pin.RestoreInteraction(); });
-        Item("Pause hotkeys", () => { ConfigureHotkeys(hotkeyPause.Toggle(Hotkeys.Paused)); BuildTray(); }, Hotkeys.Paused);
-        Item("Clear temporary screenshots", ClearTemporary); Item("Retry history save", () => { Repository.Persist(); Notify("History saved. Cleanup can resume."); });
-        if (!Diagnostic) Item("Launch at Windows login", () => { var draft = System.Text.Json.JsonSerializer.Deserialize<Settings>(System.Text.Json.JsonSerializer.Serialize(Settings))!; draft.LaunchOnStartup = !StartupService.Enabled; ApplySettings(draft); }, StartupService.Enabled);
-        Item("Last operation details", () => MessageBox.Show(lastNotice, "SnippyGrab · Operation details"));
-        Item("About", () => MessageBox.Show("SnippyGrab " + BuildVersion.Display + "\nNative, local screenshot shelf. MIT licensed.\nNo uploads, accounts, analytics or update polling.\n\nPrint Screen: region · Ctrl+Shift+S: fallback\nCtrl-click: select several · Drag: attach files\nClick: edit · Alt-drag: reorder\n\nUnsigned build. See README for verification and limitations.", "SnippyGrab"));
-        menu.Items.Add(new Forms.ToolStripSeparator()); Item("Exit", Exit);
+        Item("Show screenshot shelf", "image", Dock.Reveal); Item("Focus screenshot shelf", "capture", Dock.FocusShelf); Item("Recent captures", "history", ShowHistory); Item("Settings", "settings", ShowSettings);
+        menu.Items.Add(new Forms.ToolStripSeparator());
+        Item("Restore pins", "pin", () => { foreach (var pin in pins.Values) pin.RestoreInteraction(); });
+        Item("Pause hotkeys", "pause", () => { ConfigureHotkeys(hotkeyPause.Toggle(Hotkeys.Paused)); BuildTray(); }, Hotkeys.Paused);
+        if (!Diagnostic) Item("Launch at Windows login", "startup", () => { var draft = System.Text.Json.JsonSerializer.Deserialize<Settings>(System.Text.Json.JsonSerializer.Serialize(Settings))!; draft.LaunchOnStartup = !StartupService.Enabled; ApplySettings(draft); }, StartupService.Enabled);
+        menu.Items.Add(new Forms.ToolStripSeparator());
+        var maintenance = Item("Maintenance", "settings", () => { });
+        Item("Clear temporary captures…", "trash", ClearTemporary, target: maintenance.DropDownItems);
+        Item("Retry history save", "history", () => { Repository.Persist(); Notify("History saved. Cleanup can resume."); }, target: maintenance.DropDownItems);
+        var help = Item("Help & about", "info", () => { });
+        Item("Hotkey help / conflicts", "keyboard", ShowHotkeyHelp, target: help.DropDownItems);
+        Item("Last operation details", "info", () => DialogWindow.Information("Last operation", lastNotice, this), target: help.DropDownItems);
+        Item("About", "info", () => DialogWindow.Information("About SnippyGrab", "SnippyGrab " + BuildVersion.Display + " · MIT\n\nNative, local screenshot shelf.\nNo uploads, accounts, analytics or update polling.\n\nPrint Screen: region · Ctrl+Shift+S: fallback\nCtrl-click: select several · Drag: attach files\nClick: edit · Alt-drag: reorder\n\nUpdates are manual. This build is unsigned. See README for verification and limitations.", this), target: help.DropDownItems);
+        maintenance.DropDown.Renderer = menu.Renderer; help.DropDown.Renderer = menu.Renderer;
+        menu.Items.Add(new Forms.ToolStripSeparator()); Item("Exit", "close", Exit);
+        var menuFont = menu.Font; menu.Disposed += (_, _) => menuFont.Dispose();
         var old = tray.ContextMenuStrip; tray.ContextMenuStrip = menu; old?.Dispose();
     }
     private void DisplayChanged(object? sender, EventArgs e) => lifecycle.Post(() => Try(Dock.TopologyChanged));
     private void PowerChanged(object sender, PowerModeChangedEventArgs e) { if (e.Mode == PowerModes.Resume) lifecycle.Post(() => Try(() => { ConfigureHotkeys(Hotkeys.Paused); Repository.Cleanup(DateTimeOffset.UtcNow, Settings.RetentionHours); Dock.TopologyChanged(); BuildTray(); if (Hotkeys.Warnings.Count > 0) Notify(string.Join("\n", Hotkeys.Warnings)); })); }
-    private void PreferencesChanged(object sender, UserPreferenceChangedEventArgs e) => lifecycle.Post(() => Ui.Theme(Settings.Theme));
+    private void PreferencesChanged(object sender, UserPreferenceChangedEventArgs e) => lifecycle.Post(() => { Ui.Theme(Settings.Theme); Dock.Refresh(); BuildTray(); });
     public async void Run(Func<Task> action) { try { await action(); } catch (Exception ex) { Failure(ex); } }
     public void Try(Action action) { try { action(); } catch (Exception ex) { Failure(ex); } }
     public void Failure(Exception ex)

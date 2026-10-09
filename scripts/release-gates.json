@@ -1,0 +1,516 @@
+{
+  "schemaVersion": 1,
+  "gates": [
+    {
+      "id": "Q1",
+      "priority": 1,
+      "owner": "Agent",
+      "closed": false,
+      "milestone": 0,
+      "title": "Establish milestone completion evidence"
+    },
+    {
+      "id": "Q2",
+      "priority": 0,
+      "owner": "Agent",
+      "closed": true,
+      "milestone": 5,
+      "title": "Make editor close and Exit failure-safe"
+    },
+    {
+      "id": "Q3",
+      "priority": 0,
+      "owner": "Agent",
+      "closed": true,
+      "milestone": 8,
+      "title": "Complete corrupt-history recovery"
+    },
+    {
+      "id": "Q4",
+      "priority": 1,
+      "owner": "Agent",
+      "closed": true,
+      "milestone": 8,
+      "title": "Lease detached pins and refresh their images"
+    },
+    {
+      "id": "Q5",
+      "priority": 1,
+      "owner": "Agent",
+      "closed": true,
+      "milestone": 8,
+      "title": "Restore expired captures to the shelf correctly"
+    },
+    {
+      "id": "Q6",
+      "priority": 1,
+      "owner": "Agent",
+      "closed": true,
+      "milestone": 8,
+      "title": "Recover orphan metadata and bound history growth"
+    },
+    {
+      "id": "Q7",
+      "priority": 1,
+      "owner": "Agent",
+      "closed": true,
+      "milestone": 2,
+      "title": "Make capture/storage/settings failures recoverable"
+    },
+    {
+      "id": "Q8",
+      "priority": 1,
+      "owner": "Shared",
+      "closed": true,
+      "milestone": 1,
+      "title": "Validate every capture mode and selection edge"
+    },
+    {
+      "id": "Q9",
+      "priority": 1,
+      "owner": "Shared",
+      "closed": false,
+      "milestone": 1,
+      "title": "Verify hotkey conflicts and first-run recovery"
+    },
+    {
+      "id": "Q10",
+      "priority": 1,
+      "owner": "Shared",
+      "closed": true,
+      "milestone": 1,
+      "title": "Complete monitor/DPI identity and placement"
+    },
+    {
+      "id": "Q11",
+      "priority": 1,
+      "owner": "Shared",
+      "closed": true,
+      "milestone": 1,
+      "title": "Define cursor and HDR behavior"
+    },
+    {
+      "id": "Q12",
+      "priority": 1,
+      "owner": "Shared",
+      "closed": true,
+      "milestone": 2,
+      "title": "Verify external file and image receivers"
+    },
+    {
+      "id": "Q13",
+      "priority": 1,
+      "owner": "Agent",
+      "closed": true,
+      "milestone": 2,
+      "title": "Exercise retention during transfers and crashes"
+    },
+    {
+      "id": "Q14",
+      "priority": 1,
+      "owner": "Agent",
+      "closed": true,
+      "milestone": 2,
+      "title": "Report clipboard outcomes and cancel stale OCR"
+    },
+    {
+      "id": "Q15",
+      "priority": 1,
+      "owner": "Agent",
+      "closed": true,
+      "milestone": 3,
+      "title": "Fix selection-aware keyboard actions"
+    },
+    {
+      "id": "Q16",
+      "priority": 1,
+      "owner": "Shared",
+      "closed": false,
+      "milestone": 3,
+      "title": "Fix hover reachability, selection collapse and reorder targeting"
+    },
+    {
+      "id": "Q17",
+      "priority": 1,
+      "owner": "Agent",
+      "closed": true,
+      "milestone": 3,
+      "title": "Add screen-edge placements"
+    },
+    {
+      "id": "Q18",
+      "priority": 1,
+      "owner": "Agent",
+      "closed": true,
+      "milestone": 3,
+      "title": "Bound dock thumbnail work and improve transitions"
+    },
+    {
+      "id": "Q19",
+      "priority": 1,
+      "owner": "Shared",
+      "closed": false,
+      "milestone": 3,
+      "title": "Complete keyboard/accessibility acceptance"
+    },
+    {
+      "id": "Q20",
+      "priority": 1,
+      "owner": "Shared",
+      "closed": false,
+      "milestone": 5,
+      "title": "Verify every required tool end to end"
+    },
+    {
+      "id": "Q21",
+      "priority": 1,
+      "owner": "Agent",
+      "closed": true,
+      "milestone": 5,
+      "title": "Resolve Save destination and misleading labels"
+    },
+    {
+      "id": "Q22",
+      "priority": 1,
+      "owner": "Agent",
+      "closed": true,
+      "milestone": 5,
+      "title": "Keep edited state consistent across views"
+    },
+    {
+      "id": "Q23",
+      "priority": 1,
+      "owner": "Agent",
+      "closed": true,
+      "milestone": 5,
+      "title": "Keep the editor responsive at large sizes"
+    },
+    {
+      "id": "Q24",
+      "priority": 1,
+      "owner": "Shared",
+      "closed": true,
+      "milestone": 6,
+      "title": "Harden and accept local OCR"
+    },
+    {
+      "id": "Q25",
+      "priority": 1,
+      "owner": "Shared",
+      "closed": false,
+      "milestone": 7,
+      "title": "Verify tray/OS lifecycle"
+    },
+    {
+      "id": "Q26",
+      "priority": 1,
+      "owner": "Shared",
+      "closed": false,
+      "milestone": 7,
+      "title": "Verify settings coverage and persistence"
+    },
+    {
+      "id": "Q27",
+      "priority": 1,
+      "owner": "Shared",
+      "closed": false,
+      "milestone": 7,
+      "title": "Verify login startup and setup on real login"
+    },
+    {
+      "id": "Q28",
+      "priority": 1,
+      "owner": "Agent",
+      "closed": true,
+      "milestone": 7,
+      "title": "Make failures visible without excessive UI"
+    },
+    {
+      "id": "Q29",
+      "priority": 1,
+      "owner": "Shared",
+      "closed": false,
+      "milestone": 8,
+      "title": "Complete history/pin behavior"
+    },
+    {
+      "id": "Q30",
+      "priority": 1,
+      "owner": "User",
+      "closed": true,
+      "milestone": 4,
+      "title": "Complete primary Codex acceptance"
+    },
+    {
+      "id": "Q31",
+      "priority": 1,
+      "owner": "Shared",
+      "closed": true,
+      "milestone": 1,
+      "title": "Complete hardware capture acceptance"
+    },
+    {
+      "id": "Q32",
+      "priority": 1,
+      "owner": "User",
+      "closed": false,
+      "milestone": 3,
+      "title": "Accept actual dock/editor accessibility and interaction"
+    },
+    {
+      "id": "Q33",
+      "priority": 1,
+      "owner": "Agent",
+      "closed": true,
+      "milestone": 9,
+      "title": "Expand automated boundary tests"
+    },
+    {
+      "id": "Q34",
+      "priority": 1,
+      "owner": "Shared",
+      "closed": true,
+      "milestone": 9,
+      "title": "Measure startup and end-to-end capture latency"
+    },
+    {
+      "id": "Q35",
+      "priority": 1,
+      "owner": "Agent",
+      "closed": true,
+      "milestone": 8,
+      "title": "Run prolonged resource/stress testing"
+    },
+    {
+      "id": "Q36",
+      "priority": 1,
+      "owner": "Shared",
+      "closed": true,
+      "milestone": 0,
+      "title": "Configure GitHub and observe hosted checks"
+    },
+    {
+      "id": "Q37",
+      "priority": 1,
+      "owner": "Agent",
+      "closed": true,
+      "milestone": 9,
+      "title": "Make dependency/security checks enforce policy"
+    },
+    {
+      "id": "Q38",
+      "priority": 1,
+      "owner": "Agent",
+      "closed": true,
+      "milestone": 9,
+      "title": "Finish import/storage security review"
+    },
+    {
+      "id": "Q39",
+      "priority": 1,
+      "owner": "Agent",
+      "closed": true,
+      "milestone": 9,
+      "title": "Close the threat model with evidence"
+    },
+    {
+      "id": "Q40",
+      "priority": 1,
+      "owner": "Agent",
+      "closed": true,
+      "milestone": 10,
+      "title": "Provide an easy per-user installer artifact"
+    },
+    {
+      "id": "Q41",
+      "priority": 1,
+      "owner": "Shared",
+      "closed": false,
+      "milestone": 10,
+      "title": "Verify clean installation and upgrade"
+    },
+    {
+      "id": "Q42",
+      "priority": 1,
+      "owner": "Agent",
+      "closed": true,
+      "milestone": 10,
+      "title": "Align release versions and reproducibility"
+    },
+    {
+      "id": "Q43",
+      "priority": 1,
+      "owner": "Agent",
+      "closed": true,
+      "milestone": 10,
+      "title": "Bound local packaging leftovers"
+    },
+    {
+      "id": "Q44",
+      "priority": 1,
+      "owner": "Shared",
+      "closed": false,
+      "milestone": 10,
+      "title": "Finish release documentation and stable gate"
+    },
+    {
+      "id": "Q45",
+      "priority": 2,
+      "owner": "Agent",
+      "closed": true,
+      "milestone": 5,
+      "title": "Editor extras"
+    },
+    {
+      "id": "Q46",
+      "priority": 2,
+      "owner": "Shared",
+      "closed": true,
+      "milestone": 8,
+      "title": "Refine detached pins"
+    },
+    {
+      "id": "Q47",
+      "priority": 2,
+      "owner": "Shared",
+      "closed": true,
+      "milestone": 8,
+      "title": "Evaluate the shelf model with real workflows"
+    },
+    {
+      "id": "Q48",
+      "priority": 2,
+      "owner": "Agent",
+      "closed": true,
+      "milestone": 10,
+      "title": "Prepare secure future signing and optional OCR languages"
+    },
+    {
+      "id": "Q49",
+      "priority": 1,
+      "owner": "Agent",
+      "closed": true,
+      "milestone": 3,
+      "title": "Eliminate multi-capture first-hover jitter"
+    },
+    {
+      "id": "Q50",
+      "priority": 1,
+      "owner": "Shared",
+      "closed": true,
+      "milestone": 4,
+      "title": "Define and verify multi-image transfer order"
+    },
+    {
+      "id": "Q51",
+      "priority": 1,
+      "owner": "Agent",
+      "closed": true,
+      "milestone": 6,
+      "title": "Resolve native OCR component security gate"
+    }
+  ],
+  "milestones": [
+    {
+      "id": 0,
+      "name": "Foundation",
+      "tests": [
+        "tests/SnippyGrab.Tests/LifecycleDispatchTests.cs"
+      ]
+    },
+    {
+      "id": 1,
+      "name": "Capture",
+      "tests": [
+        "tests/SnippyGrab.Tests/CaptureGeometryTests.cs",
+        "tests/SnippyGrab.Tests/HotkeyRegistrationTests.cs",
+        "tests/SnippyGrab.IntegrationTests/OverlayLayoutTests.cs"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Clipboard and storage",
+      "tests": [
+        "tests/SnippyGrab.Tests/ClipboardWriterTests.cs",
+        "tests/SnippyGrab.Tests/StorageFailureTests.cs",
+        "tests/SnippyGrab.Tests/ManagedPathTests.cs",
+        "tests/SnippyGrab.Tests/TransferLifecycleTests.cs"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "Screenshot shelf",
+      "tests": [
+        "tests/SnippyGrab.Tests/DockLayoutTests.cs",
+        "tests/SnippyGrab.Tests/ShelfSelectionTests.cs",
+        "tests/SnippyGrab.IntegrationTests/UiRedesignTests.cs"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "File transfers",
+      "tests": [
+        "tests/SnippyGrab.Tests/TransferOrderTests.cs",
+        "tests/SnippyGrab.Tests/TransferLifecycleTests.cs"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "Editor",
+      "tests": [
+        "tests/SnippyGrab.Tests/EditorCommitTests.cs",
+        "tests/SnippyGrab.Tests/CaptureExportTests.cs",
+        "tests/SnippyGrab.Tests/CrossViewRevisionTests.cs",
+        "tests/SnippyGrab.IntegrationTests/EditorDocumentTests.cs",
+        "tests/SnippyGrab.IntegrationTests/UiRedesignTests.cs"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "Local OCR",
+      "tests": [
+        "tests/SnippyGrab.IntegrationTests/OcrBoundaryTests.cs"
+      ]
+    },
+    {
+      "id": 7,
+      "name": "Tray and setup",
+      "tests": [
+        "tests/SnippyGrab.Tests/SettingsCoverageTests.cs",
+        "tests/SnippyGrab.Tests/StartupRegistrationTests.cs",
+        "tests/SnippyGrab.Tests/OperationFailureTests.cs",
+        "tests/SnippyGrab.IntegrationTests/UiRedesignTests.cs"
+      ]
+    },
+    {
+      "id": 8,
+      "name": "History and pins",
+      "tests": [
+        "tests/SnippyGrab.Tests/HistoryRecoveryTests.cs",
+        "tests/SnippyGrab.Tests/HistoryPagingTests.cs",
+        "tests/SnippyGrab.Tests/HistoryBehaviorTests.cs",
+        "tests/SnippyGrab.Tests/CaptureRestoreTests.cs",
+        "tests/SnippyGrab.Tests/CaptureViewLeaseTests.cs",
+        "tests/SnippyGrab.Tests/PinLayoutTests.cs",
+        "tests/SnippyGrab.IntegrationTests/UiRedesignTests.cs"
+      ]
+    },
+    {
+      "id": 9,
+      "name": "Hardening",
+      "tests": [
+        "tests/SnippyGrab.Tests/ManagedPathTests.cs",
+        "tests/SnippyGrab.Tests/OperationFailureTests.cs",
+        "tests/SnippyGrab.IntegrationTests/ImportSafetyTests.cs"
+      ]
+    },
+    {
+      "id": 10,
+      "name": "Packaging and release",
+      "tests": [
+        "scripts/test-release-gates.ps1",
+        "scripts/test-installer.ps1"
+      ]
+    }
+  ]
+}

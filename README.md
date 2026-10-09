@@ -1,6 +1,6 @@
 # SnippyGrab
 
-A native Windows screenshot shelf for AI and developer workflows.
+A native Windows screenshot shelf with annotation, local OCR, and clipboard or drag-and-drop sharing.
 
 
 **Print Screen → select → release → paste or drag.** Captures land on the clipboard and a small transparent shelf. Click to annotate, Ctrl-click several images to attach together, or copy terminal errors with local OCR.
@@ -27,10 +27,6 @@ Synthetic content rendered by the current WPF interface; no private captures. Th
 ![Recent captures with a large preview](docs/images/history.png)
 
 ![Minimal first-run setup](docs/images/welcome.png)
-
-Illustrated capture-to-Codex workflow, using synthetic content. This animation is a diagram, not a recording of an acceptance test.
-
-![Illustrated capture-to-Codex workflow](docs/images/capture-to-codex.gif)
 
 ## Installation
 
@@ -114,7 +110,7 @@ CI builds/tests, verifies formatting and audits dependencies. CodeQL runs separa
 
 ## Known limitations
 
-- Alpha: the owner reported successful Codex/ChatGPT/VS Code/browser drop and paste. Exact-version, selection/order and delayed-read acceptance remains incomplete; receiver support varies.
+- Alpha: the owner reported successful drop and paste in desktop chat clients, a code editor, and browsers. Exact-version, selection/order and delayed-read acceptance remains incomplete; receiver support varies.
 - GDI produces SDR; HDR colors can differ. Window capture uses visible pixels, without reconstructing occluded/minimized/protected windows.
 - Physical selections passed at 100% and 150% on the connected mixed-DPI layout. Owner acceptance covers the available layout and current accessibility configuration. 125/175/200%, vertical/HDR screens and other text-scale/assistive-technology configurations remain unverified compatibility limits; the owner accepted this narrower scope. Explorer restart, sleep/resume and all-day behavior remain unverified.
 - Resource testing uses synthetic workloads; all-day use and startup latency need desktop acceptance; .NET packaging is larger than a C++ utility. The user-run [two-hour resource test instructions](docs/RESOURCE-TESTING.md) provide the packaged command and reporting criteria.
@@ -124,7 +120,7 @@ CI builds/tests, verifies formatting and audits dependencies. CodeQL runs separa
 
 ## Contributing
 
-[CONTRIBUTING.md](CONTRIBUTING.md) covers checks and privacy-safe evidence. MIT licensed; OCR licenses are under `licenses/`. Recording, cloud sharing and accounts are out of scope.
+[CONTRIBUTING.md](CONTRIBUTING.md) covers checks and privacy-safe evidence. Please follow the [Code of Conduct](CODE_OF_CONDUCT.md) and use the [issue templates](https://github.com/How-e/SnippyGrab/issues/new/choose) for bugs and feature requests. MIT licensed; OCR licenses are under `licenses/`. Recording, cloud sharing and accounts are out of scope.
 
 ### Print Screen setup and conflicts
 

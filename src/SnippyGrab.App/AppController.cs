@@ -38,6 +38,8 @@ internal sealed class AppController : IDisposable
     private readonly Dictionary<Guid, PinWindow> pins = [];
     private SettingsWindow? settingsWindow;
     private HistoryWindow? historyWindow;
+    private ScrollCaptureWindow? scrollWindow;
+    private bool startingScroll;
     private WelcomeWindow? welcomeWindow;
     private readonly string dataDirectory;
     private bool dockWasVisible;
@@ -223,6 +225,57 @@ internal sealed class AppController : IDisposable
         if (!Directory.Exists(directory)) throw new IOException("The export folder is no longer available.");
         Process.Start(new ProcessStartInfo { FileName = directory!, UseShellExecute = true });
     });
+    public async Task StartScrolling()
+    {
+        if (startingScroll) return; startingScroll = true;
+        try { await StartScrollingCore(); } finally { startingScroll = false; }
+    }
+    private async Task StartScrollingCore()
+    {
+        if (scrollWindow is not null) { scrollWindow.Activate(); return; }
+        if (capture.Busy || choosingMonitor || exitRequested || Exiting) return;
+        var first = await capture.CaptureAsync(CaptureMode.Region, false,
+            () => { dockWasVisible = Dock.IsVisible; Dock.Hide(); foreach (var pin in pins.Values) pin.Hide(); },
+            () => { if (dockWasVisible) Dock.Reveal(); foreach (var pin in pins.Values) pin.Show(); });
+        if (first is null || exitRequested || Exiting) return;
+        if (first.Bounds.Width > 4096 || first.Bounds.Height is < 32 or > 4096 || (long)first.Bounds.Width * first.Bounds.Height > 8_000_000) { Notify("Choose a scrolling viewport of at least 32 pixels high, no more than 4096 per axis and 8 MP."); return; }
+        var target = Native.GetAncestor(Native.WindowFromPoint(new Native.POINT { X = first.Bounds.X + first.Bounds.Width / 2, Y = first.Bounds.Y + first.Bounds.Height / 2 }), 2);
+        if (!Native.GetWindowRect(target, out var windowBounds) || first.Bounds.Intersect(windowBounds.Pixels) != first.Bounds) { Notify("Select a viewport entirely inside one visible application window."); return; }
+        var dpi = Native.GetDpiForWindow(target);
+        string Topology() => string.Join(";", MonitorService.All().Select(m => $"{m.Identity}:{m.Bounds}:{m.Dpi}"));
+        var topology = Topology(); var viewport = first.Bounds;
+        var session = new ScrollSession(Path.Combine(dataDirectory, "scroll-sessions"));
+        try
+        {
+            await Task.Run(() => session.Stage(first.Image), exportLifetime.Token); exportLifetime.Token.ThrowIfCancellationRequested();
+            scrollWindow = new ScrollCaptureWindow(session, first.Image, async () =>
+            {
+                try
+                {
+                    if (Exiting || exitRequested || !Native.IsWindow(target) || Native.IsIconic(target) || Native.GetDpiForWindow(target) != dpi || !Native.GetWindowRect(target, out var current) || current.Pixels != windowBounds.Pixels || Topology() != topology)
+                        throw new InvalidOperationException("Scrolling cancelled: target/window/DPI/display layout changed. Reselect the viewport.");
+                    var visible = Dock.IsVisible; Dock.Hide(); foreach (var pin in pins.Values) pin.Hide();
+                    try
+                    {
+                        if (!Native.SetForegroundWindow(target) || Native.GetAncestor(Native.GetForegroundWindow(), 2) != target) throw new InvalidOperationException("Scrolling cancelled: target cannot be brought to the foreground.");
+                        await Task.Delay(120); Native.DwmFlush();
+                        if (Exiting || exitRequested || exportLifetime.IsCancellationRequested) throw new OperationCanceledException();
+                        if (!Native.GetWindowRect(target, out current) || current.Pixels != windowBounds.Pixels || Native.GetDpiForWindow(target) != dpi || Topology() != topology || Native.GetAncestor(Native.GetForegroundWindow(), 2) != target)
+                            throw new InvalidOperationException("Scrolling cancelled: target changed before capture.");
+                        return ImageService.Capture(viewport, false);
+                    }
+                    finally { if (visible && !disposed) Dock.Reveal(); foreach (var pin in pins.Values) pin.Show(); }
+                }
+                catch (Exception ex) { if (!disposed) Notify(ex is InvalidOperationException ? ex.Message : "Scrolling capture failed. Start a new session."); throw; }
+            }, (image, png) =>
+            {
+                if (exitRequested || Exiting) throw new OperationCanceledException();
+                var record = Repository.Add(png, image.PixelWidth, image.PixelHeight); Dock.Refresh(newCapture: true); Edit(record);
+            });
+            scrollWindow.Closed += (_, _) => scrollWindow = null; scrollWindow.Show();
+        }
+        catch { scrollWindow = null; session.Dispose(); throw; }
+    }
     public async Task ExportSelected(IReadOnlyList<CaptureRecord> selected, Window? owner = null)
     {
         if (exporting || selected.Count == 0 || exitRequested || Exiting) return;
@@ -352,6 +405,7 @@ internal sealed class AppController : IDisposable
             }
         };
         menu.Items.Add(monitorMenu);
+        Item("Assisted scrolling…", "capture", () => Run(StartScrolling));
         menu.Items.Add(new Forms.ToolStripSeparator());
         Item("Show screenshot shelf", "image", Dock.Reveal); Item("Focus screenshot shelf", "capture", Dock.FocusShelf); Item("Recent captures", "history", ShowHistory); Item("Settings", "settings", ShowSettings);
         menu.Items.Add(new Forms.ToolStripSeparator());
@@ -425,6 +479,6 @@ internal sealed class AppController : IDisposable
         if (disposed) return; disposed = true;
         Exiting = true; lifecycle.Dispose(); cleanup.Stop(); expiry.Stop();
         SystemEvents.DisplaySettingsChanged -= DisplayChanged; SystemEvents.PowerModeChanged -= PowerChanged; SystemEvents.UserPreferenceChanged -= PreferencesChanged;
-        exportLifetime.Cancel(); Ui.FailureHandler = null; ocr.Dispose(); Clipboard.Invalidate(); Hotkeys.Dispose(); tray.Visible = false; tray.ContextMenuStrip?.Dispose(); tray.Icon?.Dispose(); tray.Dispose();
+        scrollWindow?.CancelSession(); exportLifetime.Cancel(); Ui.FailureHandler = null; ocr.Dispose(); Clipboard.Invalidate(); Hotkeys.Dispose(); tray.Visible = false; tray.ContextMenuStrip?.Dispose(); tray.Icon?.Dispose(); tray.Dispose();
     }
 }

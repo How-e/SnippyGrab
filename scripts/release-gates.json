@@ -423,6 +423,8 @@
       "name": "Capture",
       "tests": [
         "tests/SnippyGrab.Tests/CaptureGeometryTests.cs",
+        "tests/SnippyGrab.Tests/ScrollOverlapTests.cs",
+        "tests/SnippyGrab.IntegrationTests/ScrollSessionTests.cs",
         "tests/SnippyGrab.Tests/HotkeyRegistrationTests.cs",
         "tests/SnippyGrab.IntegrationTests/OverlayLayoutTests.cs"
       ]

@@ -9,7 +9,7 @@ The former task queue is absent from this checkout. New work uses F identifiers 
 | 1 | F01 | P1 | Reconcile capability, compatibility and acceptance documentation | S | Agent; owner evidence if unavailable | Implemented; unavailable build/receiver evidence explicit |
 | 2 | F02 | P1 | Make OCR prerequisites and package failures actionable | M | F01; Agent + clean-profile acceptance | Implemented; clean-profile acceptance NOT RUN |
 | 3 | F03 | P1 | Establish real publisher signing and downloaded-install evidence | M | F02; owner signing identity/access + Agent | Tooling implemented; real signing/install blocked by external prerequisites |
-| 4 | F04 | P1 | Add dedicated monitor capture | S–M | Agent + physical monitor acceptance | Planned |
+| 4 | F04 | P1 | Add dedicated monitor capture | S–M | Agent + physical monitor acceptance | Implemented; physical monitor acceptance NOT RUN |
 | 5 | F05 | P1 | Add JPEG export with shared safe export boundary | M | Agent | Planned |
 | 6 | F06 | P1 | Add ordered batch export from shelf and history | M | F05; Agent + receiver/file workflow acceptance | Planned |
 | 7 | F07 | P1 | Combine selected captures into strip/grid | M | Agent + editor/shelf acceptance | Planned |

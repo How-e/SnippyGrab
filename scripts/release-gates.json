@@ -61,7 +61,7 @@
       "id": "Q8",
       "priority": 1,
       "owner": "Shared",
-      "closed": true,
+      "closed": false,
       "milestone": 1,
       "title": "Validate every capture mode and selection edge"
     },
@@ -245,7 +245,7 @@
       "id": "Q31",
       "priority": 1,
       "owner": "Shared",
-      "closed": true,
+      "closed": false,
       "milestone": 1,
       "title": "Complete hardware capture acceptance"
     },

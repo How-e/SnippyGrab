@@ -5,7 +5,7 @@ public static class HotkeyRegistration
     public static Dictionary<int, CaptureMode> Register(Settings settings, Func<int, Hotkey, bool> register, ICollection<string> warnings)
     {
         var active = new Dictionary<int, CaptureMode>();
-        var requested = new[] { (settings.PrimaryHotkey, settings.DefaultCaptureMode), (settings.DesktopHotkey, CaptureMode.Desktop), (settings.WindowHotkey, CaptureMode.Window), (settings.ActiveWindowHotkey, CaptureMode.ActiveWindow), (settings.FallbackHotkey, CaptureMode.Region) };
+        var requested = new[] { (settings.PrimaryHotkey, settings.DefaultCaptureMode), (settings.DesktopHotkey, CaptureMode.Desktop), (settings.WindowHotkey, CaptureMode.Window), (settings.ActiveWindowHotkey, CaptureMode.ActiveWindow), (settings.FallbackHotkey, CaptureMode.Region), (settings.MonitorHotkey, CaptureMode.Monitor) };
         for (var i = 0; i < requested.Length; i++)
         {
             var (key, mode) = requested[i];

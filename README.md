@@ -7,7 +7,7 @@ A native Windows screenshot shelf with annotation, local OCR, and clipboard or d
 
 .NET 10, WPF and Win32. No Electron, account, telemetry or cloud dependency.
 
-**0.1.0 alpha:** runnable implementation with unit, integration and interactive synthetic checks. Current acceptance has 12 open gates; older owner acceptance applies to its recorded build and available scope. [Capabilities and evidence](docs/CAPABILITIES.md) · [Architecture](docs/ARCHITECTURE.md) · [Desktop acceptance](docs/ACCEPTANCE.md)
+**0.1.0 alpha:** runnable implementation with unit, integration and interactive synthetic checks. Current acceptance has open gates in the manifest; older owner acceptance applies to its recorded build and available scope. [Capabilities and evidence](docs/CAPABILITIES.md) · [Architecture](docs/ARCHITECTURE.md) · [Desktop acceptance](docs/ACCEPTANCE.md)
 
 
 Release requirements and regression ownership are maintained in `scripts/release-gates.json`. Use the [desktop checklist](docs/USER-TESTING.md) for interaction changes. Detailed audit and test-result reports are kept outside the repository.
@@ -45,6 +45,7 @@ Initial builds are unsigned; SmartScreen may prompt. Compare `Get-FileHash <down
 The app lives in the tray. Closing a window keeps it running; **Exit** stops it. Double-click the tray icon to capture. First run explains the Windows Print Screen prerequisite, opens Keyboard settings on request, and lets you choose a Pictures / PNG export folder and optional login startup. The export folder defaults to your Windows Pictures folder; Browse chooses another location. Captures remain in the temporary cache until explicitly exported.
 
 - Capture and immediately **Ctrl+V** into an application accepting clipboard images.
+- Tray → **Capture monitor…** captures an explicitly chosen display's complete physical bounds, including its taskbar. Choose display opens a keyboard-accessible picker. The optional Monitor picker shortcut is disabled by default. A disconnected target cancels; shelf placement stays independent. Entire desktop still captures the virtual desktop.
 - Drag a thumbnail to attach its temporary PNG file.
 - **Ctrl-click** several captures, then drag one selected image to export all of them. Multi-image Ctrl+C copies file-drop data; no universal multi-image bitmap paste format exists.
 - File-copy and drag use **ascending shelf-number order**, regardless of selection-click order. Alt-reordering changes that order. Cards grow outward from number 1 at the anchored corner, so physical left-to-right/top-to-bottom order can be reversed. History file transfers also use underlying shelf order, even if the history list is sorted by capture time. Receivers may present attachments in a different order.

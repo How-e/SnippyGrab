@@ -2,7 +2,7 @@ using System.Text.Json;
 
 namespace SnippyGrab.Core;
 
-public enum CaptureMode { Region, Desktop, Window, ActiveWindow }
+public enum CaptureMode { Region, Desktop, Window, ActiveWindow, Monitor }
 public enum DockCorner { BottomRight, BottomLeft, TopRight, TopLeft, Top, Bottom, Left, Right }
 public enum DockOrientation { Vertical, Horizontal }
 public enum AppTheme { System, Dark, Light }
@@ -24,6 +24,7 @@ public sealed class Settings
     public Hotkey WindowHotkey { get; set; } = new(44, 3);
     public Hotkey ActiveWindowHotkey { get; set; } = new(44, 1);
     public Hotkey FallbackHotkey { get; set; } = new(83, 6);
+    public Hotkey MonitorHotkey { get; set; } = new(0, 0);
     public bool IncludeCursor { get; set; }
     public bool Animate { get; set; } = true;
     public int DockMonitor { get; set; } = -1;
@@ -78,7 +79,7 @@ public sealed class Settings
         if (!Enum.IsDefined(PreviewQuality)) PreviewQuality = PreviewQuality.Sharp;
         if (!Enum.IsDefined(OcrLayout)) OcrLayout = OcrLayout.Auto;
         if (!Enum.IsDefined(DefaultCaptureMode)) DefaultCaptureMode = CaptureMode.Region;
-        foreach (var key in new[] { PrimaryHotkey, DesktopHotkey, WindowHotkey, ActiveWindowHotkey, FallbackHotkey })
+        foreach (var key in new[] { PrimaryHotkey, DesktopHotkey, WindowHotkey, ActiveWindowHotkey, FallbackHotkey, MonitorHotkey })
             if (key is null || key.Key > 254 || key.Modifiers > 15 || (key.Key == 0 && key.Modifiers != 0)) throw new InvalidDataException("Invalid hotkey.");
     }
 }

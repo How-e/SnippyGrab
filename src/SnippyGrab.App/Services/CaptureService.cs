@@ -9,7 +9,7 @@ internal sealed class CaptureService
 {
     public bool Busy { get; private set; }
     public event Action<string>? Timing;
-    public async Task<CaptureResult?> CaptureAsync(CaptureMode mode, bool cursor, Action hide, Action restore)
+    public async Task<CaptureResult?> CaptureAsync(CaptureMode mode, bool cursor, Action hide, Action restore, CaptureTarget? target = null)
     {
         if (Busy) return null;
         Busy = true;
@@ -20,6 +20,12 @@ internal sealed class CaptureService
         {
             hide(); await Task.Delay(45); Native.DwmFlush();
             var desktop = Native.Desktop;
+            if (mode == CaptureMode.Monitor)
+            {
+                if (target is null) throw new InvalidOperationException("Choose a display before capturing.");
+                var monitorBounds = MonitorCapture.Resolve(MonitorService.All().Select(m => (m.Identity, m.Bounds)), target);
+                return new(ImageService.Capture(monitorBounds, cursor), monitorBounds, stopwatch.ElapsedMilliseconds);
+            }
             var bounds = mode == CaptureMode.ActiveWindow ? WindowBounds(previous).Intersect(desktop) : desktop;
             if (mode is CaptureMode.Desktop or CaptureMode.ActiveWindow)
                 return new(ImageService.Capture(bounds, cursor), bounds, stopwatch.ElapsedMilliseconds);
@@ -33,8 +39,8 @@ internal sealed class CaptureService
             if (overlay.WindowPoint is { } point)
             {
                 Native.DwmFlush();
-                var target = Native.GetAncestor(Native.WindowFromPoint(point), 2);
-                bounds = WindowBounds(target).Intersect(desktop);
+                var windowTarget = Native.GetAncestor(Native.WindowFromPoint(point), 2);
+                bounds = WindowBounds(windowTarget).Intersect(desktop);
                 if (bounds.IsEmpty) return null;
                 // Freeze-to-select also prevents hover UI from becoming part of the selected window.
                 return new(ImageService.Crop(frozen, bounds.RelativeTo(desktop)), bounds, stopwatch.ElapsedMilliseconds);

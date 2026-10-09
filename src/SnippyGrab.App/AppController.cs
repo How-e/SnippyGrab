@@ -46,6 +46,7 @@ internal sealed class AppController : IDisposable
     private readonly HotkeyPauseState hotkeyPause = new();
     private readonly LatestOperation ocr = new();
     private bool exitRequested;
+    private bool choosingMonitor;
     private string? cacheWarning;
     private string lastNotice = "No recent notification.";
     internal string LastOperationDetails => lastNotice;
@@ -95,13 +96,25 @@ internal sealed class AppController : IDisposable
         else if (Hotkeys.Warnings.Count > 0) Notify(string.Join("\n", Hotkeys.Warnings));
         if (settingsService.Recovered || Repository.Recovered) Notify(Repository.CleanupBlocked ? "History needs recovery. Open Recent captures to review and confirm. Unknown old captures are pinned; cleanup is disabled and the original history is preserved." : "Recovered invalid local settings. Review Settings before continuing.");
     }
-    public async Task Capture(CaptureMode mode)
+    public async Task Capture(CaptureMode mode, CaptureTarget? target = null)
     {
-        if (capture.Busy || exitRequested || Exiting) return;
+        if (capture.Busy || choosingMonitor || exitRequested || Exiting) return;
+        if (mode == CaptureMode.Monitor && target is null)
+        {
+            var foreground = Native.GetForegroundWindow(); choosingMonitor = true;
+            try { var picker = new MonitorCaptureWindow(); if (picker.ShowDialog() != true) return; target = picker.Target; }
+            finally { choosingMonitor = false; if (foreground != 0) Native.SetForegroundWindow(foreground); }
+        }
         ocr.Cancel(); Clipboard.Invalidate();
-        var result = await capture.CaptureAsync(mode, Settings.IncludeCursor,
-            () => { dockWasVisible = Dock.IsVisible; Dock.Hide(); foreach (var pin in pins.Values) pin.Hide(); },
-            () => { if (dockWasVisible) Dock.Reveal(); foreach (var pin in pins.Values) pin.Show(); });
+        CaptureResult? result;
+        try
+        {
+            result = await capture.CaptureAsync(mode, Settings.IncludeCursor,
+                () => { dockWasVisible = Dock.IsVisible; Dock.Hide(); foreach (var pin in pins.Values) pin.Hide(); },
+                () => { if (dockWasVisible) Dock.Reveal(); foreach (var pin in pins.Values) pin.Show(); }, target);
+        }
+        catch (InvalidOperationException) when (mode == CaptureMode.Monitor)
+        { Notify("Monitor capture cancelled. The selected display is unavailable or ambiguous; choose a display again."); return; }
         if (result is null || exitRequested || Exiting) return;
         var ready = Stopwatch.StartNew();
         var png = await Task.Run(() => ImageService.Png(result.Image));
@@ -272,6 +285,20 @@ internal sealed class AppController : IDisposable
         Item("Window", "window", () => Run(() => Capture(CaptureMode.Window)), shortcut: Settings.WindowHotkey.ToString());
         Item("Active window", "window", () => Run(() => Capture(CaptureMode.ActiveWindow)), shortcut: Settings.ActiveWindowHotkey.ToString());
         Item("Entire desktop", "desktop", () => Run(() => Capture(CaptureMode.Desktop)), shortcut: Settings.DesktopHotkey.ToString());
+        var monitorMenu = new Forms.ToolStripMenuItem("Capture monitor…");
+        monitorMenu.DropDownItems.Add("Choose display…"); monitorMenu.DropDown.Renderer = menu.Renderer;
+        monitorMenu.DropDownOpening += (_, _) =>
+        {
+            foreach (Forms.ToolStripItem oldItem in monitorMenu.DropDownItems.Cast<Forms.ToolStripItem>().ToArray()) oldItem.Dispose();
+            monitorMenu.DropDownItems.Clear();
+            var choose = monitorMenu.DropDownItems.Add("Choose display…"); choose.Click += (_, _) => Run(() => Capture(CaptureMode.Monitor));
+            foreach (var display in MonitorService.All())
+            {
+                var choice = monitorMenu.DropDownItems.Add($"Display {display.Index + 1} · {display.Bounds.Width} × {display.Bounds.Height}" + (display.Primary ? " · primary" : ""));
+                choice.Click += (_, _) => Run(() => Capture(CaptureMode.Monitor, new CaptureTarget(display.Identity)));
+            }
+        };
+        menu.Items.Add(monitorMenu);
         menu.Items.Add(new Forms.ToolStripSeparator());
         Item("Show screenshot shelf", "image", Dock.Reveal); Item("Focus screenshot shelf", "capture", Dock.FocusShelf); Item("Recent captures", "history", ShowHistory); Item("Settings", "settings", ShowSettings);
         menu.Items.Add(new Forms.ToolStripSeparator());

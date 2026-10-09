@@ -108,6 +108,7 @@ internal sealed class SettingsWindow : Window
                 case 1:
                     Group("Capture"); Add(nameof(Settings.DefaultCaptureMode), "Default capture mode"); Add(nameof(Settings.IncludeCursor), "Include cursor");
                     Group("Keyboard shortcuts"); Add(nameof(Settings.PrimaryHotkey), "Region"); Add(nameof(Settings.DesktopHotkey), "Entire desktop"); Add(nameof(Settings.WindowHotkey), "Window picker"); Add(nameof(Settings.ActiveWindowHotkey), "Active window"); Add(nameof(Settings.FallbackHotkey), "Fallback region");
+                    Add(nameof(Settings.MonitorHotkey), "Monitor picker", "Disabled by default; choose a display on each capture.");
                     Note("Click a shortcut and press the keys. Tab moves between fields; Escape disables a shortcut.");
                     var info = new StackPanel(); info.Children.Add(Ui.Heading("Print Screen in Windows", 16)); info.Children.Add(Ui.Text("Turn off Windows screen capture if this shortcut is intercepted.", 12, true));
                     info.Children.Add(Ui.ActionButton("Open Keyboard settings", "keyboard", "Open Windows Print Screen settings", () => Process.Start(new ProcessStartInfo("ms-settings:easeofaccess-keyboard") { UseShellExecute = true }), "QuietButton")); page.Children.Add(Ui.Group(info)); break;

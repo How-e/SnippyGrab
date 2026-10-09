@@ -7,10 +7,12 @@ A native Windows screenshot shelf with annotation, local OCR, and clipboard or d
 
 .NET 10, WPF and Win32. No Electron, account, telemetry or cloud dependency.
 
-**0.1.0 alpha:** runnable implementation with unit, integration and interactive synthetic checks. Receiver acceptance and available hardware scope are accepted by the owner; exact receiver versions and wider hardware coverage remain limitations. [Architecture](docs/ARCHITECTURE.md) · [Desktop acceptance](docs/ACCEPTANCE.md)
+**0.1.0 alpha:** runnable implementation with unit, integration and interactive synthetic checks. Current acceptance has 12 open gates; older owner acceptance applies to its recorded build and available scope. [Capabilities and evidence](docs/CAPABILITIES.md) · [Architecture](docs/ARCHITECTURE.md) · [Desktop acceptance](docs/ACCEPTANCE.md)
 
 
 Release requirements and regression ownership are maintained in `scripts/release-gates.json`. Use the [desktop checklist](docs/USER-TESTING.md) for interaction changes. Detailed audit and test-result reports are kept outside the repository.
+
+Future improvements are ordered in the [task queue](TASK_QUEUE.md), with [research and implementation briefs](docs/IMPLEMENTATION-BRIEFS.md). These are planned work, not current capabilities.
 
 ## Preview
 
@@ -113,7 +115,7 @@ CI builds/tests, verifies formatting and audits dependencies. CodeQL runs separa
 - Alpha: the owner reported successful drop and paste in desktop chat clients, a code editor, and browsers. Exact-version, selection/order and delayed-read acceptance remains incomplete; receiver support varies.
 - GDI produces SDR; HDR colors can differ. Window capture uses visible pixels, without reconstructing occluded/minimized/protected windows.
 - Physical selections passed at 100% and 150% on the connected mixed-DPI layout. Owner acceptance covers the available layout and current accessibility configuration. 125/175/200%, vertical/HDR screens and other text-scale/assistive-technology configurations remain unverified compatibility limits; the owner accepted this narrower scope. Explorer restart, sleep/resume and all-day behavior remain unverified.
-- Resource testing uses synthetic workloads; all-day use and startup latency need desktop acceptance; .NET packaging is larger than a C++ utility. The user-run [two-hour resource test instructions](docs/RESOURCE-TESTING.md) provide the packaged command and reporting criteria.
+- Q34 latency and Q35 resource gates are closed for their reviewed workloads, not every later build. The recovered two-hour synthetic report completed 7279 cycles in 7201.09 seconds; its exact build identity is unavailable. Current-build startup and all-day use remain unverified. [Evidence scope](docs/CAPABILITIES.md) · [Resource regression instructions](docs/RESOURCE-TESTING.md).
 - Undo is bounded to 20 states; large crop/effect histories can consume substantial memory. Annotation counts and imported sizes are bounded.
 - Transfers protect sources for 24 hours. Session-only cleans on normal exit while preserving pins/transfers; crashes fall back to retention.
 - User-profile ACLs protect normal cache access. Files are not encrypted or securely erased.

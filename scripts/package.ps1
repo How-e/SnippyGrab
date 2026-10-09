@@ -3,6 +3,8 @@ $ErrorActionPreference = 'Stop'
 if ($Version -notmatch '^\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?$') { throw 'Invalid release version.' }
 $repoRoot = Split-Path -Parent $PSScriptRoot
 . (Join-Path $PSScriptRoot 'sign-artifact.ps1')
+if ($SigningThumbprint -and -not $TimestampServer) { throw 'Signed packaging requires -TimestampServer before publishing any artifacts.' }
+if ($TimestampServer -and -not $SigningThumbprint) { throw 'TimestampServer requires a signing identity.' }
 . (Join-Path $PSScriptRoot 'release-gates.ps1')
 Assert-SnippyReleaseGates -Version $Version -ManifestJson (Get-Content -LiteralPath (Join-Path $repoRoot 'scripts/release-gates.json') -Raw)
 $revision = git -C $repoRoot rev-parse HEAD

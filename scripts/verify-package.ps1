@@ -1,6 +1,8 @@
-param([Parameter(Mandatory)][string]$Bundle, [Parameter(Mandatory)][string]$Installer)
+param([Parameter(Mandatory)][string]$Bundle, [Parameter(Mandatory)][string]$Installer, [string]$SigningThumbprint, [string]$ExpectedPublisher)
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'install-files.ps1')
+. (Join-Path $PSScriptRoot 'sign-artifact.ps1')
+if ($ExpectedPublisher -and -not $SigningThumbprint) { throw 'ExpectedPublisher requires SigningThumbprint.' }
 Test-SnippyBundle $Bundle
 foreach ($path in @("$Bundle.zip", $Installer)) {
     $line = (Get-Content -LiteralPath "$path.sha256" -Raw).Trim()
@@ -9,4 +11,11 @@ foreach ($path in @("$Bundle.zip", $Installer)) {
 $report = Join-Path (Split-Path -Parent $Installer) 'installer-payload-check.txt'
 $process = Start-Process -FilePath $Installer -ArgumentList @('--verify-payload', ('"' + $report + '"')) -WindowStyle Hidden -Wait -PassThru
 if ($process.ExitCode -ne 0) { throw "Embedded installer verification failed: $(Get-Content $report)" }
+if ($SigningThumbprint) {
+    if (-not $ExpectedPublisher) { throw 'Signed release verification requires the expected publisher certificate subject.' }
+    foreach ($owned in @((Join-Path $Bundle 'SnippyGrab.exe'), $Installer)) {
+        Assert-SnippySignature -Path $owned -Thumbprint $SigningThumbprint -ExpectedPublisher $ExpectedPublisher
+    }
+    Write-Output 'PASS: owned app/setup Authenticode chain, publisher identity and timestamp. Browser/clean-profile acceptance remains separate.'
+}
 Write-Output 'PASS: complete bundle inventory, ZIP/setup digests and independently embedded setup payload.'

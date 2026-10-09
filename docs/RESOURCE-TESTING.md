@@ -1,6 +1,6 @@
 # Manual two-hour resource test — Q35
 
-**Q35 complete:** the user-run report has passed completion and trend/recovery review on 2026-10-07; see [resource acceptance](RESOURCE-REVIEW-20261007.md). Instructions below remain available for future manual regression runs. The agent's interrupted earlier attempt remains a non-pass and will not resume automatically.
+**Q35 complete:** the user-run report has passed completion and trend/recovery review on 2026-10-07; see resource acceptance (see the maintained desktop acceptance instructions). Instructions below remain available for future manual regression runs. The agent's interrupted earlier attempt remains a non-pass and will not resume automatically.
 
 Use the complete portable **0.1.0-alpha.queue.20261006.3** folder, including its x64 native libraries and tessdata. No compiler is required. Allow at least two hours plus startup/cleanup, enough free disk space for thousands of synthetic captures, and keep Windows awake. Avoid running another heavy benchmark at the same time.
 

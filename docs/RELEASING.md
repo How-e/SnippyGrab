@@ -1,7 +1,7 @@
 # Releasing
 
 1. Provision OCR, locked restore, Release build with warnings as errors, tests, format verification.
-2. Complete docs/ACCEPTANCE.md and update docs/VALIDATION.md. Keep incomplete builds prerelease.
+2. Complete docs/ACCEPTANCE.md and update scripts/release-gates.json. Keep detailed results outside Git. Keep incomplete builds prerelease.
 3. Update CHANGELOG.md; run `pwsh ./scripts/package.ps1 -Version 0.1.0-alpha`.
 4. Run the bundle executable with `--self-test` on an interactive desktop; test install/removal in a disposable user profile.
 5. For the configured How-e/SnippyGrab remote, push an authorized reviewed version tag. The tag workflow builds/tests and publishes ZIP/setup + SHA-256 using the ephemeral GitHub token. Ordinary PR builds need no signing credentials or application secrets. The initial alpha upload required manual recovery; verify the corrected upload end to end on the next authorized release.
@@ -10,7 +10,7 @@
 
 Initial builds are unsigned; SmartScreen can warn. SHA-256 verifies download integrity, not publisher identity. Add Authenticode through a protected environment/external signer, then regenerate checksums. Never put a PFX/private key in source. SDK 10.0.400 and separate build/publish lock files are pinned. Update these deliberately when servicing the runtime; compilation is deterministic for the same SDK/dependencies; fixed archive timestamps/order remove ZIP timestamp drift, while independent native/signing builds still need separate reproducibility evidence.
 
-Private vulnerability reporting, secret scanning/push protection, required CI/CodeQL, protected main and restricted tags are enabled and verified in [the current review](REMAINING-WORK.md). Recheck these service settings before future releases; source files alone cannot enforce them.
+Private vulnerability reporting, secret scanning/push protection, required CI/CodeQL, protected main and restricted tags are enabled and verified in the current review (see the maintained desktop acceptance instructions). Recheck these service settings before future releases; source files alone cannot enforce them.
 
 Release metadata derives from assembly informational version, including commit identity. Bundles carry BUILD-PROVENANCE.json (version, commit, dirty status, SDK, lock hashes and native digests) plus the curated CHANGELOG. Hosted tag packaging requires a clean matching tag. Archive entries are sorted with fixed 1980 timestamps; identical inputs produce identical ZIPs under the same compression runtime. This is archive reproducibility, not proof that independent ReadyToRun/signing builds are byte-identical. Use scripts/archive.ps1 to compare fixed-input archives. Local development packages explicitly record a dirty source tree.
 
@@ -27,4 +27,4 @@ Packaging is unsigned by default. On a protected Windows signing machine, provis
 
 English remains the only supported offline OCR language for this release. Additional languages are deferred: each future model needs immutable source/hash/license admission, explicit setup selection, resource measurement and corpus validation. No runtime language downloads are introduced.
 
-Stable packaging now enforces all 51 queue identities and refuses an unqualified stable version while any P0/P1 entry remains unchecked. Prerelease packaging reports the remaining count and preserves alpha evaluation. This prevents local or hosted stable artifacts bypassing recorded release gates. Checkboxes must still be backed by the closure records and milestone evidence; this parser does not invent acceptance. No gate-override flag is provided.
+Packaging validates scripts/release-gates.json and blocks stable versions while required P0/P1 gates remain open. Gate status represents the reviewed scope, not proof that later changes are accepted. Reopen affected gates after substantial changes and run the desktop checklist. scripts/test-release-gates.ps1 and test-milestone-map.ps1 verify fail-closed parsing, ownership and executable regression coverage. No override flag is provided. Keep detailed evidence and design references outside Git.

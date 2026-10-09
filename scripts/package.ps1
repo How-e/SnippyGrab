@@ -4,7 +4,7 @@ if ($Version -notmatch '^\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?$') { throw 'Invalid rele
 $repoRoot = Split-Path -Parent $PSScriptRoot
 . (Join-Path $PSScriptRoot 'sign-artifact.ps1')
 . (Join-Path $PSScriptRoot 'release-gates.ps1')
-Assert-SnippyReleaseGates -Version $Version -QueueText (Get-Content -LiteralPath (Join-Path $repoRoot 'TASK_QUEUE.md') -Raw)
+Assert-SnippyReleaseGates -Version $Version -ManifestJson (Get-Content -LiteralPath (Join-Path $repoRoot 'scripts/release-gates.json') -Raw)
 $revision = git -C $repoRoot rev-parse HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Git provenance unavailable.' }
 $dirty = [bool](git -C $repoRoot status --porcelain)

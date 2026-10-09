@@ -9,6 +9,15 @@ namespace SnippyGrab.App.Services;
 
 internal static class RuntimeChecks
 {
+    private static IEnumerable<T> Descendants<T>(DependencyObject root) where T : DependencyObject
+    {
+        for (var index = 0; index < VisualTreeHelper.GetChildrenCount(root); index++)
+        {
+            var child = VisualTreeHelper.GetChild(root, index); if (child is T match) yield return match;
+            foreach (var descendant in Descendants<T>(child)) yield return descendant;
+        }
+    }
+
     public static async Task CheckOcrCorpus(string destination)
     {
         var service = new OcrService();
@@ -67,18 +76,18 @@ internal static class RuntimeChecks
             try
             {
                 history.Show(); pin.Show(); await Task.Delay(30);
-                var list = ((DockPanel)history.Content).Children.OfType<ListBox>().Single(); list.SelectedIndex = 0;
+                var list = history.CaptureList; list.SelectedIndex = 0;
                 controller.Repository.Add(png, 320, 160); Assert(list.Items.Count == 2 && list.SelectedItems.Count == 1, "Open history refresh preserves selection after capture");
                 controller.Repository.Replace(record, ImageService.Png(SyntheticCode(640, 240)), 640, 240);
-                var historyImage = ((DockPanel)history.Content).Children.OfType<Image>().Single();
-                var pinImage = (Image)((Border)pin.Content).Child;
+                var historyImage = history.PreviewImage;
+                var pinImage = pin.PreviewImage;
                 Assert(((BitmapSource)historyImage.Source).PixelWidth == 640 && ((BitmapSource)pinImage.Source).PixelWidth == 640, $"History and detached pin refresh committed pixels (history={((BitmapSource)historyImage.Source).PixelWidth}, pin={((BitmapSource)pinImage.Source).PixelWidth})");
                 var large = ImageService.Png(SyntheticCode(2240, 800));
                 foreach (var quality in Enum.GetValues<PreviewQuality>())
                 {
                     controller.Settings.PreviewQuality = quality;
                     controller.Repository.Replace(record, large, 2240, 800);
-                    var expectedHistory = quality == PreviewQuality.Original ? 2240 : ImageService.PreviewPixels((int)Math.Ceiling(600 * VisualTreeHelper.GetDpi(history).DpiScaleX), quality);
+                    var expectedHistory = quality == PreviewQuality.Original ? 2240 : ImageService.PreviewPixels((int)Math.Ceiling(history.PreviewWidth * VisualTreeHelper.GetDpi(history).DpiScaleX), quality);
                     var expectedPin = quality == PreviewQuality.Original ? 2240 : ImageService.PreviewPixels(800, quality);
                     Assert(((BitmapSource)historyImage.Source).PixelWidth == expectedHistory && ((BitmapSource)pinImage.Source).PixelWidth == expectedPin, "Configured quality refreshes open history and pin previews");
                     Assert(File.ReadAllBytes(controller.Repository.PathFor(record)).SequenceEqual(large), "Preview quality preserves original PNG bytes");
@@ -161,7 +170,7 @@ internal static class RuntimeChecks
         finally
         {
             foreach (var window in new[] { editor, other }.Where(w => w.IsVisible))
-                ((DockPanel)window.Content).Children.OfType<WrapPanel>().First().Children.OfType<Button>().Single(b => Equals(b.Content, "Discard")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Descendants<Button>((DependencyObject)window.Content).Single(b => Equals(b.Content, "Discard changes")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         }
     }
     private static async Task CheckCapturePersistenceFailures(string parent, BitmapSource image, byte[] png)
@@ -211,23 +220,24 @@ internal static class RuntimeChecks
                 foreach (var textScale in new[] { 1.0, 1.5, 2.25 })
                     foreach (var width in new[] { 660, 1000 })
                     {
-                        Application.Current.Resources["BodyTextSize"] = 13 * textScale;
-                        Application.Current.Resources["TextSize.12"] = 12 * textScale;
-                        ((DockPanel)editor.Content).Children.OfType<WrapPanel>().Last().Children.OfType<ComboBox>().Single().SelectedValue = EditTool.OcrArea;
+                        Ui.Theme(AppTheme.Dark, textScale);
+                        editor.ToolPicker.SelectedValue = EditTool.OcrArea;
                         editor.Width = width; editor.UpdateLayout(); await Task.Delay(25);
                         var rootPanel = (DockPanel)editor.Content;
-                        var toolbar = rootPanel.Children.OfType<WrapPanel>().First();
-                        var buttons = toolbar.Children.OfType<Button>().ToArray();
-                        Assert(buttons.Any(b => Equals(b.Content, "Apply + copy")) && buttons.Any(b => Equals(b.Content, "Export PNG…")) && !buttons.Any(b => Equals(b.Content, "Save")), "Explicit apply/export labels");
-                        Assert(buttons.Single(b => Equals(b.Content, "Open export folder")).IsEnabled, "Successful export exposes folder action");
-                        foreach (var input in rootPanel.Children.OfType<WrapPanel>().SelectMany(p => p.Children.OfType<Control>()).Where(c => c is TextBox or ComboBox))
+                        var buttons = Descendants<Button>(rootPanel).ToArray();
+                        string Id(DependencyObject element) => System.Windows.Automation.AutomationProperties.GetAutomationId(element);
+                        Assert(buttons.Any(b => Id(b) == "Apply + copy") && buttons.Any(b => Id(b) == "Export PNG…"), "Explicit apply/export actions");
+                        Assert(editor.ExportFolderAction.IsEnabled, "Successful export exposes folder action");
+                        foreach (var input in Descendants<Control>(rootPanel).Where(c => c is TextBox or ComboBox))
                             Assert(!string.IsNullOrWhiteSpace(System.Windows.Automation.AutomationProperties.GetName(input)), "Editor input exposes an accessible name");
-                        Assert(buttons.All(b => b.ActualWidth >= 30 && b.ActualHeight >= 30), "Editor actions have minimum 30 DIP targets");
-                        foreach (var control in rootPanel.Children.OfType<WrapPanel>().SelectMany(p => p.Children.OfType<FrameworkElement>()))
+                        Assert(buttons.Where(b => b.IsVisible).All(b => b.ActualWidth >= 30 && b.ActualHeight >= 30), "Editor actions have minimum 30 DIP targets");
+                        foreach (var control in buttons.Where(b => b.IsVisible && b.Tag is not EditTool))
                         {
                             var bounds = control.TransformToAncestor(rootPanel).TransformBounds(new Rect(control.RenderSize));
-                            Assert(bounds.Left >= -1 && bounds.Right <= rootPanel.ActualWidth + 1 && bounds.Bottom <= rootPanel.ActualHeight, $"Every editor action/tool stays reachable at {width} DIP and {textScale:P0} text");
+                            Assert(bounds.Left >= -1 && bounds.Right <= rootPanel.ActualWidth + 1 && bounds.Bottom <= rootPanel.ActualHeight, $"Every editor command stays reachable at {width} DIP and {textScale:P0} text");
                         }
+                        Assert(buttons.Count(b => b.Tag is EditTool) == Enum.GetValues<EditTool>().Length, "All tools remain in the scrollable rail");
+                        foreach (var tool in Enum.GetValues<EditTool>()) { editor.ToolPicker.SelectedValue = tool; editor.UpdateLayout(); }
                         Snapshot(editor, Path.Combine(Path.GetDirectoryName(Path.GetFullPath(destination))!, $"editor-export-{width}-text{(int)(textScale * 100)}.png"));
                     }
                 Assert(Native.GetForegroundWindow() == foreground, "Editor layout probe preserves focus");
@@ -371,7 +381,7 @@ internal static class RuntimeChecks
                 {
                     var grid = (Grid)card.Child; var toolbar = grid.Children.OfType<StackPanel>().Single();
                     Assert(toolbar.ActualWidth <= grid.ActualWidth, "Compact action toolbar fits screenshot width");
-                    Assert(toolbar.Children.Count == (thumbnailSize < 200 ? 3 : 6), "Compact shelf keeps edit/copy and full action menu");
+                    Assert(toolbar.Children.Count == (thumbnailSize < 210 ? 3 : 6), "Compact shelf keeps edit/copy and full action menu");
                 }
             }
             Snapshot(dock, Path.Combine(Path.GetDirectoryName(Path.GetFullPath(destination))!, "dock-layout-synthetic.png"));

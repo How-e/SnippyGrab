@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Unified WPF windows, menus, dialogs and tray icons with shared Light/Dark/System themes, line icons, visible keyboard focus and high-contrast colors; refreshed the installer appearance.
+- Organized settings into seven categories with preserved drafts and field-level validation. Added a scrollable editor tool rail, contextual properties and a responsive history list/preview view.
+- Updated README previews and contributor testing guidance. Replaced internal planning and acceptance reports with an executable release-gate manifest; detailed results remain local.
+- Checked the current design at normal and narrow widths; automated coverage includes theme changes, complete settings/tool access and editor bounds at enlarged text sizes. New-design receiver, hardware and assistive-technology acceptance remains separate.
+
 ## 0.1.0-alpha.acceptance.20261007.8 — 2026-10-08
 
 - Added an explicitly illustrated, privacy-safe capture-to-Codex workflow animation at the owner's request.
@@ -32,7 +39,7 @@
 - Installer failures now direct users to the actual error details. Regression checks cover hidden ancestors, settings migration, preview/original fidelity and small dialog text.
 
 ## 0.1.0-alpha — 2026-10-06
-Initial native Windows implementation. Desktop acceptance remains a release gate; see docs/VALIDATION.md.
+Initial native Windows implementation. Desktop acceptance remains a release gate; see docs/ACCEPTANCE.md.
 
 ### Reliability implementations
 
@@ -59,6 +66,5 @@ Initial native Windows implementation. Desktop acceptance remains a release gate
 - Self-contained per-user setup, embedded checksum admission, verified staged upgrades and rollback backups.
 - Derived release version, SDK/source/dependency provenance, fixed-order/timestamp ZIPs and conservative three-build artifact retention.
 - 187 automated tests plus isolated installer/upgrade/retention and packaged runtime checks pass. Real login/clean-machine/performance-duration and existing hardware/receiver gates remain open.
-
 
 

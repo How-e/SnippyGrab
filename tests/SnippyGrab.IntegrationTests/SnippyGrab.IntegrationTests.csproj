@@ -28,5 +28,7 @@
     <ItemGroup><SnippyNativeFiles Include="../../artifacts/native-ocr/current/x64/*.dll" /></ItemGroup>
     <Copy SourceFiles="@(SnippyNativeFiles)" DestinationFolder="$(TargetDir)x64" />
     <Copy SourceFiles="../../artifacts/native-ocr/current/NATIVE-OCR-PROVENANCE.json" DestinationFolder="$(TargetDir)" />
+    <Copy SourceFiles="../../artifacts/native-webp/current/x64/snippywebp.dll" DestinationFolder="$(TargetDir)x64" />
+    <Copy SourceFiles="../../artifacts/native-webp/current/WEBP-PROVENANCE.json" DestinationFolder="$(TargetDir)" />
   </Target>
 </Project>

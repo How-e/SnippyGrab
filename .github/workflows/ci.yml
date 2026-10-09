@@ -22,6 +22,7 @@ jobs:
         shell: pwsh
         run: |
           ./scripts/test-native-ocr-policy.ps1
+          ./scripts/test-webp-policy.ps1
           ./scripts/test-release-gates.ps1
           ./scripts/test-resource-review.ps1
           ./scripts/test-signing.ps1

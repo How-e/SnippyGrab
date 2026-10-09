@@ -54,3 +54,6 @@ foreach ($entry in $manifest.files.PSObject.Properties) {
 }
 Write-Output 'OCR component integrity passed. Native advisory review and residual risks are documented in docs/DEPENDENCY-REVIEW.md; this is not a native CVE scanner.'
 & (Join-Path $PSScriptRoot 'inventory-native-ocr.ps1') -ComponentDirectory $ComponentDirectory
+. (Join-Path $PSScriptRoot 'webp-policy.ps1')
+$null = Test-SnippyWebpBuild $ComponentDirectory -Packaged
+Write-Output 'WebP source/recipe/binary integrity passed; advisory review is documented in docs/WEBP-ADMISSION.md, not covered by the NuGet scanner.'

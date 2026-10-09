@@ -25,6 +25,20 @@
   <Target Name="BuildPinnedNativeOcr" BeforeTargets="PrepareForBuild">
     <Exec Command="pwsh -NoProfile -File &quot;$(MSBuildThisFileDirectory)..\..\scripts\build-native-ocr.ps1&quot;" />
   </Target>
+  <PropertyGroup><SnippyWebpRoot>$(MSBuildThisFileDirectory)..\..\artifacts\native-webp\current\</SnippyWebpRoot></PropertyGroup>
+  <Target Name="BuildPinnedNativeWebp" BeforeTargets="PrepareForBuild">
+    <Exec Command="pwsh -NoProfile -File &quot;$(MSBuildThisFileDirectory)..\..\scripts\build-native-webp.ps1&quot;" />
+  </Target>
+  <Target Name="CopyPinnedNativeWebp" AfterTargets="CopyFilesToOutputDirectory">
+    <Copy SourceFiles="$(SnippyWebpRoot)x64\snippywebp.dll" DestinationFolder="$(TargetDir)x64" />
+    <Copy SourceFiles="$(SnippyWebpRoot)WEBP-PROVENANCE.json" DestinationFolder="$(TargetDir)" />
+  </Target>
+  <Target Name="PublishPinnedNativeWebp" AfterTargets="ComputeFilesToPublish">
+    <ItemGroup>
+      <ResolvedFileToPublish Include="$(SnippyWebpRoot)x64\snippywebp.dll"><RelativePath>x64\snippywebp.dll</RelativePath><CopyToPublishDirectory>Always</CopyToPublishDirectory><ExcludeFromSingleFile>true</ExcludeFromSingleFile></ResolvedFileToPublish>
+      <ResolvedFileToPublish Include="$(SnippyWebpRoot)WEBP-PROVENANCE.json"><RelativePath>WEBP-PROVENANCE.json</RelativePath><CopyToPublishDirectory>Always</CopyToPublishDirectory><ExcludeFromSingleFile>true</ExcludeFromSingleFile></ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
   <Target Name="CopyPinnedNativeOcr" AfterTargets="CopyFilesToOutputDirectory">
     <ItemGroup><SnippyNativeFiles Include="$(SnippyNativeRoot)x64\*.dll" /></ItemGroup>
     <Copy SourceFiles="@(SnippyNativeFiles)" DestinationFolder="$(TargetDir)x64" />

@@ -15,7 +15,7 @@ public static class BatchExport
         var ordered = TransferPayload.Ordered(repository, selected.ToArray());
         if (ordered.Count is < 1 or > 200) throw new InvalidDataException("Select between 1 and 200 captures.");
         var result = new List<BatchExportItem>(); var reserved = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var extension = format == ExportFormat.Png ? ".png" : ".jpg";
+        var extension = CaptureExport.Extension(format);
         foreach (var capture in ordered)
         {
             var name = $"{result.Count + 1:D3}-SnippyGrab-{capture.CreatedUtc.UtcDateTime:yyyyMMdd-HHmmss}";

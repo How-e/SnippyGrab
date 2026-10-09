@@ -17,6 +17,10 @@ LocalAppData/SnippyGrab/cache, UUID-based PNG names, atomic writes, versioned JS
 Tesseract wrapper 5.2.0 with source-pinned native engine snapshot 5.5.3 plus reviewed fixes and Leptonica 1.88.0 (exact inventory in DEPENDENCY-REVIEW.md and NATIVE-OCR.md), lazy initialized for each OCR job, bundled hash-verified English LSTM model. Native DLL filenames retain the older names for wrapper ABI compatibility; the exported versions and build receipt identify their contents. Production OCR decodes admitted images with Windows WIC and passes raw RGBA pixels to native OCR; compressed native image readers are bypassed and external native codecs are disabled. Model provisioning requires network only at build time. Portable OCR requires Microsoft VC++ 2015–2022 x64 runtime; failures leave capture working. No cloud API. OCR text is never logged or persisted.
 
 ## Failure boundaries
+Shared export keeps cached PNG revisions immutable. Single export and ordered serial batch export hold revision leases, validate destinations outside the cache and use atomic writes; durable file writes and metadata persistence are reported separately. JPEG flattens alpha onto white. WebP uses a separately pinned, source-built x64 pixel-only encoder with private-path integrity checks, straight BGRA and stricter dimensions; its API does not admit encoded input or modify OCR. See WEBP-ADMISSION.md.
+
+Composition computes checked Core rectangles/budgets and renders sources sequentially into a new PNG. Assisted scrolling uses owned private staging, bounded overlap scoring and explicit seam acceptance; only Finish adds to history and opens the editor. Fixed HWND/window/DPI/topology guards stop invalid sessions; content-layout changes within a window require user reselection. ADR-001 defines the narrow static scope. Recording stays excluded.
+
 Clipboard uses bounded asynchronous retries. Capture/save/OCR/cache failures show concise status without terminating the app. A per-user mutex prevents duplicate hotkey/tray ownership. No IPC server. Timers run only for coarse cleanup/dock expiry or pending hide, not continual capture/provider polling.
 
 ## Release

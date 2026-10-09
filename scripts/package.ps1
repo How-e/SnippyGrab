@@ -27,10 +27,12 @@ $unusedPath = [IO.Path]::GetFullPath((Join-Path $stagingPath 'x86'))
 if ($unusedPath.StartsWith([IO.Path]::GetFullPath($stagingPath) + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -and (Test-Path -LiteralPath $unusedPath)) { Remove-Item -LiteralPath $unusedPath -Recurse -Force }
 Get-ChildItem -LiteralPath $stagingPath -Filter '*.pdb' | Remove-Item -Force
 & (Join-Path $PSScriptRoot 'audit-dependencies.ps1') -ComponentDirectory $stagingPath
+. (Join-Path $PSScriptRoot 'webp-policy.ps1')
+$null = Test-SnippyWebpBuild $stagingPath -Packaged
 foreach ($name in @('README.md', 'CHANGELOG.md', 'LICENSE', 'THIRD-PARTY-NOTICES.md')) { Copy-Item -LiteralPath (Join-Path $repoRoot $name) -Destination $stagingPath }
 $locks = [ordered]@{}
 Get-ChildItem (Join-Path $repoRoot 'src') -Recurse -Filter 'packages*.lock.json' | Sort-Object FullName | ForEach-Object { $locks[[IO.Path]::GetRelativePath($repoRoot, $_.FullName)] = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash }
-[ordered]@{ Version = $Version; Commit = $revision; Dirty = $dirty; Sdk = (dotnet --version); Runtime = 'win-x64 self-contained'; DependencyLocks = $locks; NativeComponents = (Get-Content (Join-Path $PSScriptRoot 'ocr-components.json') -Raw | ConvertFrom-Json) } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $stagingPath 'BUILD-PROVENANCE.json') -Encoding utf8
+[ordered]@{ Version = $Version; Commit = $revision; Dirty = $dirty; Sdk = (dotnet --version); Runtime = 'win-x64 self-contained'; DependencyLocks = $locks; NativeComponents = (Get-Content (Join-Path $PSScriptRoot 'ocr-components.json') -Raw | ConvertFrom-Json); WebpComponent = (Get-Content (Join-Path $PSScriptRoot 'webp-component.json') -Raw | ConvertFrom-Json) } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $stagingPath 'BUILD-PROVENANCE.json') -Encoding utf8
 Copy-Item -LiteralPath (Join-Path $repoRoot 'licenses') -Destination $stagingPath -Recurse
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'install.ps1') -Destination $stagingPath
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'install-files.ps1') -Destination $stagingPath

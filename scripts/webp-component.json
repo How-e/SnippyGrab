@@ -1,0 +1,7 @@
+{
+  "Version": "1.6.0",
+  "Commit": "4fa21912338357f89e4fd51cf2368325b59e9bd9",
+  "Repository": "https://chromium.googlesource.com/webm/libwebp",
+  "Architecture": "win-x64",
+  "Purpose": "encoder-only owned ABI; OCR codecs remain disabled"
+}

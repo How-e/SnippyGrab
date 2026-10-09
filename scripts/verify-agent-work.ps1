@@ -34,7 +34,7 @@ try {
     Invoke-Step 'build' { Invoke-Dotnet @('build', '--no-restore', '-c', 'Release', '-warnaserror') } -Critical
     Invoke-Step 'tests' { Invoke-Dotnet @('test', '--no-build', '-c', 'Release', '--logger', 'trx', '--results-directory', (Join-Path $runDirectory 'tests')) }
     Invoke-Step 'format' { Invoke-Dotnet @('format', '--no-restore', '--verify-no-changes') }
-    foreach ($script in @('test-native-ocr-policy', 'test-release-gates', 'test-resource-review', 'test-signing', 'test-installer', 'test-install-files', 'test-artifact-retention')) {
+    foreach ($script in @('test-native-ocr-policy', 'test-webp-policy', 'test-release-gates', 'test-resource-review', 'test-signing', 'test-installer', 'test-install-files', 'test-artifact-retention')) {
         $scriptPath = Join-Path $PSScriptRoot ($script + '.ps1')
         Invoke-Step $script { & $scriptPath }
     }

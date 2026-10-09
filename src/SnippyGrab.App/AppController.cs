@@ -207,7 +207,7 @@ internal sealed class AppController : IDisposable
             if (dialog.ShowDialog() != true || dialog.Request is not { } request) return new(ExportStatus.Cancelled);
             if (record.FileName != revision) throw new InvalidOperationException("Capture changed while choosing export options. Retry export.");
             var result = await CaptureExport.WriteAsync(Repository, record, request.Path, request.Format, request.Quality,
-                (source, quality) => ImageService.Jpeg(ImageService.Load(source), quality), exportLifetime.Token);
+                (source, quality) => ImageService.EncodeExport(source, request.Format, quality, exportLifetime.Token), exportLifetime.Token);
             var warning = result.MetadataSaved ? null : "Image exported, but capture history could not be updated. The file is safe; retry later to remember its destination.";
             if (!disposed) { Notify(warning ?? request.Format + " exported to: " + result.Path); Try(() => Dock.Refresh()); }
             return new(ExportStatus.Exported, result.Path, warning);
@@ -290,7 +290,7 @@ internal sealed class AppController : IDisposable
             progress = new OperationWindow("Export selected", owner); progress.Show();
             using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(progress.Cancellation, exportLifetime.Token);
             var result = await BatchExport.RunAsync(Repository, plan, request.Format, request.Quality, request.Collision,
-                (source, quality) => ImageService.Jpeg(ImageService.Load(source), quality), new Progress<string>(progress.Report), lifetime.Token);
+                (source, quality) => ImageService.EncodeExport(source, request.Format, quality, lifetime.Token), new Progress<string>(progress.Report), lifetime.Token);
             progress.Complete(result.ToString()); if (!disposed) Dock.Refresh();
         }
         catch (Exception ex) { if (progress is not null) progress.Complete(OperationFailure.From(ex).Message); if (!disposed) Failure(ex); }

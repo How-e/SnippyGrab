@@ -105,7 +105,10 @@ public sealed class UiRedesignTests
                     var format = form.Children.OfType<ComboBox>().Single(); var quality = form.Children.OfType<Slider>().Single();
                     Assert.Equal(0, format.SelectedIndex); Assert.Equal(90, quality.Value); Assert.False(quality.IsEnabled);
                     format.SelectedIndex = 1; Assert.True(quality.IsEnabled); quality.Value = 75;
-                    Assert.Contains(form.Children.OfType<TextBlock>(), text => text.Text == "JPEG quality: 75");
+                    Assert.Contains(form.Children.OfType<TextBlock>(), text => text.Text == "Lossy quality: 75");
+                    format.SelectedIndex = 2; Assert.False(quality.IsEnabled);
+                    format.SelectedIndex = 3; Assert.True(quality.IsEnabled);
+                    Assert.EndsWith(".webp", ExportWindow.SuggestedFileName(exportRecord, ExportFormat.WebpLossless));
                     Assert.Null(exportWindow.Request);
                     exportWindow.Measure(new Size(560, 360)); exportWindow.Arrange(new Rect(0, 0, 560, 360)); exportWindow.UpdateLayout();
                 }

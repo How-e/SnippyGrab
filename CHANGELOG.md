@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — local improvements, 2026-10-09
+
+- Added actionable OCR readiness checks and timestamp/publisher verification tooling; real publisher signing still requires external identity/access.
+- Added explicit monitor capture, shared PNG/JPEG/WebP export, ordered cancellable batch export, and native-pixel strip/grid composition.
+- Added bounded user-assisted static vertical scrolling with seam correction/undo and private frame staging. No automatic scrolling or recording.
+- Added pinned WebP source/recipe/binary provenance and codec/license review. Local synthetic/offscreen verification does not close physical, receiver or clean-profile acceptance gates. These changes are not yet published.
+
 ## 0.1.0-alpha.design.20261008.1 — 2026-10-08
 
 - Unified WPF windows, menus, dialogs and tray icons with shared Light/Dark/System themes, line icons, visible keyboard focus and high-contrast colors; refreshed the installer appearance.

@@ -1,10 +1,11 @@
 namespace SnippyGrab.Core;
 
 public sealed record CaptureExportResult(string Path, bool MetadataSaved);
-public enum ExportFormat { Png, Jpeg }
+public enum ExportFormat { Png, Jpeg, WebpLossless, WebpLossy }
 
 public static class CaptureExport
 {
+    public static string Extension(ExportFormat format) => format switch { ExportFormat.Png => ".png", ExportFormat.Jpeg => ".jpg", ExportFormat.WebpLossless or ExportFormat.WebpLossy => ".webp", _ => throw new InvalidDataException("Unsupported export format.") };
     public static CaptureExportResult Write(CaptureRepository repository, CaptureRecord capture, string destination)
     {
         var path = ValidateDestination(repository.Root, destination, ExportFormat.Png);
@@ -16,7 +17,7 @@ public static class CaptureExport
     public static async Task<CaptureExportResult> WriteAsync(CaptureRepository repository, CaptureRecord capture, string destination,
         ExportFormat format, int quality, Func<string, int, byte[]> encodeJpeg, CancellationToken cancellation = default)
     {
-        if (quality is < 1 or > 100) throw new InvalidDataException("JPEG quality must be between 1 and 100.");
+        if (quality is < 1 or > 100) throw new InvalidDataException("Export quality must be between 1 and 100.");
         var path = ValidateDestination(repository.Root, destination, format);
         var revision = capture.FileName; EnsureCurrent(repository, capture, revision);
         using var lease = repository.Lease([capture]);
@@ -54,8 +55,8 @@ public static class CaptureExport
         if (!Path.IsPathFullyQualified(destination)) throw new InvalidDataException("Choose an absolute export path.");
         var path = Path.GetFullPath(destination);
         var extension = Path.GetExtension(path);
-        if (format == ExportFormat.Png ? !extension.Equals(".png", StringComparison.OrdinalIgnoreCase) : !extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase) && !extension.Equals(".jpeg", StringComparison.OrdinalIgnoreCase))
-            throw new InvalidDataException("The filename extension must match the selected PNG or JPEG format.");
+        if (!extension.Equals(Extension(format), StringComparison.OrdinalIgnoreCase) && !(format == ExportFormat.Jpeg && extension.Equals(".jpeg", StringComparison.OrdinalIgnoreCase)))
+            throw new InvalidDataException("The filename extension must match the selected export format.");
         var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(cache));
         if (path.Equals(root, StringComparison.OrdinalIgnoreCase) || path.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException("Choose a location outside the managed cache.");

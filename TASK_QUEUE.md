@@ -15,7 +15,7 @@ The former task queue is absent from this checkout. New work uses F identifiers 
 | 7 | F07 | P1 | Combine selected captures into strip/grid | M | Agent + editor/shelf acceptance | Implemented; native gesture acceptance NOT RUN |
 | 8 | F08 | P1 | Specify scrolling capture feasibility and supported first-release targets | M | Agent research; F07 informs composition | Complete; GO for bounded assisted static viewport scope |
 | 9 | F09 | P1 | Implement bounded, assisted scrolling capture after feasibility decision | L | F08 go decision; F07 composition conventions; Shared | Implemented within ADR-001; physical target acceptance NOT RUN |
-| 10 | F10 | P2 | Add WebP export after explicit codec admission | M | F05; dependency/security review | Planned; codec decision |
+| 10 | F10 | P2 | Add WebP export after explicit codec admission | M | F05; dependency/security review | Implemented; pinned encoder admitted; clean-profile acceptance NOT RUN |
 | 11 | F11 | P3 | Evaluate video/GIF as a separately approved product scope | XL | Owner scope decision; Agent research | Deferred; no recording implementation |
 
 P1 means the next improvement cycle, not an emergency defect. P2 is useful follow-on work. P3 is outside the current still-image scope. Scrolling is the largest still-image gap; its two-stage sequence follows the simpler export and composition improvements because those deliver value sooner and establish bounded image processing. WebP follows scrolling because JPEG already addresses a broad file-size workflow without a new codec. Documented evidence and installation confidence take precedence over feature expansion.

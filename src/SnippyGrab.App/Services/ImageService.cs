@@ -8,6 +8,20 @@ namespace SnippyGrab.App.Services;
 internal static class ImageService
 {
     public const long MaxPixels = 80_000_000;
+    internal static byte[] EncodeExport(string path, ExportFormat format, int quality, CancellationToken cancellation)
+    {
+        if (format is ExportFormat.WebpLossless or ExportFormat.WebpLossy)
+        {
+            // Inspect dimensions before decoding a potentially large composed PNG.
+            using (var input = File.OpenRead(path))
+            {
+                var frame = BitmapDecoder.Create(input, BitmapCreateOptions.DelayCreation, BitmapCacheOption.None).Frames[0];
+                WebpService.ValidateDimensions(frame.PixelWidth, frame.PixelHeight);
+            }
+            return WebpService.Encode(Load(path), format == ExportFormat.WebpLossless, quality, cancellation);
+        }
+        return Jpeg(Load(path), quality);
+    }
     internal static byte[] Jpeg(BitmapSource image, int quality)
     {
         if (quality is < 1 or > 100 || (long)image.PixelWidth * image.PixelHeight > MaxPixels) throw new InvalidDataException("Invalid JPEG quality or dimensions.");

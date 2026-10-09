@@ -229,6 +229,38 @@ internal static class RuntimeChecks
                 }
             }
             finally { export.Close(); Ui.Theme(AppTheme.Dark, 1); }
+            // These isolated windows use synthetic captures and never invoke a file picker.
+            var second = controller.Repository.Add(ImageService.Png(image), 720, 360);
+            var ordered = TransferPayload.Ordered(controller.Repository, [record, second]);
+            using (var scrolling = new ScrollSession(Path.Combine(root, "scroll-sessions")))
+            {
+                scrolling.Stage(image);
+                var windows = new Window[] { new ExportWindow(record, root, controller.Repository.Root, null, ordered), new CompositionWindow(ordered.Select(c => new CompositionInput(controller.Repository.PathFor(c), c.Width, c.Height)).ToArray(), null), new ScrollCaptureWindow(scrolling, image, () => throw new InvalidOperationException("Diagnostic capture is disabled."), (_, _) => throw new InvalidOperationException("Diagnostic commit is disabled.")) };
+                for (var i = 0; i < windows.Length; i++)
+                {
+                    var window = windows[i]; window.ShowActivated = false; window.WindowStartupLocation = WindowStartupLocation.Manual; window.Left = -30000; window.Top = -30000;
+                    try
+                    {
+                        window.Show(); await Task.Delay(50); window.UpdateLayout();
+                        foreach (var scale in new[] { 1.0, 1.5, 2.25 })
+                        {
+                            Ui.Theme(AppTheme.Dark, scale); window.UpdateLayout();
+                            var content = (FrameworkElement)window.Content;
+                            Assert(content is ScrollViewer { VerticalScrollBarVisibility: ScrollBarVisibility.Auto }, "Improvement options remain scrollable at larger text scales");
+                            foreach (var input in Descendants<Control>(content).Where(c => c is TextBox or ComboBox or Slider))
+                                Assert(!string.IsNullOrWhiteSpace(System.Windows.Automation.AutomationProperties.GetName(input)), "Improvement input exposes accessible name");
+                            Snapshot(window, destination + $".improvement-{i}-text{(int)(scale * 100)}.png");
+                        }
+                    }
+                    finally { window.Close(); Ui.Theme(AppTheme.Dark, 1); }
+                }
+            }
+            var raw = new byte[128 * 64 * 4]; new Random(42).NextBytes(raw);
+            var alpha = BitmapSource.Create(128, 64, 96, 96, PixelFormats.Bgra32, null, raw, 128 * 4); alpha.Freeze();
+            File.WriteAllBytes(destination + ".expected-bgra", raw);
+            File.WriteAllBytes(destination + ".lossless.webp", WebpService.Encode(alpha, true, 90));
+            File.WriteAllBytes(destination + ".lossy20.webp", WebpService.Encode(alpha, false, 20));
+            File.WriteAllBytes(destination + ".lossy100.webp", WebpService.Encode(alpha, false, 100));
             var editor = new EditorWindow(controller, record) { ShowActivated = false, WindowStartupLocation = WindowStartupLocation.Manual, Left = -30000, Top = -30000 };
             try
             {

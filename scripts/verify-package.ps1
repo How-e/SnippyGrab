@@ -4,6 +4,8 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'sign-artifact.ps1')
 if ($ExpectedPublisher -and -not $SigningThumbprint) { throw 'ExpectedPublisher requires SigningThumbprint.' }
 Test-SnippyBundle $Bundle
+. (Join-Path $PSScriptRoot 'webp-policy.ps1')
+$null = Test-SnippyWebpBuild $Bundle -Packaged
 foreach ($path in @("$Bundle.zip", $Installer)) {
     $line = (Get-Content -LiteralPath "$path.sha256" -Raw).Trim()
     if ($line -notmatch '^([0-9a-fA-F]{64})  (.+)$' -or $Matches[2] -ne [IO.Path]::GetFileName($path) -or (Get-FileHash -LiteralPath $path).Hash -ne $Matches[1]) { throw 'Release artifact checksum failed.' }

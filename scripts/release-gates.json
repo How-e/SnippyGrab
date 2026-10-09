@@ -466,6 +466,7 @@
         "tests/SnippyGrab.Tests/CompositionTests.cs",
         "tests/SnippyGrab.IntegrationTests/CompositionPixelTests.cs",
         "tests/SnippyGrab.IntegrationTests/JpegExportTests.cs",
+        "tests/SnippyGrab.IntegrationTests/WebpExportTests.cs",
         "tests/SnippyGrab.Tests/CrossViewRevisionTests.cs",
         "tests/SnippyGrab.IntegrationTests/EditorDocumentTests.cs",
         "tests/SnippyGrab.IntegrationTests/UiRedesignTests.cs"
@@ -515,6 +516,7 @@
       "name": "Packaging and release",
       "tests": [
         "scripts/test-release-gates.ps1",
+        "scripts/test-webp-policy.ps1",
         "scripts/test-installer.ps1"
       ]
     }

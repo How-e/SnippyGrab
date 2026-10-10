@@ -1,14 +1,15 @@
 # Manual two-hour resource test — Q35
 
-**Q35 closed for the reviewed workload:** the user-run report completed on 2026-10-07 and prior documentation records trend/recovery review. The recovered report confirms 7201.09 seconds, 7279 cycles and 72 OCR runs, but contains no exact app/build identity. See [capabilities and evidence](CAPABILITIES.md) for limits. Instructions below remain for regression runs; closure does not automatically cover newer builds. The interrupted earlier attempt remains a non-pass.
+**Q35 reopened for the performance release:** the 2026-10-10 build passed a 120-second synthetic workload; its identified current-build two-hour regression remains unrun. The historical user-run report completed on 2026-10-07 and prior documentation records trend/recovery review. That report confirms 7201.09 seconds, 7279 cycles and 72 OCR runs, but contains no exact app/build identity and does not cover these changes. See [capabilities and evidence](CAPABILITIES.md) for limits. The interrupted earlier attempt remains a non-pass.
 
-Use the complete portable **0.1.0-alpha.queue.20261006.3** folder, including its x64 native libraries and tessdata. No compiler is required. Allow at least two hours plus startup/cleanup, enough free disk space for thousands of synthetic captures, and keep Windows awake. Avoid running another heavy benchmark at the same time.
+Use the complete portable **0.1.0-alpha.20261010.1** folder, including its x64 native libraries and tessdata. No compiler is required. Allow at least two hours plus startup/cleanup, enough free disk space for thousands of synthetic captures, and keep Windows awake. Avoid running another heavy benchmark at the same time. Record the executable SHA-256 and BUILD-PROVENANCE.json with the report.
 
 Run this in PowerShell from the repository root. For a moved portable folder, set `$bundle` to that complete folder instead; keep its native libraries and model beside the executable:
 
 ```powershell
-$bundle = Resolve-Path '.\artifacts\SnippyGrab-0.1.0-alpha.queue.20261006.3-win-x64'
+$bundle = Resolve-Path '.\artifacts\SnippyGrab-0.1.0-alpha.20261010.1-win-x64'
 $exe = Join-Path $bundle 'SnippyGrab.exe'
+Get-FileHash -LiteralPath $exe -Algorithm SHA256
 $results = Join-Path $env:USERPROFILE 'Documents\SnippyGrab-test-results'
 New-Item -ItemType Directory -Path $results -Force | Out-Null
 $report = Join-Path $results ('resources-2h-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.json')

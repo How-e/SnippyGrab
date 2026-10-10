@@ -1,9 +1,14 @@
-# Implementation status — 2026-10-09
+# Implementation status — 2026-10-10
 
-The project remains **0.1.0-alpha**, unsigned and prerelease; the current release version is `0.1.0-alpha.20261009.3`. The [release-gate manifest](../scripts/release-gates.json) has **51 closed / 0 open** gates for the reviewed unsigned alpha scope. Current owner acceptance is recorded for `0.1.0-alpha.acceptance.20261009.2`, source `80edee6683ef055f073be2f6dc976a15a862f04d`; the release preserves that product code. The owner authorized push/publication of the unsigned alpha release after gate closure. A closed manifest does not authorize stable promotion; every release still requires final hosted checks and independent download verification.
+The project remains **0.1.0-alpha**, unsigned and prerelease; the current release version is `0.1.0-alpha.20261010.1`. The [release-gate manifest](../scripts/release-gates.json) has **41 closed / 10 open** gates after reopening Q1/Q12/Q20/Q24/Q29/Q30/Q32/Q34/Q35/Q41 for the performance changes. Previous owner acceptance is recorded for `0.1.0-alpha.acceptance.20261009.2`, source `80edee6683ef055f073be2f6dc976a15a862f04d`; it does not renew affected acceptance on this release. The owner authorized commit, push and a new unsigned alpha release. Stable promotion requires a separate decision; every release still requires final hosted checks and independent download verification.
 
 ## Current implementation
 
+- Copy reuses stored PNG bytes and prepares a frozen bitmap on a worker with clipboard generation reserved before yielding. Import/editor loading and OCR preparation also run on workers; immutable leases, shutdown and revision guards remain enforced.
+- History seals older 512-record pages, caches unchanged page identities and keeps the changing head in the atomic manifest. Production cleanup yields between slices and rechecks protections; single file operations and durable commits can still pause the UI.
+- JPEG flattens one row at a time; lossless WebP uses exact preset 1 and caller-owned input. Region effects avoid full-image rendering; unannotated crops share backing pixels under the existing undo budget.
+- History/pin previews load asynchronously, cancel obsolete requests and reuse metadata-only updates. Original preview quality requests four times display width with a four-megapixel cap; edit/copy/export/OCR use full-resolution images.
+- Native OCR reuses one serialized engine while validating package/model admission per request. Bounded two-times grayscale/Sauvola enhancement improves the synthetic small-text fixture; cached engine lifetime, model repair and cancellation are covered by regressions.
 - Capture supports region, desktop, window, active window and an explicitly selected monitor. Monitor identity/topology guards and a disabled-by-default picker shortcut preserve existing settings.
 - Local English OCR validates its pinned model/native components and provides readiness guidance. Additional languages and runtime model downloads remain excluded.
 - Single and ordered batch exports share PNG/JPEG/WebP options, path guards, revision leases and cancellation. PNG preserves cached bytes; WebP has a 16 MP / 16383-axis cap. Late Skip collisions remain skipped instead of overwriting a new file; metadata failures remain distinguishable from exported files.
@@ -14,6 +19,10 @@ The project remains **0.1.0-alpha**, unsigned and prerelease; the current releas
 - Signing hooks require a protected identity and timestamp. Real publisher signing remains an external prerequisite. Recording/GIF functionality remains excluded under [ADR-002](ADR-002-RECORDING-SCOPE.md).
 
 ## Verification and remaining acceptance
+
+The performance implementation passed a zero-warning Release build and 314 tests (203 Core, 111 integration), formatting, policy/installer/update fixtures and managed/native integrity audits. Private self-contained probes passed editor layout, history/pin reliability, native OCR corpus and transfer crash/restart. Independent WebP decoding preserved exact lossless pixels and alpha. A 120-second/410-cycle resource run recovered after disposal; matched baseline/fixed pipeline reruns found no repeatable slowdown. Large JPEG/WebP, region effect, bounded preview, small-text OCR and 4K/8K import/editor preparation fixtures provide bounded evidence on one host. Current-build two-hour/all-day, external clipboard/receiver, cold/populated startup, visible frame pacing, slow storage and lower-memory hardware acceptance remain open. Detailed results are outside Git.
+
+The following observations describe the previous 2026-10-09 acceptance/release work and do not close the reopened gates above.
 
 Use `scripts/verify-agent-work.ps1` for locked restore, Release warnings-as-errors build, tests, formatting, dependency admission and installer/update/release boundary fixtures. Optional `-NativeChecks` runs isolated synthetic/offscreen probes; these checks do not establish physical capture, receiver, assistive-technology, login or clean-profile acceptance. Detailed reports, private captures, temporary runners and packages remain outside Git or under ignored `artifacts/`.
 

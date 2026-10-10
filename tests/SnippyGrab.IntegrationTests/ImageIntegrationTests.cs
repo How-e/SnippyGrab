@@ -100,6 +100,19 @@ public sealed class ImageIntegrationTests
             return true;
         });
     }
+    [Fact]
+    public void StoredPayloadReadPreservesBytesAndRejectsOversizeBeforeAllocation()
+    {
+        var png = Sta(() => ImageService.Png(Synthetic()));
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".png");
+        try
+        {
+            File.WriteAllBytes(path, png); Assert.Equal(png, ImageService.ReadEncoded(path));
+            using (var oversized = new FileStream(path, FileMode.Open, FileAccess.Write)) oversized.SetLength(100 * 1024 * 1024 + 1);
+            var error = Assert.Throws<InvalidDataException>(() => ImageService.ReadEncoded(path)); Assert.Contains("100 MB", error.Message);
+        }
+        finally { File.Delete(path); }
+    }
     [Theory]
     [InlineData(PreviewQuality.Balanced, 40)]
     [InlineData(PreviewQuality.Sharp, 80)]
@@ -125,6 +138,45 @@ public sealed class ImageIntegrationTests
     public void CropClipsAndDetachesFromOriginal()
     {
         Sta(() => { var crop = ImageService.Crop(Synthetic(), new(-10, -10, 50, 50)); Assert.Equal(40, crop.PixelWidth); Assert.Equal(40, crop.PixelHeight); Assert.False(crop is CroppedBitmap); Assert.Throws<InvalidDataException>(() => ImageService.Crop(Synthetic(), new(300, 300, 10, 10))); return true; });
+    }
+    [Theory]
+    [InlineData(3000, 1800)]
+    [InlineData(1800, 3000)]
+    public void OriginalPreviewsAreBoundedWithoutChangingFullResolution(int width, int height)
+    {
+        Sta(() =>
+        {
+            var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".png");
+            try
+            {
+                var source = BitmapSource.Create(width, height, 96, 96, PixelFormats.Bgra32, null, new byte[width * height * 4], width * 4);
+                File.WriteAllBytes(path, ImageService.Png(source));
+                var preview = ImageService.LoadPreview(path, ImageService.PreviewPixels(2000, PreviewQuality.Original));
+                Assert.InRange((long)preview.PixelWidth * preview.PixelHeight, 1, 4_000_000);
+                var original = ImageService.Load(path); Assert.Equal(width, original.PixelWidth); Assert.Equal(height, original.PixelHeight);
+            }
+            finally { File.Delete(path); }
+            return true;
+        });
+    }
+    [Fact]
+    public async Task NewPreviewCancelsOlderRequestAndClosingCancelsPendingWork()
+    {
+        var bytes = Sta(() => ImageService.Png(Synthetic()));
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".png");
+        try
+        {
+            File.WriteAllBytes(path, bytes);
+            using var started = new ManualResetEventSlim(); using var release = new ManualResetEventSlim();
+            using var loader = new PreviewLoader((file, width, height) => { if (width != 80) { started.Set(); if (!release.Wait(TimeSpan.FromSeconds(10))) throw new TimeoutException(); } return ImageService.LoadPreview(file, width, height); });
+            var older = loader.LoadAsync(path, 20); Assert.True(started.Wait(TimeSpan.FromSeconds(10)));
+            var latest = loader.LoadAsync(path, 80); release.Set();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => older);
+            Assert.Equal(80, (await latest).PixelWidth);
+            started.Reset(); release.Reset(); var pending = loader.LoadAsync(path, 40); Assert.True(started.Wait(TimeSpan.FromSeconds(10))); loader.Dispose(); release.Set();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending);
+        }
+        finally { File.Delete(path); }
     }
     [Fact]
     public void ExportedPngContainsAppliedOpaqueRedaction()
@@ -235,6 +287,28 @@ public sealed class ImageIntegrationTests
             finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
             return true;
         });
+    }
+    [Fact]
+    public async Task StoredImageCopyPreservesPngMetadataAndCancellation()
+    {
+        var bytes = Sta(() =>
+        {
+            var metadata = new BitmapMetadata("png"); metadata.SetQuery("/tEXt/{str=Description}", "Synthetic copy metadata");
+            var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(Synthetic(), null, metadata, null));
+            using var stream = new MemoryStream(); encoder.Save(stream); return stream.ToArray();
+        });
+        var path = Path.Combine(Path.GetTempPath(), "SnippyGrab-copy-" + Guid.NewGuid().ToString("N") + ".png");
+        try
+        {
+            File.WriteAllBytes(path, bytes); var writes = new List<DataObject>(); var service = new ClipboardService(writes.Add);
+            Assert.True(await service.StoredImageAsync(path, true));
+            Assert.Equal(bytes, Assert.IsType<MemoryStream>(writes[^1].GetData("PNG")).ToArray());
+            Assert.True(writes[^1].GetDataPresent(DataFormats.Bitmap));
+            Assert.True(await service.StoredImageAsync(path, false)); Assert.False(writes[^1].GetDataPresent("PNG", false));
+            using var lifetime = new CancellationTokenSource(); lifetime.Cancel();
+            Assert.False(await service.StoredImageAsync(path, true, lifetime.Token)); Assert.Equal(2, writes.Count);
+        }
+        finally { File.Delete(path); }
     }
     [Fact]
     public async Task OcrRecognizesSyntheticErrorWithoutDesktop()

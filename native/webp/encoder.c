@@ -23,12 +23,20 @@ __declspec(dllexport) int __cdecl SnippyWebpEncode(const uint8_t* bgra,
   if (!WebPConfigInit(&config) || !WebPPictureInit(&picture)) return 0;
   config.lossless = lossless; config.quality = (float)quality;
   config.method = 4; config.exact = 1; config.thread_level = 0;
+  // Lossless effort changes compression cost, never the decoded pixels. The
+  // fast preset avoids the large search buffers used by method 4 on noise,
+  // while retaining prediction for compact screenshot exports.
+  if (lossless && !WebPConfigLosslessPreset(&config, 1)) return 0;
+  config.exact = 1;
   if (!WebPValidateConfig(&config)) return 0;
   picture.width = width; picture.height = height; picture.use_argb = 1;
+  // Windows x64 BGRA bytes are native ARGB words. WebPPicture accepts caller-
+  // owned input and keeps it untouched; WebPPictureFree frees only its own buffers.
+  picture.argb = (uint32_t*)bgra; picture.argb_stride = width;
   picture.progress_hook = Progress; picture.user_data = (void*)cancel;
   WebPMemoryWriterInit(&writer);
   picture.writer = WebPMemoryWrite; picture.custom_ptr = &writer;
-  ok = WebPPictureImportBGRA(&picture, bgra, width * 4) && WebPEncode(&config, &picture);
+  ok = WebPEncode(&config, &picture);
   WebPPictureFree(&picture);
   if (!ok || writer.size > 100 * 1024 * 1024) { WebPMemoryWriterClear(&writer); return 0; }
   *output = writer.mem; *size = writer.size;

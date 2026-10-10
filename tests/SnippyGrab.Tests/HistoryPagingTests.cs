@@ -60,7 +60,7 @@ public sealed class HistoryPagingTests : IDisposable
         var manifestPath = Path.Combine(root, "history.json"); var manifest = File.ReadAllBytes(manifestPath);
         var referenced = JsonSerializer.Deserialize<RepositoryState>(manifest)!.Pages;
         fail = true;
-        Assert.Throws<IOException>(() => repository.SetPinned(repository.Captures[0], true));
+        Assert.Throws<IOException>(() => repository.SetPinned(repository.Captures[600], true));
         Assert.Equal(manifest, File.ReadAllBytes(manifestPath));
         var reopened = new CaptureRepository(root); reopened.Load();
         Assert.False(reopened.CleanupBlocked); Assert.Equal(1025, reopened.Captures.Count);
@@ -75,6 +75,56 @@ public sealed class HistoryPagingTests : IDisposable
         var final = new CaptureRepository(root); final.Load();
         Assert.False(final.CleanupBlocked); Assert.Equal(1025, final.Captures.Count);
         Assert.Contains(final.Captures, c => c.Id == pin.Id && c.Pinned);
+    }
+    [Fact]
+    public void ChangingHeadDoesNotCreateAbandonedPagesAndCachedOlderEditsPersist()
+    {
+        var repository = new CaptureRepository(root);
+        for (var i = 0; i < 513; i++) repository.Add([1], 10, 10);
+        var pages = Directory.GetFiles(root, "history-page-*.json"); Assert.Single(pages);
+        for (var i = 0; i < 30; i++) repository.Add([1], 10, 10);
+        Assert.Equal(pages, Directory.GetFiles(root, "history-page-*.json"));
+        var record = repository.Captures[^1]; repository.SetPinned(record, true);
+        record.Saved = true; record.ExportPath = @"C:\synthetic\export.png"; repository.Persist();
+        var reopened = new CaptureRepository(root); reopened.Load(); Assert.False(reopened.CleanupBlocked);
+        Assert.Equal(543, reopened.Captures.Count);
+        var restored = Assert.Single(reopened.Captures, c => c.Id == record.Id);
+        Assert.True(restored.Pinned); Assert.True(restored.Saved); Assert.Equal(record.ExportPath, restored.ExportPath);
+    }
+    [Fact]
+    public async Task SlicedCleanupRechecksPinsLeasesAndPersistsCancellation()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new CaptureRepository(root, utcNow: () => now.AddDays(-2));
+        var pin = repository.Add([1], 10, 10); var leased = repository.Add([1], 10, 10); var eligible = repository.Add([1], 10, 10);
+        IDisposable? lease = null; var yields = 0;
+        try
+        {
+            var removed = await repository.CleanupAsync(now, 1, yield: () =>
+            {
+                if (++yields == 1) { repository.SetPinned(pin, true); lease = repository.Lease([leased]); }
+                return Task.CompletedTask;
+            }, batchSize: 1);
+            Assert.Equal(1, removed); Assert.True(File.Exists(repository.PathFor(pin))); Assert.True(File.Exists(repository.PathFor(leased)));
+            Assert.False(File.Exists(repository.PathFor(eligible))); Assert.True(yields > 1);
+            using var cancellation = new CancellationTokenSource(); var count = 0;
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => repository.CleanupAsync(now, 1,
+                yield: () => { if (++count == 1) cancellation.Cancel(); return Task.CompletedTask; }, cancellation: cancellation.Token, batchSize: 1));
+            var reopened = new CaptureRepository(root); reopened.Load(); Assert.False(reopened.CleanupBlocked); Assert.Equal(2, reopened.Captures.Count);
+        }
+        finally { lease?.Dispose(); }
+    }
+    [Fact]
+    public async Task CancellingAfterDeletionPersistsTheCompletedPartOfCleanup()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new CaptureRepository(root, utcNow: () => now.AddDays(-2));
+        for (var i = 0; i < 3; i++) repository.Add([1], 10, 10);
+        using var cancellation = new CancellationTokenSource();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => repository.CleanupAsync(now, 1,
+            yield: () => { if (repository.Captures.Count == 2) cancellation.Cancel(); return Task.CompletedTask; }, cancellation: cancellation.Token, batchSize: 1));
+        var reopened = new CaptureRepository(root); reopened.Load();
+        Assert.False(reopened.CleanupBlocked); Assert.Equal(2, reopened.Captures.Count); Assert.Equal(2, Directory.GetFiles(root, "capture-*.png").Length);
     }
     public void Dispose() { if (Directory.Exists(root)) Directory.Delete(root, true); }
 }

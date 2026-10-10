@@ -20,7 +20,7 @@ internal static class RuntimeChecks
 
     public static async Task CheckOcrCorpus(string destination)
     {
-        var service = new OcrService();
+        using var service = new OcrService();
         var cases = new[] { ("Build failed\nError CS1002: semicolon expected", "CS1002"), ("Traceback (most recent call last):\nValueError: invalid literal", "ValueError"), ("Application error\nAccess denied. Please retry.", "denied") };
         byte[]? last = null;
         foreach (var (text, expected) in cases)
@@ -79,6 +79,7 @@ internal static class RuntimeChecks
                 var list = history.CaptureList; list.SelectedIndex = 0;
                 controller.Repository.Add(png, 320, 160); Assert(list.Items.Count == 2 && list.SelectedItems.Count == 1, "Open history refresh preserves selection after capture");
                 controller.Repository.Replace(record, ImageService.Png(SyntheticCode(640, 240)), 640, 240);
+                await Task.WhenAll(history.PreviewWork, pin.PreviewWork);
                 var historyImage = history.PreviewImage;
                 var pinImage = pin.PreviewImage;
                 Assert(((BitmapSource)historyImage.Source).PixelWidth == 640 && ((BitmapSource)pinImage.Source).PixelWidth == 640, $"History and detached pin refresh committed pixels (history={((BitmapSource)historyImage.Source).PixelWidth}, pin={((BitmapSource)pinImage.Source).PixelWidth})");
@@ -87,6 +88,7 @@ internal static class RuntimeChecks
                 {
                     controller.Settings.PreviewQuality = quality;
                     controller.Repository.Replace(record, large, 2240, 800);
+                    await Task.WhenAll(history.PreviewWork, pin.PreviewWork);
                     var expectedHistory = quality == PreviewQuality.Original ? 2240 : ImageService.PreviewPixels((int)Math.Ceiling(history.PreviewWidth * VisualTreeHelper.GetDpi(history).DpiScaleX), quality);
                     var expectedPin = quality == PreviewQuality.Original ? 2240 : ImageService.PreviewPixels(800, quality);
                     Assert(((BitmapSource)historyImage.Source).PixelWidth == expectedHistory && ((BitmapSource)pinImage.Source).PixelWidth == expectedPin, "Configured quality refreshes open history and pin previews");
@@ -105,9 +107,9 @@ internal static class RuntimeChecks
                 while (((BitmapSource)pinImage.Source).PixelWidth != expectedResizedPreview && resizeDeadline.Elapsed < TimeSpan.FromSeconds(2)) await Task.Delay(50);
                 Assert(expectedResizedPreview > ImageService.PreviewPixels(800, PreviewQuality.Sharp) && ((BitmapSource)pinImage.Source).PixelWidth == expectedResizedPreview,
                     $"Resizing a pin decodes detail beyond the old fixed 800-pixel cap (physical width={resizedWidth}, expected={expectedResizedPreview}, actual={((BitmapSource)pinImage.Source).PixelWidth})");
-                controller.Repository.SetPinned(record, false); controller.Repository.Cleanup(DateTimeOffset.UtcNow, 1, true);
+                controller.Repository.SetPinned(record, false); await Task.WhenAll(history.PreviewWork, pin.PreviewWork); controller.Repository.Cleanup(DateTimeOffset.UtcNow, 1, true);
                 Assert(File.Exists(controller.Repository.PathFor(record)), "Unpinned open view protects current source");
-                pin.Close(); controller.Repository.Cleanup(DateTimeOffset.UtcNow, 1, true); Assert(list.Items.Count == 0, "Pin close releases source and history removes cleaned rows");
+                pin.Close(); await Task.WhenAll(history.PreviewWork, pin.DrainPreviewAsync()); controller.Repository.Cleanup(DateTimeOffset.UtcNow, 1, true); Assert(list.Items.Count == 0, "Pin close releases source and history removes cleaned rows");
 
                 var writes = new List<DataObject>(); controller.Clipboard = new ClipboardService(data => writes.Add(data), _ => Task.CompletedTask);
                 var pending = new PendingOcr(); controller.OcrService = pending;
@@ -132,7 +134,7 @@ internal static class RuntimeChecks
                 await CheckCapturePersistenceFailures(root, image, png);
                 Assert(Native.GetForegroundWindow() == foreground, "Reliability probe preserves foreground");
             }
-            finally { pin.Close(); history.Close(); controller.Dock.Close(); }
+            finally { pin.Close(); history.Close(); await Task.WhenAll(history.DrainPreviewAsync(), pin.DrainPreviewAsync()); controller.Dock.Close(); }
             AtomicFile.Write(destination, JsonSerializer.SerializeToUtf8Bytes(new { Result = "PASS", Scope = "Offscreen synthetic history/pin revision and lease lifecycle, injected OCR/clipboard; no pointer movement, real capture, OS clipboard write or startup registration change." }));
         }
         finally

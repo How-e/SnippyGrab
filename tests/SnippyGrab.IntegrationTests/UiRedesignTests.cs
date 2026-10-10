@@ -256,7 +256,13 @@ public sealed class UiRedesignTests
                     Assert.True(VirtualizingPanel.GetIsVirtualizing(history.CaptureList)); Assert.InRange(history.CachedThumbnailCount, 1, 24);
                     history.CaptureList.SelectedIndex = 0; var id = controller.Repository.Captures[0].Id;
                     controller.Repository.Replace(controller.Repository.Captures[0], png, 160, 100);
+                    var previewTask = history.PreviewWork;
+                    var previewFrame = new System.Windows.Threading.DispatcherFrame();
+                    _ = previewTask.ContinueWith(_ => history.Dispatcher.BeginInvoke(new Action(() => previewFrame.Continue = false)));
+                    System.Windows.Threading.Dispatcher.PushFrame(previewFrame); previewTask.GetAwaiter().GetResult();
                     Assert.Single(history.CaptureList.SelectedItems); Assert.NotNull(history.PreviewImage.Source);
+                    var selectedCapture = controller.Repository.Captures[0]; selectedCapture.Saved = true; controller.Repository.Persist();
+                    Assert.Same(previewTask, history.PreviewWork); Assert.NotNull(history.PreviewImage.Source);
                     Assert.Equal(id, controller.Repository.Captures[0].Id);
                 }
                 finally { history.Close(); }
@@ -305,6 +311,25 @@ public sealed class UiRedesignTests
                 var delete = Children<Button>(card).Single(b => System.Windows.Automation.AutomationProperties.GetName(b) == "Delete from shelf (Delete)");
                 delete.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                 Assert.True(records[0].Dismissed); Assert.True(records[1].Dismissed); Assert.False(records[2].Dismissed);
+                var importPath = Path.Combine(root, "import.png"); File.WriteAllBytes(importPath, png);
+                var priorCount = controller.Repository.Captures.Count;
+                RunUiTask(async () => { await controller.ImportAsync(importPath); return true; });
+                Assert.Equal(priorCount + 1, controller.Repository.Captures.Count);
+                var opening = controller.Repository.Captures[0];
+                var opened = RunUiTask(async () =>
+                {
+                    var first = controller.OpenEditorAsync(opening, show: false);
+                    Assert.Null(await controller.OpenEditorAsync(opening, show: false));
+                    var replacement = EditorDocumentTests.Fixture(200, 120);
+                    controller.Repository.Replace(opening, ImageService.Png(replacement), 200, 120);
+                    var result = await first; Assert.NotNull(result); Assert.Equal(200, result.BaseImage.PixelWidth);
+                    Assert.Same(result, await controller.OpenEditorAsync(opening, show: false));
+                    Assert.True(await result.RequestCloseAsync()); return true;
+                });
+                Assert.True(opened);
+                priorCount = controller.Repository.Captures.Count;
+                RunUiTask(async () => { var pending = controller.ImportAsync(importPath); controller.Dispose(); await pending; return true; });
+                Assert.Equal(priorCount, controller.Repository.Captures.Count);
                 controller.Dispose(); controller.Dock.Close();
             }
             finally
@@ -315,5 +340,16 @@ public sealed class UiRedesignTests
             }
             return true;
         });
+    }
+    private static T RunUiTask<T>(Func<Task<T>> action)
+    {
+        var dispatcher = System.Windows.Threading.Dispatcher.CurrentDispatcher;
+        var task = dispatcher.InvokeAsync(action).Task.Unwrap();
+        var frame = new System.Windows.Threading.DispatcherFrame();
+        var timeout = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(15) };
+        timeout.Tick += (_, _) => frame.Continue = false; timeout.Start();
+        _ = task.ContinueWith(_ => dispatcher.BeginInvoke(new Action(() => frame.Continue = false)));
+        System.Windows.Threading.Dispatcher.PushFrame(frame); timeout.Stop();
+        Assert.True(task.IsCompleted, "UI operation did not complete within 15 seconds."); return task.GetAwaiter().GetResult();
     }
 }

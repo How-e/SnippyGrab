@@ -5,7 +5,7 @@
       "id": "Q1",
       "priority": 1,
       "owner": "Agent",
-      "closed": true,
+      "closed": false,
       "milestone": 0,
       "title": "Establish milestone completion evidence"
     },
@@ -93,7 +93,7 @@
       "id": "Q12",
       "priority": 1,
       "owner": "Shared",
-      "closed": true,
+      "closed": false,
       "milestone": 2,
       "title": "Verify external file and image receivers"
     },
@@ -157,7 +157,7 @@
       "id": "Q20",
       "priority": 1,
       "owner": "Shared",
-      "closed": true,
+      "closed": false,
       "milestone": 5,
       "title": "Verify every required tool end to end"
     },
@@ -189,7 +189,7 @@
       "id": "Q24",
       "priority": 1,
       "owner": "Shared",
-      "closed": true,
+      "closed": false,
       "milestone": 6,
       "title": "Harden and accept local OCR"
     },
@@ -229,7 +229,7 @@
       "id": "Q29",
       "priority": 1,
       "owner": "Shared",
-      "closed": true,
+      "closed": false,
       "milestone": 8,
       "title": "Complete history/pin behavior"
     },
@@ -237,7 +237,7 @@
       "id": "Q30",
       "priority": 1,
       "owner": "User",
-      "closed": true,
+      "closed": false,
       "milestone": 4,
       "title": "Complete primary Codex acceptance"
     },
@@ -253,7 +253,7 @@
       "id": "Q32",
       "priority": 1,
       "owner": "User",
-      "closed": true,
+      "closed": false,
       "milestone": 3,
       "title": "Accept actual dock/editor accessibility and interaction"
     },
@@ -269,7 +269,7 @@
       "id": "Q34",
       "priority": 1,
       "owner": "Shared",
-      "closed": true,
+      "closed": false,
       "milestone": 9,
       "title": "Measure startup and end-to-end capture latency"
     },
@@ -277,7 +277,7 @@
       "id": "Q35",
       "priority": 1,
       "owner": "Agent",
-      "closed": true,
+      "closed": false,
       "milestone": 8,
       "title": "Run prolonged resource/stress testing"
     },
@@ -325,7 +325,7 @@
       "id": "Q41",
       "priority": 1,
       "owner": "Shared",
-      "closed": true,
+      "closed": false,
       "milestone": 10,
       "title": "Verify clean installation and upgrade"
     },

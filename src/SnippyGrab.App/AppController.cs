@@ -38,6 +38,9 @@ internal sealed class AppController : IDisposable
     private readonly UpdateService updates = new();
     private UpdatesWindow? updatesWindow;
     private readonly Dictionary<Guid, EditorWindow> editors = [];
+    private readonly HashSet<Guid> openingEditors = [];
+    private readonly SemaphoreSlim editorLoads = new(1);
+    private readonly SemaphoreSlim imports = new(1);
     private readonly Dictionary<Guid, PinWindow> pins = [];
     private SettingsWindow? settingsWindow;
     private HistoryWindow? historyWindow;
@@ -54,6 +57,7 @@ internal sealed class AppController : IDisposable
     private bool choosingMonitor;
     private bool exporting;
     private readonly CancellationTokenSource exportLifetime = new();
+    private Task<int>? cleanupWork;
     private string? cacheWarning;
     private string lastNotice = "No recent notification.";
     internal string LastOperationDetails => lastNotice;
@@ -96,10 +100,10 @@ internal sealed class AppController : IDisposable
             updateTimer.Tick += (_, _) => _ = updates.CheckAsync(); updateTimer.Start();
             Application.Current.Dispatcher.BeginInvoke(new Action(() => _ = updates.CheckAsync()));
         }
-        cleanup.Tick += (_, _) => Try(() => { Repository.Cleanup(DateTimeOffset.UtcNow, Settings.RetentionHours); Dock.Refresh(); });
+        cleanup.Tick += (_, _) => Run(async () => { await CleanupRepositoryAsync(); });
         cleanup.Interval = TimeSpan.FromMinutes(Settings.CleanupMinutes); cleanup.Start();
         expiry.Tick += (_, _) => { if (Repository.Captures.Any(c => !c.Dismissed)) Dock.Refresh(); }; expiry.Start();
-        Try(() => Repository.Cleanup(DateTimeOffset.UtcNow, Settings.RetentionHours));
+        Application.Current.Dispatcher.BeginInvoke(new Action(() => Run(async () => { await CleanupRepositoryAsync(); })), DispatcherPriority.Background);
         Microsoft.Win32.SystemEvents.DisplaySettingsChanged += DisplayChanged;
         Microsoft.Win32.SystemEvents.PowerModeChanged += PowerChanged;
         Microsoft.Win32.SystemEvents.UserPreferenceChanged += PreferencesChanged;
@@ -152,9 +156,15 @@ internal sealed class AppController : IDisposable
         var success = await Clipboard.ImageAsync(image, Settings.ClipboardPng, encoded);
         if (!success) Notify("Clipboard is busy. Capture is in the shelf; use Copy again."); return success;
     }
-    public async Task Copy(CaptureRecord record)
+    public async Task Copy(CaptureRecord record) { await CopyStoredImage(record); }
+    internal async Task<bool> CopyStoredImage(CaptureRecord record)
     {
-        using var lease = Repository.Lease([record]); await CopyImage(ImageService.Load(Repository.PathFor(record)));
+        ocr.Cancel();
+        using var lease = Repository.Lease([record]);
+        var path = Repository.PathFor(record);
+        var success = await Clipboard.StoredImageAsync(path, Settings.ClipboardPng, exportLifetime.Token);
+        if (!success && !Exiting) Notify("Image was not copied. Clipboard is busy or a newer copy superseded it; retry Copy.");
+        return success;
     }
     public async Task CopyFiles(IReadOnlyList<CaptureRecord> records)
     {
@@ -175,12 +185,18 @@ internal sealed class AppController : IDisposable
         if (!success && !cancellation.IsCancellationRequested) Notify("Text was not copied. Clipboard is busy or a newer copy superseded it; retry Copy.");
         return success;
     }
-    public async Task<string> OcrText(BitmapSource image, CancellationToken lifetime = default)
+    public Task<string> OcrText(BitmapSource image, CancellationToken lifetime = default)
+    {
+        if (!image.IsFrozen) { image = image.CloneCurrentValue(); image.Freeze(); }
+        return OcrPng(token => Task.Run(() => ImageService.Png(image), token), lifetime);
+    }
+    private async Task<string> OcrPng(Func<CancellationToken, Task<byte[]>> prepare, CancellationToken lifetime = default)
     {
         var token = ocr.Begin(lifetime); Clipboard.Invalidate();
         try
         {
-            var text = await OcrService.ReadAsync(ImageService.Png(image), token);
+            var png = await prepare(token); token.ThrowIfCancellationRequested();
+            var text = await OcrService.ReadAsync(png, token);
             token.ThrowIfCancellationRequested();
             if (string.IsNullOrWhiteSpace(text)) return "No text found.";
             return await CopyText(text, token) ? "OCR text copied." : "OCR text was not copied. Retry OCR when the clipboard is available.";
@@ -191,15 +207,35 @@ internal sealed class AppController : IDisposable
     public async Task Ocr(CaptureRecord record)
     {
         using var lease = Repository.Lease([record]);
-        Notify(await OcrText(ImageService.Load(Repository.PathFor(record))));
+        var path = Repository.PathFor(record);
+        Notify(await OcrPng(token => Task.Run(() => { ManagedPath.RejectRedirects(path); return ImageService.ReadEncoded(path); }, token), exportLifetime.Token));
     }
-    public void Edit(CaptureRecord record) => Try(() =>
+    public void Edit(CaptureRecord record) => Run(async () => { await OpenEditorAsync(record); });
+    internal async Task<EditorWindow?> OpenEditorAsync(CaptureRecord record, bool show = true)
     {
-        if (exitRequested) return;
-        if (editors.TryGetValue(record.Id, out var existing)) { existing.Activate(); return; }
-        var editor = new EditorWindow(this, record); editors[record.Id] = editor;
-        editor.Closed += (_, _) => editors.Remove(record.Id); editor.Show();
-    });
+        if (exitRequested || Exiting) return null;
+        if (editors.TryGetValue(record.Id, out var existing)) { existing.Activate(); return existing; }
+        if (!openingEditors.Add(record.Id)) return null;
+        try
+        {
+            while (!exitRequested && !Exiting && Repository.Captures.Contains(record))
+            {
+                using var lease = Repository.Lease([record]);
+                var revision = record.FileName; var path = Repository.PathFor(record);
+                BitmapSource image;
+                await editorLoads.WaitAsync(exportLifetime.Token);
+                try { image = await Task.Run(() => ImageService.Load(path), exportLifetime.Token); }
+                finally { editorLoads.Release(); }
+                if (exitRequested || Exiting || !Repository.Captures.Contains(record)) return null;
+                if (revision != record.FileName) continue;
+                var editor = new EditorWindow(this, record, image); editors[record.Id] = editor;
+                editor.Closed += (_, _) => editors.Remove(record.Id); if (show) editor.Show(); return editor;
+            }
+            return null;
+        }
+        catch (OperationCanceledException) when (exportLifetime.IsCancellationRequested) { return null; }
+        finally { openingEditors.Remove(record.Id); }
+    }
     public async Task<ExportOutcome> Save(CaptureRecord record, Window? owner = null)
     {
         if (exporting || exitRequested || Exiting) return new(ExportStatus.Cancelled);
@@ -347,17 +383,45 @@ internal sealed class AppController : IDisposable
         if (!ShelfOrder.Move(items, from, target)) return;
         Repository.Persist(); Dock.Refresh();
     });
-    public void Import(string path) => Try(() =>
+    public void Import(string path) => Run(() => ImportAsync(path));
+    internal async Task ImportAsync(string path)
     {
+        if (exitRequested || Exiting) return;
         var extension = Path.GetExtension(path).ToLowerInvariant();
         if (extension is not (".png" or ".jpg" or ".jpeg" or ".bmp")) throw new InvalidDataException("Only PNG, JPEG and BMP images are accepted.");
-        var image = ImageService.Load(path); Repository.Add(ImageService.Png(image), image.PixelWidth, image.PixelHeight); Dock.Refresh(true);
-    });
+        try
+        {
+            await imports.WaitAsync(exportLifetime.Token);
+            try
+            {
+                var prepared = await Task.Run(() => { var image = ImageService.Load(path); return (Png: ImageService.Png(image), Width: image.PixelWidth, Height: image.PixelHeight); }, exportLifetime.Token);
+                if (exitRequested || Exiting) return;
+                Repository.Add(prepared.Png, prepared.Width, prepared.Height); Dock.Refresh(true);
+            }
+            finally { imports.Release(); }
+        }
+        catch (OperationCanceledException) when (exportLifetime.IsCancellationRequested) { }
+    }
+    private async Task<int> CleanupRepositoryAsync(bool clear = false, bool sessionOnly = false)
+    {
+        if (disposed) return 0;
+        if (cleanupWork is not null)
+        {
+            if (!clear && !sessionOnly) return 0;
+            await cleanupWork;
+        }
+        var work = Repository.CleanupAsync(DateTimeOffset.UtcNow, sessionOnly ? -1 : Settings.RetentionHours, clear, sessionOnly,
+            async () => { await Dispatcher.Yield(DispatcherPriority.Background); }, exportLifetime.Token);
+        cleanupWork = work;
+        try { var removed = await work; if (!disposed) Dock.Refresh(); return removed; }
+        catch (OperationCanceledException) when (exportLifetime.IsCancellationRequested) { return 0; }
+        finally { if (ReferenceEquals(cleanupWork, work)) cleanupWork = null; }
+    }
     public void ClearTemporary() => Try(() =>
     {
         if (Repository.CleanupBlocked) { Notify("Cleanup is disabled because history is unreadable. Original metadata is preserved; recover it before deleting captures."); return; }
         if (!DialogWindow.Confirm("Clear temporary captures?", "Remove eligible unpinned captures.\n\nPins, active editors and transfers stay protected. Files in the transfer grace period are kept.", "Clear temporary", danger: true)) return;
-        var count = Repository.Cleanup(DateTimeOffset.UtcNow, Settings.RetentionHours, clear: true); Dock.Refresh(); Notify($"Cleared {count} temporary capture(s). Pins and transfers are protected.");
+        Run(async () => { var count = await CleanupRepositoryAsync(clear: true); if (!disposed) Notify($"Cleared {count} temporary capture(s). Pins and transfers are protected."); });
     });
     private void ShowWelcome()
     {
@@ -500,7 +564,7 @@ internal sealed class AppController : IDisposable
         {
             foreach (var editor in editors.Values.ToArray())
                 if (!await editor.RequestCloseAsync()) return;
-            if (Settings.SessionOnly && launch is null) { foreach (var pin in pins.Values.ToArray()) pin.Close(); Repository.CleanupSession(DateTimeOffset.UtcNow); }
+            if (Settings.SessionOnly && launch is null) { foreach (var pin in pins.Values.ToArray()) pin.Close(); await CleanupRepositoryAsync(clear: true, sessionOnly: true); }
             else Repository.Persist();
             launch?.Invoke();
             Exiting = true;
@@ -518,5 +582,6 @@ internal sealed class AppController : IDisposable
         Exiting = true; lifecycle.Dispose(); cleanup.Stop(); expiry.Stop(); updateTimer.Stop(); updates.Dispose(); updatesWindow?.Close();
         SystemEvents.DisplaySettingsChanged -= DisplayChanged; SystemEvents.PowerModeChanged -= PowerChanged; SystemEvents.UserPreferenceChanged -= PreferencesChanged;
         scrollWindow?.CancelSession(); exportLifetime.Cancel(); Ui.FailureHandler = null; ocr.Dispose(); Clipboard.Invalidate(); Hotkeys.Dispose(); tray.Visible = false; tray.ContextMenuStrip?.Dispose(); tray.Icon?.Dispose(); tray.Dispose();
+        (OcrService as IDisposable)?.Dispose();
     }
 }

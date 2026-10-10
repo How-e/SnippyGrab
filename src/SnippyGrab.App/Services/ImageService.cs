@@ -20,26 +20,46 @@ internal static class ImageService
             }
             return WebpService.Encode(Load(path), format == ExportFormat.WebpLossless, quality, cancellation);
         }
-        return Jpeg(Load(path), quality);
+        cancellation.ThrowIfCancellationRequested();
+        return Jpeg(Load(path), quality, cancellation);
     }
-    internal static byte[] Jpeg(BitmapSource image, int quality)
+    internal static byte[] Jpeg(BitmapSource image, int quality, CancellationToken cancellation = default)
     {
         if (quality is < 1 or > 100 || (long)image.PixelWidth * image.PixelHeight > MaxPixels) throw new InvalidDataException("Invalid JPEG quality or dimensions.");
-        var visual = new DrawingVisual();
-        using (var drawing = visual.RenderOpen())
+        cancellation.ThrowIfCancellationRequested();
+        // Flatten one scanline at a time into a single opaque native buffer. A full
+        // WPF render plus format conversion retained several copies of large images.
+        var source = new FormatConvertedBitmap(image, WpfPixelFormats.Bgra32, null, 0); source.Freeze();
+        using var opaque = new Bitmap(image.PixelWidth, image.PixelHeight, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+        opaque.SetResolution(96, 96);
+        var bits = opaque.LockBits(new System.Drawing.Rectangle(0, 0, opaque.Width, opaque.Height), ImageLockMode.WriteOnly, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+        try
         {
-            var bounds = new Rect(0, 0, image.PixelWidth, image.PixelHeight);
-            drawing.DrawRectangle(System.Windows.Media.Brushes.White, null, bounds); drawing.DrawImage(image, bounds);
+            var row = new byte[checked(image.PixelWidth * 4)];
+            var flattened = new byte[checked(image.PixelWidth * 3)];
+            for (var y = 0; y < image.PixelHeight; y++)
+            {
+                cancellation.ThrowIfCancellationRequested();
+                source.CopyPixels(new Int32Rect(0, y, image.PixelWidth, 1), row, row.Length, 0);
+                for (var x = 0; x < image.PixelWidth; x++)
+                {
+                    var alpha = row[x * 4 + 3];
+                    for (var c = 0; c < 3; c++) flattened[x * 3 + c] = (byte)((row[x * 4 + c] * alpha + 255 * (255 - alpha) + 127) / 255);
+                }
+                Marshal.Copy(flattened, 0, IntPtr.Add(bits.Scan0, y * bits.Stride), flattened.Length);
+            }
         }
-        var opaque = new RenderTargetBitmap(image.PixelWidth, image.PixelHeight, 96, 96, WpfPixelFormats.Pbgra32); opaque.Render(visual); opaque.Freeze();
-        var pixels = new FormatConvertedBitmap(opaque, WpfPixelFormats.Bgr24, null, 0); pixels.Freeze();
-        var encoder = new JpegBitmapEncoder { QualityLevel = quality };
-        encoder.Frames.Add(BitmapFrame.Create(pixels)); // No source metadata is carried into a converted export.
-        using var stream = new MemoryStream(); encoder.Save(stream); return stream.ToArray();
+        finally { opaque.UnlockBits(bits); }
+        cancellation.ThrowIfCancellationRequested();
+        using var options = new EncoderParameters(1);
+        options.Param[0] = new EncoderParameter(System.Drawing.Imaging.Encoder.Quality, (long)quality);
+        using var stream = new MemoryStream();
+        opaque.Save(stream, ImageCodecInfo.GetImageEncoders().Single(codec => codec.FormatID == ImageFormat.Jpeg.Guid), options);
+        cancellation.ThrowIfCancellationRequested(); return stream.ToArray();
     }
     internal static int PreviewPixels(int pixels, PreviewQuality quality) => quality switch
     {
-        PreviewQuality.Original => 0,
+        PreviewQuality.Original => checked(pixels * 4),
         PreviewQuality.Sharp => checked(pixels * 2),
         _ => pixels
     };
@@ -76,7 +96,8 @@ internal static class ImageService
         }
         finally { bitmap.UnlockBits(bits); }
     }
-    public static BitmapSource Load(string path, int thumbnail = 0, int thumbnailHeight = 0)
+    internal static BitmapSource LoadPreview(string path, int width, int height = 0) => Load(path, width, height, 4_000_000);
+    public static BitmapSource Load(string path, int thumbnail = 0, int thumbnailHeight = 0, long maxDecodedPixels = MaxPixels)
     {
         using var stream = File.OpenRead(path);
         ValidateEncoded(stream);
@@ -84,14 +105,16 @@ internal static class ImageService
         if (decoder is not (PngBitmapDecoder or JpegBitmapDecoder or BmpBitmapDecoder)) throw new InvalidDataException("Only PNG, JPEG and BMP image content is accepted.");
         var frame = decoder.Frames[0];
         if ((long)frame.PixelWidth * frame.PixelHeight > MaxPixels) throw new InvalidDataException("Image exceeds 80 megapixels.");
+        if (maxDecodedPixels < 1) throw new ArgumentOutOfRangeException(nameof(maxDecodedPixels));
         stream.Position = 0;
         var image = new BitmapImage(); image.BeginInit(); image.CacheOption = BitmapCacheOption.OnLoad;
-        if (thumbnail > 0)
+        var decodeScale = Math.Min(1, Math.Sqrt(maxDecodedPixels / ((double)frame.PixelWidth * frame.PixelHeight)));
+        if (thumbnail > 0) decodeScale = Math.Min(decodeScale, thumbnail / (double)frame.PixelWidth);
+        if (thumbnailHeight > 0) decodeScale = Math.Min(decodeScale, thumbnailHeight / (double)frame.PixelHeight);
+        if (decodeScale < 1)
         {
-            var width = Math.Min(thumbnail, frame.PixelWidth);
-            if (thumbnailHeight > 0 && width * (double)frame.PixelHeight / frame.PixelWidth > thumbnailHeight)
-                image.DecodePixelHeight = Math.Min(thumbnailHeight, frame.PixelHeight);
-            else image.DecodePixelWidth = width;
+            if (frame.PixelHeight > frame.PixelWidth) image.DecodePixelHeight = Math.Max(1, (int)Math.Floor(frame.PixelHeight * decodeScale));
+            else image.DecodePixelWidth = Math.Max(1, (int)Math.Floor(frame.PixelWidth * decodeScale));
         }
         image.StreamSource = stream; image.EndInit(); image.Freeze(); return image;
     }
@@ -118,6 +141,12 @@ internal static class ImageService
         }
         else if (header[0] != 66 || header[1] != 77) throw new InvalidDataException("Only PNG, JPEG and BMP image content is accepted.");
         stream.Position = 0;
+    }
+    internal static byte[] ReadEncoded(string path)
+    {
+        using var stream = File.OpenRead(path);
+        ValidateEncoded(stream); // Enforce size/header limits before allocating the clipboard/OCR payload.
+        var bytes = new byte[checked((int)stream.Length)]; stream.ReadExactly(bytes); return bytes;
     }
     public static byte[] Png(BitmapSource image)
     {

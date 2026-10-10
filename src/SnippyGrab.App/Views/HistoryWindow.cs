@@ -11,6 +11,10 @@ internal sealed class HistoryWindow : Window
     internal Image PreviewImage => preview;
     internal int CachedThumbnailCount => thumbnails.Count;
     internal double PreviewWidth => Math.Max(600, previewPane.ActualWidth);
+    internal Task PreviewWork { get; private set; } = Task.CompletedTask;
+    internal Task DrainPreviewAsync() => previewLoader.DrainAsync();
+    private readonly PreviewLoader previewLoader = new();
+    private (Guid Id, string File, int Pixels)? previewStamp;
     private readonly AppController controller;
     private readonly ListBox list = new() { SelectionMode = SelectionMode.Extended };
     private readonly BoundedCache<(string File, int Pixels), BitmapSource> thumbnails = new(24);
@@ -29,6 +33,7 @@ internal sealed class HistoryWindow : Window
     private readonly Border previewPane;
     private int page;
     private bool refreshing;
+    private bool closed;
     private sealed record Row(CaptureRecord Capture, Func<CaptureRecord, BitmapSource?> Load)
     {
         public string Title => "Screenshot · " + Capture.CreatedUtc.LocalDateTime.ToString("t");
@@ -95,14 +100,14 @@ internal sealed class HistoryWindow : Window
         PreviewKeyDown += (_, e) => { if (e.Key == Key.Escape) Close(); if (e.Key == Key.Delete && Keyboard.Modifiers == ModifierKeys.None) { controller.Dismiss(Selected()); Refresh(); e.Handled = true; } if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.None && Selected().FirstOrDefault() is { } c) { controller.Edit(c); e.Handled = true; } };
         controller.Repository.Changed += RepositoryChanged; controller.SettingsChanged += RepositoryChanged;
         DpiChanged += (_, e) => { if (ReferenceEquals(e.Source, this)) Dispatcher.BeginInvoke(new Action(() => { thumbnails.RemoveWhere(_ => true); if (IsLoaded) controller.Try(Refresh); })); };
-        Closed += (_, _) => { controller.Repository.Changed -= RepositoryChanged; controller.SettingsChanged -= RepositoryChanged; thumbnails.RemoveWhere(_ => true); preview.Source = null; }; Refresh();
+        Closed += (_, _) => { closed = true; controller.Repository.Changed -= RepositoryChanged; controller.SettingsChanged -= RepositoryChanged; previewLoader.Dispose(); thumbnails.RemoveWhere(_ => true); preview.Source = null; }; Refresh();
     }
     private void Responsive()
     {
         var compact = ActualWidth < 800 || Ui.TextScale > 1.5;
         previewPane.Visibility = compact ? Visibility.Collapsed : Visibility.Visible; split.ColumnDefinitions[0].Width = new GridLength(compact ? 1 : 0.42, GridUnitType.Star); split.ColumnDefinitions[1].Width = new GridLength(compact ? 0 : 0.58, GridUnitType.Star);
     }
-    private void Import() { var dialog = new OpenFileDialog { Filter = "Images|*.png;*.jpg;*.jpeg;*.bmp", Multiselect = true }; if (dialog.ShowDialog(this) == true) { foreach (var path in dialog.FileNames) controller.Import(path); Refresh(); } }
+    private void Import() { var dialog = new OpenFileDialog { Filter = "Images|*.png;*.jpg;*.jpeg;*.bmp", Multiselect = true }; if (dialog.ShowDialog(this) == true) controller.Run(async () => { foreach (var path in dialog.FileNames) await controller.ImportAsync(path); }); }
     private List<CaptureRecord> Selected() => list.SelectedItems.Cast<Row>().Select(r => r.Capture).ToList();
     private BitmapSource? LoadThumbnail(CaptureRecord capture)
     {
@@ -111,12 +116,26 @@ internal sealed class HistoryWindow : Window
     }
     private void RefreshPreview()
     {
-        preview.Source = null; metadata.Text = "";
+        if (closed) return;
+        metadata.Text = "";
         var selected = Selected(); var capture = selected.FirstOrDefault(); foreach (var button in selectionActions) button.IsEnabled = selected.Count > 0;
         copy.Content = Ui.IconLabel("copy", selected.Count > 1 ? "Copy files" : "Copy image"); selectionStatus.Text = selected.Count == 0 ? "Select a capture" : $"{selected.Count} selected"; previewHint.Visibility = capture is null ? Visibility.Visible : Visibility.Collapsed;
         if (capture is not null) controller.Repository.ResolveDimensions(capture);
-        preview.Source = capture is null ? null : ImageService.Load(controller.Repository.PathFor(capture), ImageService.PreviewPixels((int)Math.Ceiling(PreviewWidth * VisualTreeHelper.GetDpi(this).DpiScaleX), controller.Settings.PreviewQuality));
         metadata.Text = capture is null ? "" : $"{capture.Width} × {capture.Height}   ·   PNG   ·   {capture.CreatedUtc.LocalDateTime:g}"; RenderOptions.SetBitmapScalingMode(preview, BitmapScalingMode.HighQuality);
+        if (capture is null) { previewLoader.Cancel(); previewStamp = null; preview.Source = null; return; }
+        var path = controller.Repository.PathFor(capture);
+        var pixels = ImageService.PreviewPixels((int)Math.Ceiling(PreviewWidth * VisualTreeHelper.GetDpi(this).DpiScaleX), controller.Settings.PreviewQuality);
+        var stamp = (capture.Id, capture.FileName, pixels);
+        if (previewStamp == stamp && (preview.Source is not null || !PreviewWork.IsCompleted)) return;
+        if (previewStamp?.Id != capture.Id || previewStamp?.File != capture.FileName) preview.Source = null;
+        previewStamp = stamp;
+        PreviewWork = LoadPreviewAsync(capture, path, pixels); controller.Run(() => PreviewWork);
+    }
+    private async Task LoadPreviewAsync(CaptureRecord capture, string path, int pixels)
+    {
+        using var lease = controller.Repository.Lease([capture]);
+        try { preview.Source = await previewLoader.LoadAsync(path, pixels); }
+        catch (OperationCanceledException) { }
     }
     private void RepositoryChanged() => controller.Try(Refresh);
     private void Refresh()

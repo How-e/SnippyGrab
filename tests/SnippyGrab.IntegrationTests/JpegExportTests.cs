@@ -9,6 +9,34 @@ namespace SnippyGrab.IntegrationTests;
 public sealed class JpegExportTests
 {
     [Fact]
+    public void ScanlineExportPreservesRowOrderPaddingResolutionAndCancellation()
+    {
+        ImageIntegrationTests.Sta(() =>
+        {
+            const int width = 7, height = 48; var pixels = new byte[width * height * 4];
+            for (var y = 0; y < height; y++) for (var x = 0; x < width; x++)
+            {
+                var offset = (y * width + x) * 4;
+                if (y < 16) pixels[offset + 2] = 255;
+                else if (y < 32) { pixels[offset + 1] = 255; pixels[offset + 3] = 128; }
+                else { pixels[offset] = 255; pixels[offset + 3] = 255; }
+            }
+            var source = BitmapSource.Create(width, height, 144, 144, PixelFormats.Bgra32, null, pixels, width * 4); source.Freeze();
+            Assert.ThrowsAny<OperationCanceledException>(() => ImageService.Jpeg(source, 90, new CancellationToken(true)));
+            using var stream = new MemoryStream(ImageService.Jpeg(source, 100));
+            var decoded = new JpegBitmapDecoder(stream, BitmapCreateOptions.None, BitmapCacheOption.OnLoad).Frames[0];
+            Assert.Equal(width, decoded.PixelWidth); Assert.Equal(height, decoded.PixelHeight); Assert.InRange(decoded.DpiX, 95.9, 96.1);
+            var converted = new FormatConvertedBitmap(decoded, PixelFormats.Bgr32, null, 0); var pixel = new byte[4];
+            foreach (var y in new[] { 8, 24, 40 })
+            {
+                converted.CopyPixels(new System.Windows.Int32Rect(3, y, 1, 1), pixel, 4, 0);
+                var expected = y == 8 ? new[] { 255, 255, 255 } : y == 24 ? new[] { 127, 255, 127 } : new[] { 255, 0, 0 };
+                for (var c = 0; c < 3; c++) Assert.InRange((int)pixel[c], Math.Max(0, expected[c] - 6), Math.Min(255, expected[c] + 6));
+            }
+            return true;
+        });
+    }
+    [Fact]
     public void JpegPreservesDimensionsFlattensAlphaAndControlsQuality()
     {
         ImageIntegrationTests.Sta(() =>

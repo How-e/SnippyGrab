@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.0-alpha.20261010.1 — 2026-10-10
+
+- Reused exact stored PNG bytes for Copy and moved image preparation onto workers while preserving immutable revisions, clipboard request ordering, retries and cancellation. Import and editor opening also prepare images asynchronously.
+- Reduced history metadata churn with sealed older pages and an atomic inline head. Cleanup yields between bounded slices and rechecks leases/pins; individual slow file operations can still pause a slice.
+- Reduced JPEG memory by flattening alpha one row at a time. Lossless WebP uses a faster exact-pixel preset and avoids a duplicate input surface; dimensions, transparency and export cancellation remain covered by regressions.
+- Rendered editor effects and area operations only in their selected region. Frozen unannotated crops share backing pixels, retaining more undo steps under the existing memory budget.
+- Loaded history/pin previews on workers, canceled obsolete requests and reused previews for metadata-only changes. Original preview quality is now bounded to four million pixels; full-resolution edit, copy, OCR and export remain available.
+- Reused a serialized, integrity-checked native OCR engine and improved bounded small-text enhancement. The previously missed synthetic 14-pixel CS1002 fixture now passes enhanced recognition in all three layouts.
+- Passed 314 automated tests, offscreen reliability/editor/OCR/crash-recovery probes, independent WebP pixel decoding and a 120-second synthetic resource run. Measurements on one development machine showed lower copy/export/effect costs; they do not establish universal latency or a leak-free claim.
+- Reopened ten affected acceptance/milestone gates for renewed desktop/receiver, OCR, preview/editor, setup, end-to-end performance and prolonged-resource checks. Earlier owner acceptance remains specific to its recorded build. This is an unsigned alpha prerelease; checksums verify integrity, not publisher identity.
+
 ## 0.1.0-alpha.20261009.3 — 2026-10-09
 
 - Added quiet six-hour release checks, green/red Help & about status, in-app changelog and verified transactional updates with restart for installed and portable releases.

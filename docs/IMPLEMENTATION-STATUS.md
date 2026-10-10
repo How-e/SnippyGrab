@@ -1,6 +1,6 @@
 # Implementation status — 2026-10-09
 
-The project remains **0.1.0-alpha**, unsigned and prerelease. The latest published build is `v0.1.0-alpha.design.20261008.1`; the current source changes are unreleased. The [release-gate manifest](../scripts/release-gates.json) has **51 closed / 0 open** gates for the reviewed unsigned alpha scope. Current owner acceptance is recorded for `0.1.0-alpha.acceptance.20261009.2`, source `80edee6683ef055f073be2f6dc976a15a862f04d`. A closed manifest does not authorize publication or stable promotion.
+The project remains **0.1.0-alpha**, unsigned and prerelease; the current release version is `0.1.0-alpha.20261009.3`. The [release-gate manifest](../scripts/release-gates.json) has **51 closed / 0 open** gates for the reviewed unsigned alpha scope. Current owner acceptance is recorded for `0.1.0-alpha.acceptance.20261009.2`, source `80edee6683ef055f073be2f6dc976a15a862f04d`; the release preserves that product code. The owner authorized push/publication of the unsigned alpha release after gate closure. A closed manifest does not authorize stable promotion; every release still requires final hosted checks and independent download verification.
 
 ## Current implementation
 

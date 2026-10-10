@@ -16,12 +16,14 @@ public sealed class OcrReadinessTests : IDisposable
         File.Copy(Path.Combine(AppContext.BaseDirectory, "tessdata", "eng.traineddata"), Path.Combine(root, "eng.traineddata"), true);
         Assert.Equal(OcrReadinessStatus.MissingLibrary, OcrService.InspectPackage(root, root).Status);
         Assert.Equal(OcrReadinessStatus.Ready, OcrService.InspectPackage(root, AppContext.BaseDirectory).Status);
-        var service = new OcrService(root);
+        using var service = new OcrService(root);
         Assert.Equal(OcrReadinessStatus.Ready, (await service.CheckReadinessAsync()).Status);
+        Assert.Equal(OcrReadinessStatus.Ready, (await service.CheckReadinessAsync()).Status); Assert.Equal(1, service.EngineCreations);
         File.Delete(Path.Combine(root, "eng.traineddata"));
         Assert.Equal(OcrReadinessStatus.MissingModel, (await service.CheckReadinessAsync()).Status);
         File.Copy(Path.Combine(AppContext.BaseDirectory, "tessdata", "eng.traineddata"), Path.Combine(root, "eng.traineddata"));
         Assert.Equal(OcrReadinessStatus.Ready, (await service.CheckReadinessAsync()).Status);
+        Assert.Equal(2, service.EngineCreations);
     }
     [Fact]
     public async Task CancelledAdmissionDoesNotPreventRetry()

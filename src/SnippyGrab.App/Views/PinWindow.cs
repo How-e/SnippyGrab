@@ -8,10 +8,15 @@ internal sealed class PinWindow : Window
     private readonly AppController controller;
     private readonly CaptureRecord record;
     internal Image PreviewImage => preview;
+    internal Task PreviewWork { get; private set; } = Task.CompletedTask;
+    internal Task DrainPreviewAsync() => previewLoader.DrainAsync();
     private readonly Image preview;
     private readonly CaptureViewLease lease;
+    private readonly PreviewLoader previewLoader = new();
+    private (string File, int Width, int Height)? previewStamp;
     private bool clickThrough;
     private bool ready;
+    private bool closed;
     private readonly System.Windows.Threading.DispatcherTimer resizeTimer = new() { Interval = TimeSpan.FromMilliseconds(150) };
     public PinWindow(AppController controller, CaptureRecord record)
     {
@@ -19,7 +24,7 @@ internal sealed class PinWindow : Window
         this.controller = controller; this.record = record;
         Title = "SnippyGrab pin"; WindowStyle = WindowStyle.None; AllowsTransparency = true; Background = Brushes.Transparent;
         ShowInTaskbar = false; ShowActivated = false; Topmost = true; Width = 320; Height = 220; MinWidth = 80; MinHeight = 60; ResizeMode = ResizeMode.CanResizeWithGrip;
-        preview = new Image { Source = LoadPreview(), Stretch = Stretch.Uniform };
+        preview = new Image { Stretch = Stretch.Uniform };
         RenderOptions.SetBitmapScalingMode(preview, BitmapScalingMode.HighQuality);
         var frame = new Grid(); frame.Children.Add(preview);
         var chrome = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Bottom, Visibility = Visibility.Collapsed };
@@ -62,8 +67,9 @@ internal sealed class PinWindow : Window
         Loaded += (_, _) => RestoreLayout();
         DpiChanged += (_, e) => { if (ReferenceEquals(e.Source, this)) { resizeTimer.Stop(); resizeTimer.Start(); } };
         Closing += (_, _) => SaveLayout();
-        Closed += (_, _) => { ready = false; resizeTimer.Stop(); controller.SettingsChanged -= RefreshPreview; controller.Repository.RevisionChanged -= RevisionChanged; lease.Dispose(); };
+        Closed += (_, _) => { closed = true; ready = false; resizeTimer.Stop(); controller.SettingsChanged -= RefreshPreview; controller.Repository.RevisionChanged -= RevisionChanged; previewLoader.Dispose(); preview.Source = null; lease.Dispose(); };
         KeyDown += (_, e) => { if (e.Key == Key.Escape) Close(); };
+        RefreshPreview();
     }
     private static bool FindButton(DependencyObject? source)
     {
@@ -72,12 +78,12 @@ internal sealed class PinWindow : Window
     }
     private void RevisionChanged(CaptureRecord changed)
     {
-        if (changed.Id == record.Id) controller.Try(() => preview.Source = LoadPreview());
+        if (changed.Id == record.Id) RefreshPreview();
     }
     public void RestoreInteraction()
     {
         SetClickThrough(false); SaveLayout();
-        Show(); Activate(); preview.Source = LoadPreview();
+        Show(); Activate(); RefreshPreview();
     }
     private void SetClickThrough(bool enabled)
     {
@@ -113,12 +119,23 @@ internal sealed class PinWindow : Window
             if (record.PinLayout != layout) controller.Repository.SetPinLayout(record, layout);
         });
     }
-    private void RefreshPreview() => controller.Try(() => preview.Source = LoadPreview());
-    private BitmapSource LoadPreview()
+    private void RefreshPreview()
     {
+        if (closed) return;
         var dpi = VisualTreeHelper.GetDpi(this);
         var width = ImageService.PreviewPixels((int)Math.Ceiling(Math.Max(800, ActualWidth * dpi.DpiScaleX)), controller.Settings.PreviewQuality);
         var height = ImageService.PreviewPixels((int)Math.Ceiling(Math.Max(800, ActualHeight * dpi.DpiScaleY)), controller.Settings.PreviewQuality);
-        return ImageService.Load(controller.Repository.PathFor(record), width, height);
+        var path = controller.Repository.PathFor(record);
+        var stamp = (record.FileName, width, height);
+        if (previewStamp == stamp && (preview.Source is not null || !PreviewWork.IsCompleted)) return;
+        if (previewStamp?.File != record.FileName) preview.Source = null;
+        previewStamp = stamp;
+        PreviewWork = LoadPreviewAsync(path, width, height); controller.Run(() => PreviewWork);
+    }
+    private async Task LoadPreviewAsync(string path, int width, int height)
+    {
+        using var pendingLease = controller.Repository.Lease([record]);
+        try { preview.Source = await previewLoader.LoadAsync(path, width, height); }
+        catch (OperationCanceledException) { }
     }
 }

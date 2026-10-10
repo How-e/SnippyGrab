@@ -18,6 +18,7 @@ internal sealed class EditorWindow : Window
     private readonly TextBlock status;
     private readonly Button openExportFolder;
     internal ComboBox ToolPicker => tools;
+    internal BitmapSource BaseImage => journal.Current.Base;
     internal Button ExportFolderAction => openExportFolder;
     private readonly ComboBox tools;
     private readonly TextBox color;
@@ -37,12 +38,12 @@ internal sealed class EditorWindow : Window
     private Task? documentWork;
     private readonly EditorCommitCoordinator commits = new();
     private readonly EditorCommitCoordinator closes = new();
-    public EditorWindow(AppController controller, CaptureRecord record)
+    public EditorWindow(AppController controller, CaptureRecord record, BitmapSource? preparedImage = null)
     {
         Ui.StyleWindow(this);
         this.controller = controller; this.record = record;
         expectedRevision = record.FileName;
-        journal = new(new EditorState(ImageService.Load(controller.Repository.PathFor(record)), []), 20, RetainedBytes, 256L * 1024 * 1024);
+        journal = new(new EditorState(preparedImage ?? ImageService.Load(controller.Repository.PathFor(record)), []), 20, RetainedBytes, 256L * 1024 * 1024);
         Title = "SnippyGrab · Editor"; Width = 1120; Height = 800; MinWidth = 660; MinHeight = 500; WindowStartupLocation = WindowStartupLocation.CenterScreen;
         var root = new DockPanel(); Content = root;
         var actions = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right, MaxWidth = 1000 };
@@ -189,8 +190,10 @@ internal sealed class EditorWindow : Window
     }
     private async Task PickCoreAsync(Point point)
     {
-        var image = await RenderAsync(journal.Current);
-        var picked = SampleColor(image, point);
+        var state = journal.Current;
+        var area = new PixelRect(Math.Clamp((int)point.X, 0, state.Base.PixelWidth - 1), Math.Clamp((int)point.Y, 0, state.Base.PixelHeight - 1), 1, 1);
+        var image = await Task.Run(() => RenderRegion(state, area));
+        var picked = SampleColor(image, new(0, 0));
         color.Text = $"#{picked.R:X2}{picked.G:X2}{picked.B:X2}";
         status.Text = "Annotation color: " + color.Text + ". Sampled from the edited image; select a drawing tool to use it.";
     }
@@ -246,8 +249,7 @@ internal sealed class EditorWindow : Window
         return Task.Run(() =>
         {
             // Create the drawing on this worker; all input bitmaps are frozen and cross-thread safe.
-            var rendered = Render(state);
-            var crop = ImageService.Crop(rendered, area);
+            var crop = RenderRegion(state, area);
             if (mark.Tool == EditTool.Crop) return new EditorState(crop, []);
             var patch = Effects.Apply(crop, mark.Tool == EditTool.Pixelate);
             return state with { Marks = [.. state.Marks, mark with { Start = new(area.X, area.Y), End = new(area.Right, area.Bottom), Patch = patch }] };
@@ -272,8 +274,8 @@ internal sealed class EditorWindow : Window
         content.IsEnabled = false;
         try
         {
-            var image = dirty ? await ApplyAsync() : await Task.Run(() => ImageService.Load(controller.Repository.PathFor(record)));
-            copyRetryNeeded = !await controller.CopyImage(image);
+            if (dirty) await ApplyAsync();
+            copyRetryNeeded = !await controller.CopyStoredImage(record);
             status.Text = copyRetryNeeded ? "Edits are saved to the shelf. Clipboard is busy; retry Apply + copy or close again, or Discard to close." : "Applied to the managed shelf image and copied to clipboard. Use Export image for a separate file.";
             return !copyRetryNeeded;
         }
@@ -333,7 +335,7 @@ internal sealed class EditorWindow : Window
     private async Task CopyDocumentOcr(PixelRect? area = null)
     {
         var token = ocrLifetime.Token; var state = journal.Current;
-        var image = await Task.Run(() => area is { } crop ? ImageService.Crop(Render(state), crop) : Render(state));
+        var image = await Task.Run(() => area is { } crop ? RenderRegion(state, crop) : Render(state));
         if (!token.IsCancellationRequested) await CopyOcr(image);
     }
     private async Task CopyOcr(BitmapSource image)
@@ -349,20 +351,33 @@ internal sealed class EditorWindow : Window
         var marks = new HashSet<Annotation>(ReferenceEqualityComparer.Instance);
         foreach (var state in states)
         {
-            images.Add(state.Base);
-            foreach (var mark in state.Marks) { marks.Add(mark); if (mark.Patch is not null) images.Add(mark.Patch); }
+            images.Add(Root(state.Base));
+            foreach (var mark in state.Marks) { marks.Add(mark); if (mark.Patch is not null) images.Add(Root(mark.Patch)); }
         }
         return images.Sum(image => (long)image.PixelWidth * image.PixelHeight * 4) + marks.Sum(mark => (long)mark.Points.Count * 16 + mark.Text.Length * 2L + 128);
+        static BitmapSource Root(BitmapSource image) { while (image is CroppedBitmap crop) image = crop.Source; return image; }
     }
-    internal static BitmapSource Render(EditorState state)
+    internal static BitmapSource Render(EditorState state) => RenderRegion(state, new(0, 0, state.Base.PixelWidth, state.Base.PixelHeight));
+    internal static BitmapSource RenderRegion(EditorState state, PixelRect area)
     {
+        area = area.Intersect(new(0, 0, state.Base.PixelWidth, state.Base.PixelHeight));
+        if (area.IsEmpty) throw new InvalidDataException("Select an image area first.");
+        if (state.Marks.Length == 0)
+        {
+            if (area == new PixelRect(0, 0, state.Base.PixelWidth, state.Base.PixelHeight)) return state.Base;
+            // Frozen crop views share pixels with their source. RetainedBytes charges
+            // the full backing image once, so undo stays within its actual budget.
+            var crop = new CroppedBitmap(state.Base, new Int32Rect(area.X, area.Y, area.Width, area.Height)); crop.Freeze(); return crop;
+        }
         var drawing = new DrawingVisual();
         using (var dc = drawing.RenderOpen())
         {
+            dc.PushTransform(new TranslateTransform(-area.X, -area.Y));
             dc.DrawImage(state.Base, new Rect(0, 0, state.Base.PixelWidth, state.Base.PixelHeight));
             foreach (var mark in state.Marks) Draw(dc, mark, state.Base.PixelWidth, state.Base.PixelHeight);
+            dc.Pop();
         }
-        var bitmap = new RenderTargetBitmap(state.Base.PixelWidth, state.Base.PixelHeight, 96, 96, PixelFormats.Pbgra32); bitmap.Render(drawing); bitmap.Freeze(); return bitmap;
+        var bitmap = new RenderTargetBitmap(area.Width, area.Height, 96, 96, PixelFormats.Pbgra32); bitmap.Render(drawing); bitmap.Freeze(); return bitmap;
     }
     internal static Task<BitmapSource> RenderAsync(EditorState state) => Task.Run(() => Render(state));
     internal static void Draw(DrawingContext dc, Annotation m, int width, int height)

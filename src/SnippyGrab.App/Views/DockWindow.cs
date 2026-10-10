@@ -203,7 +203,7 @@ internal sealed class DockWindow : Window
         try
         {
             var pixels = PreviewPixels();
-            var thumb = thumbnails.GetOrAdd((capture.FileName, pixels), () => { var decoded = ImageService.Load(controller.Repository.PathFor(capture), pixels, pixels); ThumbnailDecodeCount++; return decoded; });
+            var thumb = thumbnails.GetOrAdd((capture.FileName, pixels), () => { var decoded = ImageService.LoadPreview(controller.Repository.PathFor(capture), pixels, pixels); ThumbnailDecodeCount++; return decoded; });
             var image = new Image { Source = thumb, Stretch = Stretch.Uniform };
             RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.HighQuality);
             imageArea.Children.Add(image);

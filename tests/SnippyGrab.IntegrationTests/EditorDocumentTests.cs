@@ -104,4 +104,40 @@ public sealed class EditorDocumentTests
             return true;
         });
     }
+    [Theory]
+    [InlineData(0)]
+    [InlineData(3)]
+    [InlineData(5)]
+    [InlineData(6)]
+    [InlineData(8)]
+    [InlineData(9)]
+    [InlineData(10)]
+    [InlineData(12)]
+    public void RegionRenderingMatchesFullRenderingIncludingExistingEffects(int tool)
+    {
+        ImageIntegrationTests.Sta(() =>
+        {
+            var state = new EditorState(Fixture(), []);
+            state = EditorWindow.BuildStateAsync(state, Mark((EditTool)tool)).GetAwaiter().GetResult();
+            var area = new PixelRect(25, 18, 80, 50);
+            var full = new FormatConvertedBitmap(ImageService.Crop(EditorWindow.Render(state), area), PixelFormats.Bgra32, null, 0);
+            var region = new FormatConvertedBitmap(EditorWindow.RenderRegion(state, area), PixelFormats.Bgra32, null, 0);
+            var before = new byte[area.Width * area.Height * 4]; var after = new byte[before.Length];
+            full.CopyPixels(before, area.Width * 4, 0); region.CopyPixels(after, area.Width * 4, 0);
+            Assert.Equal(before, after); return true;
+        });
+    }
+    [Fact]
+    public void RepeatedCropsShareBackingPixelsAndRetainUndoWithinBudget()
+    {
+        ImageIntegrationTests.Sta(() =>
+        {
+            var initial = new EditorState(Fixture(), []);
+            var journal = new UndoJournal<EditorState>(initial, 20, EditorWindow.RetainedBytes, 160 * 100 * 4);
+            for (var i = 0; i < 3; i++) journal.Push(EditorWindow.BuildStateAsync(journal.Current, new(EditTool.Crop, new(2, 2), new(journal.Current.Base.PixelWidth - 2, journal.Current.Base.PixelHeight - 2), Colors.Red, 3, 24, "", [])).GetAwaiter().GetResult());
+            Assert.Equal(EditorWindow.RetainedBytes([initial]), EditorWindow.RetainedBytes([initial, journal.Current]));
+            var steps = 0; while (journal.CanUndo) { journal.Undo(); steps++; }
+            Assert.Equal(3, steps); Assert.Same(initial.Base, journal.Current.Base); return true;
+        });
+    }
 }

@@ -77,6 +77,34 @@ public sealed class OcrBoundaryTests
         Assert.Equal(expected, scale);
         if (scale > 1) Assert.True(width * (double)height * scale * scale <= 8_000_001);
     }
+    [Theory]
+    [InlineData(OcrLayout.Auto)]
+    [InlineData(OcrLayout.SparseText)]
+    [InlineData(OcrLayout.SingleBlock)]
+    public async Task EnhancedSmallCodeRecognizesExactTokenAndCachedResultsStayStable(OcrLayout layout)
+    {
+        var png = ImageIntegrationTests.Sta(() =>
+        {
+            var visual = new DrawingVisual();
+            using (var dc = visual.RenderOpen())
+            {
+                dc.DrawRectangle(Brushes.White, null, new Rect(0, 0, 1200, 500));
+                dc.DrawText(new FormattedText("Build failed\nError CS1002: semicolon expected", CultureInfo.InvariantCulture, FlowDirection.LeftToRight, new Typeface("Consolas"), 14, Brushes.Black, 1), new Point(30, 70));
+            }
+            var bitmap = new RenderTargetBitmap(1200, 500, 96, 96, PixelFormats.Pbgra32); bitmap.Render(visual); return ImageService.Png(bitmap);
+        });
+        using var service = new OcrService(settingsProvider: () => new Settings { OcrLayout = layout });
+        var first = await service.ReadAsync(png); Assert.Contains("CS1002", first); Assert.Contains("semicolon expected", first);
+        Assert.Equal(first, await service.ReadAsync(png)); Assert.Equal(1, service.EngineCreations);
+        service.Dispose(); await Assert.ThrowsAsync<ObjectDisposedException>(() => service.ReadAsync(png));
+    }
+    [Fact]
+    public async Task TinyBlankImageReturnsNoTextAndCanBeFollowedByNormalOcr()
+    {
+        var tiny = ImageIntegrationTests.Sta(() => ImageService.Png(BitmapSource.Create(2, 2, 96, 96, PixelFormats.Bgra32, null, new byte[16], 8)));
+        using var service = new OcrService(); Assert.True(string.IsNullOrWhiteSpace(await service.ReadAsync(tiny)));
+        Assert.Contains("expected", await service.ReadAsync(TextImage("Error: expected value", false)));
+    }
     private static byte[] TextImage(string text, bool area)
     {
         return ImageIntegrationTests.Sta(() =>

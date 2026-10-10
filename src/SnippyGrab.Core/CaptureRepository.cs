@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -44,6 +45,16 @@ public sealed partial class CaptureRepository
     private readonly Dictionary<string, int> leases = new(StringComparer.OrdinalIgnoreCase);
     private RepositoryState state = new();
     private bool recoveryNeedsBackup;
+    private HashSet<string> committedPages = [];
+    private readonly Dictionary<Guid, CachedPage> pageCache = [];
+    private readonly SemaphoreSlim cleanupSerial = new(1);
+    private readonly record struct CaptureStamp(Guid Id, string File, DateTimeOffset Created, DateTimeOffset? Restored, int Width, int Height,
+        bool DimensionsPending, string Monitor, bool Pinned, bool Edited, bool Saved, string ExportPath, bool Dismissed, PinLayout? PinLayout)
+    {
+        internal static CaptureStamp From(CaptureRecord c) => new(c.Id, c.FileName, c.CreatedUtc, c.RestoredUtc, c.Width, c.Height,
+            c.DimensionsPending, c.Monitor, c.Pinned, c.Edited, c.Saved, c.ExportPath, c.Dismissed, c.PinLayout);
+    }
+    private sealed record CachedPage(string Name, CaptureStamp[] Stamps);
     public IReadOnlyList<CaptureRecord> Captures => state.Captures;
     public string Root => root;
     public bool HistoryEnabled { get; set; } = true;
@@ -101,12 +112,12 @@ public sealed partial class CaptureRepository
     public void Load()
     {
         ManagedPath.RejectRedirects(root);
-        state = new(); Recovered = false; CleanupBlocked = false; recoveryNeedsBackup = false;
+        state = new(); Recovered = false; CleanupBlocked = false; recoveryNeedsBackup = false; pageCache.Clear(); committedPages.Clear();
         var metadata = Path.Combine(root, "history.json");
         var recovery = Path.Combine(root, "history-recovered.json");
         try
         {
-            if (File.Exists(metadata)) state = ReadState(metadata);
+            if (File.Exists(metadata)) { state = ReadState(metadata); committedPages = state.Pages.ToHashSet(); }
             else if (File.Exists(recovery)) throw new InvalidDataException("Unconfirmed recovered history.");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidDataException or ArgumentException)
@@ -219,7 +230,8 @@ public sealed partial class CaptureRepository
                 File.Copy(metadata, Path.Combine(root, "history-recovered.invalid-" + Guid.NewGuid().ToString("N") + ".json"));
                 recoveryNeedsBackup = false;
             }
-            write(metadata, SerializeState()); PersistencePending = false;
+            var serialized = SerializeState(out var pages);
+            write(metadata, serialized); committedPages = pages; PersistencePending = false;
         }
         catch { PersistencePending = true; throw; }
     }
@@ -229,7 +241,8 @@ public sealed partial class CaptureRepository
         try { write(path, [0]); }
         finally { if (File.Exists(path)) File.Delete(path); }
     }
-    private byte[] SerializeState()
+    private byte[] SerializeState() => SerializeState(out _);
+    private byte[] SerializeState(out HashSet<string> pages)
     {
         var saved = new RepositoryState
         {
@@ -240,23 +253,38 @@ public sealed partial class CaptureRepository
         if (!CleanupBlocked && saved.Captures.Count > 512)
         {
             saved.SchemaVersion = 2; // Older builds fail closed instead of ignoring pinned page records.
-            var captures = saved.Captures; saved.Captures = [];
-            // Chunk from the oldest end so inserting a new capture only rewrites the newest page.
+            var captures = saved.Captures;
+            // Keep the changing head in the atomic manifest. Only sealed older chunks need
+            // immutable page files, avoiding a new abandoned file for every capture.
             var first = captures.Count % 512; if (first == 0) first = 512;
-            for (var offset = 0; offset < captures.Count;)
+            saved.Captures = captures.GetRange(0, first);
+            var activeCache = new HashSet<Guid>();
+            for (var offset = first; offset < captures.Count; offset += 512)
             {
-                var count = offset == 0 ? first : 512;
-                var page = JsonSerializer.SerializeToUtf8Bytes(captures.GetRange(offset, count));
-                if (page.Length > 4 * 1024 * 1024) throw new InvalidDataException("History page exceeds the size limit.");
-                var name = "history-page-" + Convert.ToHexString(SHA256.HashData(page)).ToLowerInvariant() + ".json";
+                var key = captures[offset].Id; activeCache.Add(key);
+                var cached = pageCache.GetValueOrDefault(key);
+                var unchanged = cached is not null && cached.Stamps.Length == 512;
+                for (var i = 0; unchanged && i < 512; i++) unchanged = cached!.Stamps[i] == CaptureStamp.From(captures[offset + i]);
+                byte[]? page = null;
+                if (!unchanged)
+                {
+                    page = JsonSerializer.SerializeToUtf8Bytes(captures.GetRange(offset, 512));
+                    if (page.Length > 4 * 1024 * 1024) throw new InvalidDataException("History page exceeds the size limit.");
+                    cached = new("history-page-" + Convert.ToHexString(SHA256.HashData(page)).ToLowerInvariant() + ".json",
+                        Enumerable.Range(offset, 512).Select(i => CaptureStamp.From(captures[i])).ToArray());
+                }
+                var name = cached!.Name;
                 var path = Path.Combine(root, name);
                 if (File.Exists(path) && !SafeFile(path)) throw new InvalidDataException("Invalid history page location.");
-                if (!SafeFile(path)) write(path, page);
-                saved.Pages.Add(name); offset += count;
+                if (!SafeFile(path)) write(path, page ?? JsonSerializer.SerializeToUtf8Bytes(captures.GetRange(offset, 512)));
+                pageCache[key] = cached; saved.Pages.Add(name);
             }
+            foreach (var key in pageCache.Keys.Where(k => !activeCache.Contains(k)).ToArray()) pageCache.Remove(key);
         }
+        else pageCache.Clear();
         var bytes = JsonSerializer.SerializeToUtf8Bytes(saved);
         if (bytes.Length > 4 * 1024 * 1024) throw new InvalidDataException("History exceeds the recovery size limit. Metadata has not been replaced; cleanup remains blocked during recovery.");
+        pages = saved.Pages.ToHashSet();
         return bytes;
     }
     public void ConfirmHistoryRecovery()
@@ -310,38 +338,77 @@ public sealed partial class CaptureRepository
     }
     public int CleanupSession(DateTimeOffset now) => Cleanup(now, -1, clear: true, sessionOnly: true);
     public int Cleanup(DateTimeOffset now, int retentionHours, bool clear = false, bool sessionOnly = false)
+        => CleanupSteps(now, retentionHours, clear, sessionOnly).Sum();
+    public async Task<int> CleanupAsync(DateTimeOffset now, int retentionHours, bool clear = false, bool sessionOnly = false,
+        Func<Task>? yield = null, CancellationToken cancellation = default, int batchSize = 16)
+    {
+        if (batchSize is < 1 or > 256) throw new ArgumentOutOfRangeException(nameof(batchSize));
+        await cleanupSerial.WaitAsync(cancellation);
+        var removed = 0; var finished = false;
+        try
+        {
+            // State/lease decisions remain on the caller's context. Yield between bounded
+            // slices and recheck protections, rather than deleting from a stale worker snapshot.
+            var slice = Stopwatch.StartNew(); var count = 0;
+            foreach (var item in CleanupSteps(now, retentionHours, clear, sessionOnly))
+            {
+                removed += item;
+                cancellation.ThrowIfCancellationRequested();
+                if (++count < batchSize && slice.ElapsedMilliseconds < 6) continue;
+                cancellation.ThrowIfCancellationRequested();
+                if (yield is null) await Task.Yield(); else await yield();
+                cancellation.ThrowIfCancellationRequested();
+                count = 0; slice.Restart();
+            }
+            finished = true; return removed;
+        }
+        finally
+        {
+            try { if (!finished && removed > 0 && !CleanupBlocked && !PersistencePending) Persist(); }
+            finally { cleanupSerial.Release(); }
+        }
+    }
+    private IEnumerable<int> CleanupSteps(DateTimeOffset now, int retentionHours, bool clear, bool sessionOnly)
     {
         ManagedPath.RejectRedirects(root);
-        if (CleanupBlocked || PersistencePending) return 0; // Corrupt pin metadata must never turn into permission to delete images.
-        var pinned = state.Captures.Where(c => c.Pinned).Select(c => c.FileName).ToHashSet();
+        if (CleanupBlocked || PersistencePending) yield break; // Corrupt pin metadata must never turn into permission to delete images.
         var records = state.Captures.ToDictionary(c => c.FileName);
-        var removed = 0;
-        foreach (var path in Directory.EnumerateFiles(root, "capture-*.png"))
+        foreach (var path in Directory.GetFiles(root, "capture-*.png"))
         {
+            yield return 0;
+            if (CleanupBlocked || PersistencePending) yield break;
             var name = Path.GetFileName(path);
-            if ((sessionOnly && !sessionFiles.Contains(name)) || !IsSafeName(name) || !SafeFile(path) || pinned.Contains(name) || leases.ContainsKey(name) || state.ProtectedUntil.GetValueOrDefault(name) > now) continue;
             var record = records.GetValueOrDefault(name);
+            if ((sessionOnly && !sessionFiles.Contains(name)) || !IsSafeName(name) || !SafeFile(path) || record?.Pinned == true || leases.ContainsKey(name) || state.ProtectedUntil.GetValueOrDefault(name) > now) continue;
             var created = record is null ? new DateTimeOffset(File.GetLastWriteTimeUtc(path)) : record.RestoredUtc ?? record.CreatedUtc;
             if (!clear && (retentionHours < 0 || created.AddHours(retentionHours) > now)) continue;
-            try { File.Delete(path); state.Superseded.Remove(name); state.Captures.RemoveAll(c => c.FileName == name); removed++; }
+            var deleted = false;
+            try { File.Delete(path); state.Superseded.Remove(name); state.Captures.RemoveAll(c => c.FileName == name); deleted = true; }
             catch (IOException) { }
             catch (UnauthorizedAccessException) { }
+            if (deleted) yield return 1;
         }
-        foreach (var key in state.ProtectedUntil.Where(p => p.Value <= now).Select(p => p.Key).ToArray()) state.ProtectedUntil.Remove(key);
+        foreach (var key in state.ProtectedUntil.Where(p => p.Value <= now).Select(p => p.Key).ToArray())
+            if (state.ProtectedUntil.GetValueOrDefault(key) <= now) state.ProtectedUntil.Remove(key);
         // Remove only old, owned incomplete atomic writes, never unknown files.
         foreach (var path in Directory.EnumerateFiles(root, "*.tmp"))
+        {
+            yield return 0;
+            if (CleanupBlocked || PersistencePending) yield break;
             if (SafeFile(path) && File.GetLastWriteTimeUtc(path) < now.UtcDateTime.AddDays(-1) &&
                 TemporaryPattern().IsMatch(Path.GetFileName(path)))
                 try { File.Delete(path); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+        }
         Persist();
         // Only owned pages unreferenced by the durable manifest and older than the crash grace are removable.
-        var manifest = Path.Combine(root, "history.json");
-        var pages = File.Exists(manifest) ? JsonSerializer.Deserialize<RepositoryState>(File.ReadAllText(manifest))?.Pages.ToHashSet() ?? [] : new HashSet<string>();
         var hasArchivedHistory = Directory.EnumerateFiles(root, "history.invalid-*.json").Any();
         foreach (var path in hasArchivedHistory ? Enumerable.Empty<string>() : Directory.EnumerateFiles(root, "history-page-*.json"))
-            if (PagePattern().IsMatch(Path.GetFileName(path)) && !pages.Contains(Path.GetFileName(path)) && SafeFile(path) && File.GetLastWriteTimeUtc(path) < now.UtcDateTime.AddDays(-1))
+        {
+            yield return 0;
+            if (CleanupBlocked || PersistencePending) yield break;
+            if (PagePattern().IsMatch(Path.GetFileName(path)) && !committedPages.Contains(Path.GetFileName(path)) && SafeFile(path) && File.GetLastWriteTimeUtc(path) < now.UtcDateTime.AddDays(-1))
                 try { File.Delete(path); } catch (IOException) { } catch (UnauthorizedAccessException) { }
-        return removed;
+        }
     }
     private sealed class ReleaseLease(Action release) : IDisposable
     {

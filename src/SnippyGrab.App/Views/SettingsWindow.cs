@@ -115,7 +115,7 @@ internal sealed class SettingsWindow : Window
                 case 2:
                     Group("Position & appearance"); AddMonitor(); Add(nameof(Settings.Corner), "Screen position"); Add(nameof(Settings.Orientation), "Corner orientation", "Edges expand inward.");
                     Add(nameof(Settings.ThumbnailSize), "Thumbnail width", "120–400 DIP"); Add(nameof(Settings.ExpandedItems), "Expanded captures", "1–5 captures"); Add(nameof(Settings.DockOpacity), "Opacity", "0.25–1"); Add(nameof(Settings.PreviewQuality), "Preview quality");
-                    Note("Balanced uses less memory. Sharp improves detail. Original uses more memory. Copies, exports and OCR always use the lossless full-resolution image.");
+                    Note("Balanced uses less memory. Sharp improves detail. Original shows more detail in a bounded preview. Open the editor at 100% for original pixels. Copies, exports and OCR always use the full-resolution image.");
                     Group("Behavior"); Add(nameof(Settings.AlwaysOnTop), "Always on top"); Add(nameof(Settings.AutoCollapse), "Collapse when pointer leaves"); Add(nameof(Settings.AutoHideSeconds), "Auto-hide", "Seconds · 0 keeps the shelf visible"); Add(nameof(Settings.DockLifetimeMinutes), "Shelf lifetime", "Minutes · 0 keeps captures indefinitely"); Add(nameof(Settings.Animate), "Fade new captures into the shelf", "Arrival only. Respects Windows reduced motion."); break;
                 case 3:
                     Group("Copying"); Add(nameof(Settings.AutoCopy), "Copy automatically on capture", "Paste immediately with Ctrl+V."); Add(nameof(Settings.ClipboardPng), "Include PNG representation", "Keeps a lossless PNG alongside the Windows image format."); break;

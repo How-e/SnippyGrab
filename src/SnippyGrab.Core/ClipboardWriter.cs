@@ -4,13 +4,14 @@ namespace SnippyGrab.Core;
 public sealed class ClipboardWriter
 {
     private int generation;
-    public void Invalidate() => generation++;
-    public async Task<bool> WriteAsync(Action write, Func<int, Task>? delay = null, CancellationToken cancellation = default)
+    public int BeginOperation() => Interlocked.Increment(ref generation);
+    public void Invalidate() => BeginOperation();
+    public async Task<bool> WriteAsync(Action write, Func<int, Task>? delay = null, CancellationToken cancellation = default, int? reservedOperation = null)
     {
-        var operation = ++generation;
+        var operation = reservedOperation ?? BeginOperation();
         for (var attempt = 0; attempt < 6; attempt++)
         {
-            if (operation != generation || cancellation.IsCancellationRequested) return false;
+            if (operation != Volatile.Read(ref generation) || cancellation.IsCancellationRequested) return false;
             try { write(); return true; }
             catch (ExternalException) { await (delay?.Invoke(25 * (attempt + 1)) ?? Task.Delay(25 * (attempt + 1))); }
         }

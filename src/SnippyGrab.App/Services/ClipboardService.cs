@@ -6,16 +6,45 @@ internal sealed class ClipboardService(Action<DataObject>? write = null, Func<in
 {
     private readonly ClipboardWriter writer = new();
     public void Invalidate() => writer.Invalidate();
-    public async Task<bool> ImageAsync(BitmapSource image, bool png, byte[]? encoded = null)
+    public async Task<bool> ImageAsync(BitmapSource image, bool png, byte[]? encoded = null, CancellationToken cancellation = default)
+    {
+        var operation = writer.BeginOperation();
+        try
+        {
+            if (png && encoded is null)
+            {
+                if (!image.IsFrozen) { image = image.CloneCurrentValue(); image.Freeze(); }
+                encoded = await Task.Run(() => ImageService.Png(image), cancellation);
+            }
+            return await PublishImageAsync(image, png ? encoded : null, cancellation, operation);
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { return false; }
+    }
+    internal async Task<bool> StoredImageAsync(string path, bool png, CancellationToken cancellation = default)
+    {
+        // Reserve before yielding: a slower decode must never overwrite a newer copy/OCR action.
+        var operation = writer.BeginOperation();
+        try
+        {
+            var prepared = await Task.Run(() =>
+            {
+                cancellation.ThrowIfCancellationRequested(); ManagedPath.RejectRedirects(path);
+                return (Image: ImageService.Load(path), Png: png ? ImageService.ReadEncoded(path) : null);
+            }, cancellation);
+            return await PublishImageAsync(prepared.Image, prepared.Png, cancellation, operation);
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { return false; }
+    }
+    private Task<bool> PublishImageAsync(BitmapSource image, byte[]? png, CancellationToken cancellation, int operation)
     {
         var data = new DataObject(); data.SetImage(image);
-        if (png) data.SetData("PNG", new MemoryStream(encoded ?? ImageService.Png(image)));
-        return await SetAsync(data);
+        if (png is not null) data.SetData("PNG", new MemoryStream(png, writable: false));
+        return SetAsync(data, cancellation, operation);
     }
     public Task<bool> TextAsync(string text, CancellationToken cancellation = default) => SetAsync(new DataObject(DataFormats.UnicodeText, text), cancellation);
     public Task<bool> FilesAsync(string[] paths) => SetAsync(new DataObject(DataFormats.FileDrop, paths));
-    private Task<bool> SetAsync(DataObject data, CancellationToken cancellation = default) =>
-        writer.WriteAsync(() => { if (write is null) Clipboard.SetDataObject(data, true); else write(data); }, delay, cancellation);
+    private Task<bool> SetAsync(DataObject data, CancellationToken cancellation = default, int? operation = null) =>
+        writer.WriteAsync(() => { if (write is null) Clipboard.SetDataObject(data, true); else write(data); }, delay, cancellation, operation);
 
 }
 

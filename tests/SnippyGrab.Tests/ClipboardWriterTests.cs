@@ -5,6 +5,16 @@ namespace SnippyGrab.Tests;
 public sealed class ClipboardWriterTests
 {
     [Fact]
+    public async Task PreparationReservedBeforeYieldCannotOverwriteNewerAction()
+    {
+        var writer = new ClipboardWriter(); var old = writer.BeginOperation(); var writes = new List<string>();
+        Assert.True(await writer.WriteAsync(() => writes.Add("new")));
+        Assert.False(await writer.WriteAsync(() => writes.Add("old prepared image"), reservedOperation: old));
+        Assert.Equal(new[] { "new" }, writes);
+        var pending = writer.BeginOperation(); writer.Invalidate();
+        Assert.False(await writer.WriteAsync(() => writes.Add("after exit"), reservedOperation: pending));
+    }
+    [Fact]
     public async Task ExhaustionReportsFailureAndSuccessRetries()
     {
         var writer = new ClipboardWriter(); var attempts = 0;

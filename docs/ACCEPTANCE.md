@@ -2,7 +2,7 @@
 
 Use synthetic information. Record Windows/app build, GPU/HDR, monitor geometry/scaling, app/receiver versions, timings and observed behavior. A stable tag requires completion of this matrix.
 
-For step-by-step user checks, see [USER-TESTING.md](USER-TESTING.md). Release requirements are maintained in `scripts/release-gates.json`. This matrix defines acceptance; it is not a record of passed tests. [Capabilities and evidence](CAPABILITIES.md) reconciles current implementation, historical observations and the 39 closed / 12 open baseline gates.
+For step-by-step user checks, see [USER-TESTING.md](USER-TESTING.md). Release requirements are maintained in `scripts/release-gates.json`. This matrix defines acceptance; it is not itself a record of passed tests. [Capabilities and evidence](CAPABILITIES.md) reconciles implementation, automated evidence and the current **51 closed / 0 open** gates for the reviewed unsigned alpha scope. The owner reported PASS for the full physical monitor/DPI/HDR matrix on acceptance build `0.1.0-alpha.acceptance.20261009.2`; precise per-row configurations were not supplied. Reopen affected gates if later changes need renewed acceptance.
 
 | Area | Acceptance |
 |---|---|

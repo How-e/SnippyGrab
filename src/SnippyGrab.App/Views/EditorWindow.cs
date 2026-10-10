@@ -49,7 +49,7 @@ internal sealed class EditorWindow : Window
         actions.Children.Add(Ui.IconButton("undo", "Undo (Ctrl+Z)", Undo));
         actions.Children.Add(Ui.IconButton("redo", "Redo (Ctrl+Y)", Redo));
         actions.Children.Add(Ui.ActionButton("Apply + copy", "copy", "Update the managed shelf image and copy it (Ctrl+C)", () => controller.Run(ApplyCopy), "PrimaryButton"));
-        actions.Children.Add(Ui.ActionButton("Export image…", "export", "Apply edits and export PNG or JPEG outside the cache (Ctrl+S)", () => controller.Run(ExportImage)));
+        actions.Children.Add(Ui.ActionButton("Export image…", "export", "Apply edits and export PNG, JPEG or WebP outside the cache (Ctrl+S)", () => controller.Run(ExportImage)));
         openExportFolder = Ui.Button("Open export folder", "Open the last successful export directory", () => controller.OpenExportFolder(record.ExportPath));
         openExportFolder.IsEnabled = !string.IsNullOrWhiteSpace(record.ExportPath);
         openExportFolder.ToolTip = string.IsNullOrWhiteSpace(record.ExportPath) ? "Export an image first" : "Last image export: " + record.ExportPath;

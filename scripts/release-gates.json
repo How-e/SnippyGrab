@@ -5,7 +5,7 @@
       "id": "Q1",
       "priority": 1,
       "owner": "Agent",
-      "closed": false,
+      "closed": true,
       "milestone": 0,
       "title": "Establish milestone completion evidence"
     },
@@ -61,7 +61,7 @@
       "id": "Q8",
       "priority": 1,
       "owner": "Shared",
-      "closed": false,
+      "closed": true,
       "milestone": 1,
       "title": "Validate every capture mode and selection edge"
     },
@@ -69,7 +69,7 @@
       "id": "Q9",
       "priority": 1,
       "owner": "Shared",
-      "closed": false,
+      "closed": true,
       "milestone": 1,
       "title": "Verify hotkey conflicts and first-run recovery"
     },
@@ -125,7 +125,7 @@
       "id": "Q16",
       "priority": 1,
       "owner": "Shared",
-      "closed": false,
+      "closed": true,
       "milestone": 3,
       "title": "Fix hover reachability, selection collapse and reorder targeting"
     },
@@ -149,7 +149,7 @@
       "id": "Q19",
       "priority": 1,
       "owner": "Shared",
-      "closed": false,
+      "closed": true,
       "milestone": 3,
       "title": "Complete keyboard/accessibility acceptance"
     },
@@ -157,7 +157,7 @@
       "id": "Q20",
       "priority": 1,
       "owner": "Shared",
-      "closed": false,
+      "closed": true,
       "milestone": 5,
       "title": "Verify every required tool end to end"
     },
@@ -165,7 +165,7 @@
       "id": "Q21",
       "priority": 1,
       "owner": "Agent",
-      "closed": false,
+      "closed": true,
       "milestone": 5,
       "title": "Resolve Save destination and misleading labels"
     },
@@ -197,7 +197,7 @@
       "id": "Q25",
       "priority": 1,
       "owner": "Shared",
-      "closed": false,
+      "closed": true,
       "milestone": 7,
       "title": "Verify tray/OS lifecycle"
     },
@@ -205,7 +205,7 @@
       "id": "Q26",
       "priority": 1,
       "owner": "Shared",
-      "closed": false,
+      "closed": true,
       "milestone": 7,
       "title": "Verify settings coverage and persistence"
     },
@@ -213,7 +213,7 @@
       "id": "Q27",
       "priority": 1,
       "owner": "Shared",
-      "closed": false,
+      "closed": true,
       "milestone": 7,
       "title": "Verify login startup and setup on real login"
     },
@@ -229,7 +229,7 @@
       "id": "Q29",
       "priority": 1,
       "owner": "Shared",
-      "closed": false,
+      "closed": true,
       "milestone": 8,
       "title": "Complete history/pin behavior"
     },
@@ -245,7 +245,7 @@
       "id": "Q31",
       "priority": 1,
       "owner": "Shared",
-      "closed": false,
+      "closed": true,
       "milestone": 1,
       "title": "Complete hardware capture acceptance"
     },
@@ -253,7 +253,7 @@
       "id": "Q32",
       "priority": 1,
       "owner": "User",
-      "closed": false,
+      "closed": true,
       "milestone": 3,
       "title": "Accept actual dock/editor accessibility and interaction"
     },
@@ -325,7 +325,7 @@
       "id": "Q41",
       "priority": 1,
       "owner": "Shared",
-      "closed": false,
+      "closed": true,
       "milestone": 10,
       "title": "Verify clean installation and upgrade"
     },
@@ -349,7 +349,7 @@
       "id": "Q44",
       "priority": 1,
       "owner": "Shared",
-      "closed": false,
+      "closed": true,
       "milestone": 10,
       "title": "Finish release documentation and stable gate"
     },

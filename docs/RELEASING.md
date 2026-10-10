@@ -1,6 +1,6 @@
 # Releasing
 
-The development version remains **0.1.0-alpha**. The latest published build is `v0.1.0-alpha.design.20261008.1`; newer source work is unreleased. Stable packaging remains blocked by the open acceptance gates. Commit/push and local packaging do not publish a release.
+The current release version is **0.1.0-alpha.20261009.3**, an unsigned alpha prerelease; development defaults remain **0.1.0-alpha**. Published assets are listed on [GitHub Releases](https://github.com/How-e/SnippyGrab/releases). The acceptance manifest has **51 closed / 0 open** gates for the owner-reviewed unsigned alpha scope on `0.1.0-alpha.acceptance.20261009.2`; the release contains the same product code. Stable promotion has not been approved. Commit/push and local packaging do not publish a release.
 
 For future alpha releases, use monotonically dated tags such as `v0.1.0-alpha.20261009.1`, incrementing the final revision for another build that day. Do not reuse a published tag. The updater compares legacy `alpha.<label>.<date>.<revision>` tags by date/revision so the old descriptive labels do not cause a downgrade. Beta, release-candidate and stable promotion require a separate readiness decision.
 

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — 0.1.0-alpha, 2026-10-09
+## 0.1.0-alpha.20261009.3 — 2026-10-09
 
 - Added quiet six-hour release checks, green/red Help & about status, in-app changelog and verified transactional updates with restart for installed and portable releases.
 - Kept source builds explicitly alpha and compared legacy dated alpha releases by date/revision so older release labels cannot outrank newer builds. Downloaded installer scripts are admitted using the installed checksum validator.
@@ -9,7 +9,9 @@
 - Added actionable OCR readiness checks and timestamp/publisher verification tooling; real publisher signing still requires external identity/access.
 - Added explicit monitor capture, shared PNG/JPEG/WebP export, ordered cancellable batch export, and native-pixel strip/grid composition.
 - Added bounded user-assisted static vertical scrolling with seam correction/undo and private frame staging. No automatic scrolling or recording.
-- Added pinned WebP source/recipe/binary provenance and codec/license review. Local synthetic/offscreen verification does not close physical, receiver or clean-profile acceptance gates. These changes are not yet published.
+- Added pinned WebP source/recipe/binary provenance and codec/license review, and corrected the editor export tooltip to include WebP.
+- Closed all 51 acceptance gates for the owner-approved unsigned alpha scope using current-build desktop, Windows 11 VM and full monitor/DPI/HDR batch PASS reports plus separate agent verification. Product code is unchanged from the accepted build; exact hardware/receiver versions and warning text were not supplied. Automated dock foreground checks failed and the earlier hotkey probe was skipped; those outcomes remain documented separately from owner acceptance.
+- This is an unsigned prerelease. Windows or browsers may warn; SHA-256 establishes download integrity, not publisher identity. Capture remains SDR, English is the supported offline OCR language, and scrolling is bounded user-assisted static vertical capture.
 
 ## 0.1.0-alpha.design.20261008.1 — 2026-10-08
 

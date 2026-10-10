@@ -30,6 +30,17 @@ try {
     $rejected = $false; try { Assert-SnippyInstallPath (Join-Path $root '../escape') $root } catch { $rejected = $true }
     if (-not $rejected) { throw 'Escaped target accepted.' }
     Write-Output 'PASS: hidden ancestor entry guard, fresh install, upgrade/obsolete isolation, rollback, checksum rejection, data preservation and path containment.'
+    Write-Fixture 'portable-new'
+    $portableTarget = Join-Path $root 'portable folder with spaces'
+    New-Item -ItemType Directory -Path $portableTarget | Out-Null
+    Set-Content -LiteralPath (Join-Path $portableTarget 'SnippyGrab.exe') 'portable-old'
+    $rejected = $false; try { Install-SnippyFiles $source $portableTarget | Out-Null } catch { $rejected = $true }
+    if (-not $rejected) { throw 'Ordinary installer admitted a nonstandard target.' }
+    $portable = Install-SnippyFiles -Source $source -Target $portableTarget -Portable
+    if ((Get-Content -LiteralPath (Join-Path $portableTarget 'SnippyGrab.exe')) -ne 'portable-new') { throw 'Portable upgrade failed.' }
+    Undo-SnippyFiles $portable
+    if ((Get-Content -LiteralPath (Join-Path $portableTarget 'SnippyGrab.exe')) -ne 'portable-old') { throw 'Portable rollback failed.' }
+    Write-Output 'PASS: portable update in a custom folder with spaces, preserved default target guard and rollback.'
 } finally {
     $full = [IO.Path]::GetFullPath($root)
     if ([IO.Path]::GetDirectoryName($full) -ne [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\') -or -not [IO.Path]::GetFileName($full).StartsWith('SnippyGrab-install-lab-')) { throw 'Unexpected fixture cleanup path.' }

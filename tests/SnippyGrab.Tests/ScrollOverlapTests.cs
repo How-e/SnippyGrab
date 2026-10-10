@@ -25,6 +25,18 @@ public sealed class ScrollOverlapTests
         Assert.Equal(64, ScrollOverlap.Match(previous, next, 40, 128).Overlap);
         Assert.True(ScrollOverlap.Match(previous, previous, 40, 128).Duplicate);
     }
+    [Theory]
+    [InlineData(1080, 541)]
+    [InlineData(2160, 1082)]
+    [InlineData(4096, 2050)]
+    public void LargeViewportsFindExactJoinsBetweenCoarseCandidates(int height, int overlap)
+    {
+        const int width = 40;
+        var document = Document(width, height * 2 - overlap);
+        var previous = document[..(width * height * 4)];
+        var next = document[(width * (height - overlap) * 4)..];
+        Assert.Equal(overlap, ScrollOverlap.Match(previous, next, width, height).Overlap);
+    }
     [Fact]
     public void RepetitionBlankNoiseAndFractionalRowsStayUncertain()
     {

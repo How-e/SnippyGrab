@@ -11,7 +11,7 @@ The filenames preserve the managed wrapper's lookup ABI, not the upstream versio
 
 ## Build and provenance
 
-Install Visual Studio 2022 C++ x64 tools, Windows SDK and CMake; PowerShell 7 and Git are required. `pwsh scripts/build-native-ocr.ps1` locates CMake with vswhere (or accepts -CMake), fetches each exact Git commit, verifies HEAD and admits only the reviewed output-name CMake additions. It builds x64 Release with four build jobs. The normal App build invokes it; integration tests and publish explicitly use its outputs. Build-time networking fetches sources; runtime has no downloads.
+Install Visual Studio 2022 C++ x64 tools, Windows SDK and CMake; PowerShell 7 and Git are required. `pwsh scripts/build-native-ocr.ps1` locates CMake with vswhere (or accepts -CMake), fetches each exact Git commit, verifies HEAD and admits only the reviewed output-name CMake additions. It builds x64 Release with four build jobs. The normal App build invokes it; integration tests and publish explicitly use its outputs. Build-time networking fetches OCR sources; runtime OCR has no downloads. App update checks/downloads are separate from OCR.
 
 Leptonica's external GIF/JPEG/PNG/TIFF/WebP/OpenJPEG/zlib options are all OFF. Tesseract's TIFF/curl/libarchive integration, graphics, training tools, native-host optimization and OpenMP are OFF. The legacy engine API remains compiled because the wrapper binds its orientation export during initialization; the production engine selects LstmOnly. Built-in Leptonica helpers/format code may still exist, but production passes no encoded image to native readers. Windows WIC decodes bounded admitted content to RGBA rows. Native recognition, allocation and scaling remain.
 

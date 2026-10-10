@@ -26,9 +26,9 @@ function Test-SnippyBundle([string]$Source) {
     if ($names.Count -ne $files.Count - 1 -or $names.Contains('SHA256SUMS.txt')) { throw 'Incomplete bundle checksum coverage.' }
     foreach ($required in @('SnippyGrab.exe', 'install.ps1', 'install-files.ps1')) { if (-not $names.Contains($required)) { throw 'Incomplete application bundle.' } }
 }
-function Install-SnippyFiles([string]$Source, [string]$Target) {
+function Install-SnippyFiles([string]$Source, [string]$Target, [switch]$Portable) {
     $targetPath = [IO.Path]::GetFullPath($Target); $parent = Split-Path -Parent $targetPath
-    if ((Split-Path -Leaf $targetPath) -ne 'SnippyGrab') { throw 'Unexpected application directory.' }
+    if (-not $Portable -and (Split-Path -Leaf $targetPath) -ne 'SnippyGrab') { throw 'Unexpected application directory.' }
     Assert-SnippyInstallPath $targetPath $parent; Test-SnippyBundle $Source
     New-Item -ItemType Directory -Path $parent -Force | Out-Null
     $stage = Join-Path $parent ('SnippyGrab-stage-' + [Guid]::NewGuid().ToString('N'))

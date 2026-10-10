@@ -1,7 +1,11 @@
 # Changelog
 
-## Unreleased — local improvements, 2026-10-09
+## Unreleased — 0.1.0-alpha, 2026-10-09
 
+- Added quiet six-hour release checks, green/red Help & about status, in-app changelog and verified transactional updates with restart for installed and portable releases.
+- Kept source builds explicitly alpha and compared legacy dated alpha releases by date/revision so older release labels cannot outrank newer builds. Downloaded installer scripts are admitted using the installed checksum validator.
+- Centered tray labels, shortcuts and icons, corrected dialog heading alignment, and moved Delete onto the dock toolbar at all thumbnail sizes. Deletion retains shelf selection and history/transfer semantics.
+- Added clearer composition and scrolling instructions, thumbnails and state-specific actions; dock controls now overlay a translucent image strip. Fixed exact scrolling joins at large viewport heights and batch Skip collisions appearing during export. Single-image exports expose progress/cancellation.
 - Added actionable OCR readiness checks and timestamp/publisher verification tooling; real publisher signing still requires external identity/access.
 - Added explicit monitor capture, shared PNG/JPEG/WebP export, ordered cancellable batch export, and native-pixel strip/grid composition.
 - Added bounded user-assisted static vertical scrolling with seam correction/undo and private frame staging. No automatic scrolling or recording.

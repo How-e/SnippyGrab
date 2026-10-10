@@ -165,7 +165,7 @@
       "id": "Q21",
       "priority": 1,
       "owner": "Agent",
-      "closed": false,
+      "closed": true,
       "milestone": 5,
       "title": "Resolve Save destination and misleading labels"
     },

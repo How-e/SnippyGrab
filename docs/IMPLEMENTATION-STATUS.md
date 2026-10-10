@@ -1,6 +1,6 @@
 # Implementation status — 2026-10-09
 
-The project remains **0.1.0-alpha**, unsigned and prerelease. The latest published build is `v0.1.0-alpha.design.20261008.1`; the current source changes are unreleased. The [release-gate manifest](../scripts/release-gates.json) has **36 closed / 15 open** gates. Older owner acceptance applies to its recorded build and scope, and does not close new interaction or installation gates.
+The project remains **0.1.0-alpha**, unsigned and prerelease. The latest published build is `v0.1.0-alpha.design.20261008.1`; the current source changes are unreleased. The [release-gate manifest](../scripts/release-gates.json) has **37 closed / 14 open** gates. Older owner acceptance applies to its recorded build and scope, and does not close new interaction or installation gates.
 
 ## Current implementation
 
@@ -22,5 +22,7 @@ Current regression coverage includes theme/text-scale alignment, direct multi-se
 Pre-push verification passed locked restore, the zero-warning Release build, 199 Core and 92 integration tests (291 total), formatting, dependency/native integrity audits and all policy/installer/update-helper fixtures. Isolated editor-layout and reliability probes passed their documented scope. Git history and pending source scans found no secrets; final staged-content scanning and hosted CI/CodeQL remain separate checks.
 
 Earlier isolated export stress measurements reached roughly 847 MiB for noisy 16 MP lossless WebP and 1015 MiB for 80 MP JPEG. Input caps and composition working-image estimates do not provide a process-wide memory ceiling. Representative resource/physical target/receiver/clean-profile acceptance remains outstanding; no current-build all-day or leak-free claim is made.
+
+The 2026-10-09 acceptance continuation closes Q21 from the packaged native export workflow: cancel without success, a PNG destination outside the cache, exact source-byte preservation, complete success path, previous-folder/filename reuse, overwrite refusal/confirmation and Open export folder. The editor tooltip now includes WebP. JPEG/WebP encoding and path boundaries retain automated coverage; this closure does not establish clean-profile codec or batch gesture acceptance. The packaged interactive self-test passed synthetic capture, overlay and local OLE delivery; its primary hotkey workflow was SKIPPED because another running app held the configured shortcuts. Dock layout assertions passed, but two independent runs failed foreground preservation; that probe remains FAIL. Q31 requires the full physical monitor/DPI/HDR matrix by owner decision, and Q27/Q41 require the available Windows 11 VM/profile observations. No release was published.
 
 Review [capabilities and evidence](CAPABILITIES.md), the [desktop checklist](USER-TESTING.md), [threat model](THREAT-MODEL.md) and [release process](RELEASING.md) before a new published prerelease. Stable promotion remains blocked by the manifest; checksums authenticate admitted bytes, not an unsigned publisher.

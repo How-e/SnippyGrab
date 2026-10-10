@@ -129,7 +129,7 @@ internal sealed class SettingsWindow : Window
                     Group("Text recognition"); Add(nameof(Settings.OcrEnhanceSmallText), "Enhance small text", "Improves smaller inputs without changing the saved image."); Add(nameof(Settings.OcrLayout), "Text layout"); Note("Recognition is local and English only. Auto retries scattered text when confidence is low. Use OCR selected area in the editor for best accuracy."); AddReadiness(); break;
                 case 6:
                     Group("Startup"); Add(nameof(Settings.LaunchOnStartup), "Launch at Windows login"); Add(nameof(Settings.StartMinimized), "Start silently in tray", "After first-run setup.");
-                    Group("About SnippyGrab"); Note("A native, local screenshot shelf. No uploads, accounts, analytics or update polling."); Note("SnippyGrab " + BuildVersion.Display + " · MIT"); Note("Updates are manual through release downloads."); page.Children.Add(Ui.ActionButton("Hotkey help", "keyboard", "Review hotkeys and conflicts", controller.ShowHotkeyHelp)); break;
+                    Group("About SnippyGrab"); Note("A native, local screenshot shelf. No uploads, accounts or analytics."); Note("SnippyGrab " + BuildVersion.Display + " · MIT"); Note("Quiet GitHub release checks every six hours. Tray → Help & about → Updates for changelogs and updating."); page.Children.Add(Ui.ActionButton("Hotkey help", "keyboard", "Review hotkeys and conflicts", controller.ShowHotkeyHelp)); break;
             }
         }
     }
@@ -242,7 +242,7 @@ internal sealed class SettingsWindow : Window
         Group("Interface preview"); Note("A preview of the screenshot shelf using the selected theme.");
         var preview = new Grid(); preview.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(268) }); preview.ColumnDefinitions.Add(new ColumnDefinition());
         var sample = new StackPanel(); var code = Ui.Text("function captureScreen() {\n    const image = grab();\n    return image;\n}\n\nconsole.log('SnippyGrab');", 12); code.FontFamily = new FontFamily("Consolas"); code.Margin = new Thickness(10); sample.Children.Add(code);
-        var strip = new StackPanel { Orientation = Orientation.Horizontal }; foreach (var icon in new[] { "edit", "copy", "pin", "export", "more" }) { var b = Ui.IconButton(icon, icon + " preview", () => { }); b.Focusable = false; b.IsHitTestVisible = false; strip.Children.Add(b); }
+        var strip = new StackPanel { Orientation = Orientation.Horizontal }; foreach (var icon in new[] { "edit", "copy", "pin", "export", "trash", "more" }) { var b = Ui.IconButton(icon, icon + " preview", () => { }); b.Focusable = false; b.IsHitTestVisible = false; strip.Children.Add(b); }
         sample.Children.Add(strip);
         var previewFrame = Ui.Group(sample, new Thickness(0)); preview.Children.Add(previewFrame); var guidance = Ui.Text("System follows your Windows app theme.", 14, true); guidance.Margin = new Thickness(18, 18, 0, 0); Grid.SetColumn(guidance, 1); preview.Children.Add(guidance); group.Children.Add(preview);
         preview.SizeChanged += (_, _) => { var narrow = preview.ActualWidth < 400 * Ui.TextScale; guidance.Visibility = narrow ? Visibility.Collapsed : Visibility.Visible; };

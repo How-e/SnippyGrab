@@ -34,6 +34,9 @@ internal sealed class AppController : IDisposable
     private readonly Forms.NotifyIcon tray;
     private readonly DispatcherTimer cleanup = new();
     private readonly DispatcherTimer expiry = new() { Interval = TimeSpan.FromMinutes(1) };
+    private readonly DispatcherTimer updateTimer = new() { Interval = TimeSpan.FromHours(6) };
+    private readonly UpdateService updates = new();
+    private UpdatesWindow? updatesWindow;
     private readonly Dictionary<Guid, EditorWindow> editors = [];
     private readonly Dictionary<Guid, PinWindow> pins = [];
     private SettingsWindow? settingsWindow;
@@ -88,6 +91,11 @@ internal sealed class AppController : IDisposable
         Hotkeys.TaskbarRestored += () => lifecycle.Post(() => { if (!diagnostic) { tray.Visible = false; tray.Visible = true; } });
         Hotkeys.Capture += mode => Run(() => Capture(mode));
         ConfigureHotkeys(false); BuildTray();
+        if (!diagnostic)
+        {
+            updateTimer.Tick += (_, _) => _ = updates.CheckAsync(); updateTimer.Start();
+            Application.Current.Dispatcher.BeginInvoke(new Action(() => _ = updates.CheckAsync()));
+        }
         cleanup.Tick += (_, _) => Try(() => { Repository.Cleanup(DateTimeOffset.UtcNow, Settings.RetentionHours); Dock.Refresh(); });
         cleanup.Interval = TimeSpan.FromMinutes(Settings.CleanupMinutes); cleanup.Start();
         expiry.Tick += (_, _) => { if (Repository.Captures.Any(c => !c.Dismissed)) Dock.Refresh(); }; expiry.Start();
@@ -195,7 +203,7 @@ internal sealed class AppController : IDisposable
     public async Task<ExportOutcome> Save(CaptureRecord record, Window? owner = null)
     {
         if (exporting || exitRequested || Exiting) return new(ExportStatus.Cancelled);
-        exporting = true;
+        exporting = true; OperationWindow? progress = null;
         try
         {
             var revision = record.FileName;
@@ -206,15 +214,20 @@ internal sealed class AppController : IDisposable
             var dialog = new ExportWindow(record, directory, Repository.Root, owner);
             if (dialog.ShowDialog() != true || dialog.Request is not { } request) return new(ExportStatus.Cancelled);
             if (record.FileName != revision) throw new InvalidOperationException("Capture changed while choosing export options. Retry export.");
+            progress = new OperationWindow("Export image", owner); progress.Show();
+            progress.Report(request.Format is ExportFormat.WebpLossless or ExportFormat.WebpLossy ? "Encoding WebP… Cancel stops encoding before the file is committed." : "Exporting image… Cancel prevents the file commit after the current image operation finishes.");
+            using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(progress.Cancellation, exportLifetime.Token);
             var result = await CaptureExport.WriteAsync(Repository, record, request.Path, request.Format, request.Quality,
-                (source, quality) => ImageService.EncodeExport(source, request.Format, quality, exportLifetime.Token), exportLifetime.Token);
+                (source, quality) => ImageService.EncodeExport(source, request.Format, quality, lifetime.Token), lifetime.Token);
             var warning = result.MetadataSaved ? null : "Image exported, but capture history could not be updated. The file is safe; retry later to remember its destination.";
+            progress.Complete(warning ?? "Image exported."); progress.Close();
             if (!disposed) { Notify(warning ?? request.Format + " exported to: " + result.Path); Try(() => Dock.Refresh()); }
             return new(ExportStatus.Exported, result.Path, warning);
         }
-        catch (OperationCanceledException) { return new(ExportStatus.Cancelled); }
+        catch (OperationCanceledException) { progress?.Complete("Export cancelled before file commit."); progress?.Close(); return new(ExportStatus.Cancelled); }
         catch (Exception ex)
         {
+            progress?.Complete(OperationFailure.From(ex).Message);
             if (!disposed) Failure(ex); return new(ExportStatus.Failed, Message: OperationFailure.From(ex).Message);
         }
         finally { exporting = false; }
@@ -234,6 +247,7 @@ internal sealed class AppController : IDisposable
     {
         if (scrollWindow is not null) { scrollWindow.Activate(); return; }
         if (capture.Busy || choosingMonitor || exitRequested || Exiting) return;
+        if (!DialogWindow.Confirm("Select the page area to capture", "Open a static page or text document at its starting position. Select only the content inside that application window, leaving out browser tabs and toolbars.\n\nAfter selection, scroll down about half a screen yourself, capture the next frame, and check the join. Repeat until done, then create one screenshot. Keep the window size and display scaling unchanged.", "Select page area", null)) return;
         var first = await capture.CaptureAsync(CaptureMode.Region, false,
             () => { dockWasVisible = Dock.IsVisible; Dock.Hide(); foreach (var pin in pins.Values) pin.Hide(); },
             () => { if (dockWasVisible) Dock.Reveal(); foreach (var pin in pins.Values) pin.Show(); });
@@ -417,15 +431,35 @@ internal sealed class AppController : IDisposable
         Item("Clear temporary captures…", "trash", ClearTemporary, target: maintenance.DropDownItems);
         Item("Retry history save", "history", () => { Repository.Persist(); Notify("History saved. Cleanup can resume."); }, target: maintenance.DropDownItems);
         var help = Item("Help & about", "info", () => { });
+        var updateStatus = Item("Updates…", "info", ShowUpdates, target: help.DropDownItems);
+        help.DropDownItems.Add(new Forms.ToolStripSeparator());
+        void RefreshUpdateMenu()
+        {
+            help.Tag = updates.State;
+            help.AccessibleDescription = updates.Detail;
+            help.ToolTipText = updates.Detail;
+            updateStatus.Text = updates.State switch { UpdateState.Current => "Up to date · Updates…", UpdateState.Available => "Update available · Updates…", UpdateState.Checking => "Checking for updates…", UpdateState.Failed => "Update check failed · Retry…", _ => "Updates…" };
+            menu.Invalidate();
+        }
+        menu.Opening += (_, _) => RefreshUpdateMenu();
+        updates.Changed += RefreshUpdateMenu;
+        menu.Disposed += (_, _) => updates.Changed -= RefreshUpdateMenu;
+        RefreshUpdateMenu();
         Item("Hotkey help / conflicts", "keyboard", ShowHotkeyHelp, target: help.DropDownItems);
         Item("Last operation details", "info", () => DialogWindow.Information("Last operation", lastNotice, this), target: help.DropDownItems);
-        Item("About", "info", () => DialogWindow.Information("About SnippyGrab", "SnippyGrab " + BuildVersion.Display + " · MIT\n\nNative, local screenshot shelf.\nNo uploads, accounts, analytics or update polling.\n\nPrint Screen: region · Ctrl+Shift+S: fallback\nCtrl-click: select several · Drag: attach files\nClick: edit · Alt-drag: reorder\n\nUpdates are manual. This build is unsigned. See README for verification and limitations.", this), target: help.DropDownItems);
+        Item("About", "info", () => DialogWindow.Information("About SnippyGrab", "SnippyGrab " + BuildVersion.Display + " · MIT\n\nNative, local screenshot shelf.\nNo uploads, accounts or analytics.\nQuiet release checks contact GitHub every six hours.\n\nPrint Screen: region · Ctrl+Shift+S: fallback\nCtrl-click: select several · Drag: attach files\nClick: edit · Alt-drag: reorder\n\nHelp & about → Updates for releases and changelog. This build is unsigned. See README for verification and limitations.", this), target: help.DropDownItems);
         maintenance.DropDown.Renderer = menu.Renderer; help.DropDown.Renderer = menu.Renderer;
         menu.Items.Add(new Forms.ToolStripSeparator()); Item("Exit", "close", Exit);
         var menuFont = menu.Font; menu.Disposed += (_, _) => menuFont.Dispose();
         var old = tray.ContextMenuStrip; tray.ContextMenuStrip = menu; old?.Dispose();
     }
     private void DisplayChanged(object? sender, EventArgs e) => lifecycle.Post(() => Try(Dock.TopologyChanged));
+    private void ShowUpdates()
+    {
+        if (updatesWindow is not null) { updatesWindow.Activate(); return; }
+        updatesWindow = new(this, updates); updatesWindow.Closed += (_, _) => updatesWindow = null; updatesWindow.Show();
+        if (updates.State is UpdateState.Unknown or UpdateState.Failed) _ = updates.CheckAsync();
+    }
     private void PowerChanged(object sender, PowerModeChangedEventArgs e) { if (e.Mode == PowerModes.Resume) lifecycle.Post(() => Try(() => { ConfigureHotkeys(Hotkeys.Paused); Repository.Cleanup(DateTimeOffset.UtcNow, Settings.RetentionHours); Dock.TopologyChanged(); BuildTray(); if (Hotkeys.Warnings.Count > 0) Notify(string.Join("\n", Hotkeys.Warnings)); })); }
     private void PreferencesChanged(object sender, UserPreferenceChangedEventArgs e) => lifecycle.Post(() => { Ui.Theme(Settings.Theme); Dock.Refresh(); BuildTray(); });
     public async void Run(Func<Task> action) { try { await action(); } catch (Exception ex) { Failure(ex); } }
@@ -455,7 +489,10 @@ internal sealed class AppController : IDisposable
         Run(ExitAsync);
     }
     private async Task ExitAsync()
+        => await ExitForUpdateAsync(null);
+    internal async Task ExitForUpdateAsync(Action? launch)
     {
+        if (Exiting || exitRequested) return;
         exitRequested = true;
         var wasPaused = Hotkeys.Paused;
         ConfigureHotkeys(true);
@@ -463,8 +500,9 @@ internal sealed class AppController : IDisposable
         {
             foreach (var editor in editors.Values.ToArray())
                 if (!await editor.RequestCloseAsync()) return;
-            if (Settings.SessionOnly) { foreach (var pin in pins.Values.ToArray()) pin.Close(); Repository.CleanupSession(DateTimeOffset.UtcNow); }
+            if (Settings.SessionOnly && launch is null) { foreach (var pin in pins.Values.ToArray()) pin.Close(); Repository.CleanupSession(DateTimeOffset.UtcNow); }
             else Repository.Persist();
+            launch?.Invoke();
             Exiting = true;
             Application.Current.Shutdown();
         }
@@ -477,7 +515,7 @@ internal sealed class AppController : IDisposable
     public void Dispose()
     {
         if (disposed) return; disposed = true;
-        Exiting = true; lifecycle.Dispose(); cleanup.Stop(); expiry.Stop();
+        Exiting = true; lifecycle.Dispose(); cleanup.Stop(); expiry.Stop(); updateTimer.Stop(); updates.Dispose(); updatesWindow?.Close();
         SystemEvents.DisplaySettingsChanged -= DisplayChanged; SystemEvents.PowerModeChanged -= PowerChanged; SystemEvents.UserPreferenceChanged -= PreferencesChanged;
         scrollWindow?.CancelSession(); exportLifetime.Cancel(); Ui.FailureHandler = null; ocr.Dispose(); Clipboard.Invalidate(); Hotkeys.Dispose(); tray.Visible = false; tray.ContextMenuStrip?.Dispose(); tray.Icon?.Dispose(); tray.Dispose();
     }

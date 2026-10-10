@@ -44,14 +44,21 @@ public static class BatchExport
             try
             {
                 var bytes = await Task.Run(() => { ManagedPath.RejectRedirects(item.Source); return format == ExportFormat.Png ? File.ReadAllBytes(item.Source) : encode(item.Source, quality); }, cancellation);
-                await Task.Run(() =>
+                var written = await Task.Run(() =>
                 {
                     cancellation.ThrowIfCancellationRequested();
                     CaptureExport.ValidateDestination(repository.Root, item.Destination, format);
-                    AtomicFile.Write(item.Destination, bytes, collision == ExportCollision.Replace);
+                    if (collision == ExportCollision.Skip && (File.Exists(item.Destination) || Directory.Exists(item.Destination))) return false;
+                    try { AtomicFile.Write(item.Destination, bytes, collision == ExportCollision.Replace); }
+                    catch (IOException) when (collision == ExportCollision.Skip && (File.Exists(item.Destination) || Directory.Exists(item.Destination))) { return false; }
+                    return true;
                 }, cancellation);
-                success++;
-                if (item.Capture.FileName != item.Revision || !repository.Captures.Contains(item.Capture) || !CaptureExport.Remember(repository, item.Capture, item.Destination).MetadataSaved) warnings++;
+                if (!written) skipped++;
+                else
+                {
+                    success++;
+                    if (item.Capture.FileName != item.Revision || !repository.Captures.Contains(item.Capture) || !CaptureExport.Remember(repository, item.Capture, item.Destination).MetadataSaved) warnings++;
+                }
             }
             catch (OperationCanceledException) { break; }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or InvalidOperationException)

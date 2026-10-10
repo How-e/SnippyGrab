@@ -55,7 +55,7 @@ public sealed class Settings
     public bool LaunchOnStartup { get; set; }
     public bool StartMinimized { get; set; } = true;
     public AppTheme Theme { get; set; } = AppTheme.System;
-    // Runtime networking is deliberately absent. Updates are manual, via signed/checksummed releases.
+    // Update checks are quiet; installation requires an explicit user action.
     public void Validate()
     {
         if (SchemaVersion > 1 || SchemaVersion < 0) throw new InvalidDataException("Unsupported settings version.");

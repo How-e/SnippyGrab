@@ -43,6 +43,17 @@ public sealed class BatchExportTests : IDisposable
         Assert.Equal(1, result.Failed); Assert.Equal(new byte[] { 9 }, File.ReadAllBytes(plan[0].Destination)); Assert.False(c.Saved);
         Assert.Single(result.Errors); Assert.Contains(Path.GetFileName(plan[0].Destination), result.ToString());
     }
+    [Fact]
+    public async Task SkipPolicyCountsFilesAppearingDuringEncodingAsSkipped()
+    {
+        var repo = new CaptureRepository(Path.Combine(root, "cache")); var capture = repo.Add([1], 1, 1);
+        var plan = BatchExport.Plan(repo, [capture], root, ExportFormat.Jpeg, ExportCollision.Skip);
+        var result = await BatchExport.RunAsync(repo, plan, ExportFormat.Jpeg, 90, ExportCollision.Skip,
+            (_, _) => { File.WriteAllBytes(plan[0].Destination, [9]); return [2]; });
+        Assert.Equal(1, result.Skipped); Assert.Equal(0, result.Failed); Assert.Equal(0, result.Successful);
+        Assert.Empty(result.Errors); Assert.False(capture.Saved);
+        Assert.Equal(new byte[] { 9 }, File.ReadAllBytes(plan[0].Destination));
+    }
     public void Dispose() { if (Directory.Exists(root)) Directory.Delete(root, true); }
     [Fact]
     public async Task EditingLaterItemStillExportsItsLeasedSnapshot()

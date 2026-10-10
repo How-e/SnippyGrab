@@ -157,7 +157,7 @@ internal sealed class DockWindow : Window
         double used = 0;
         foreach (var capture in visible.Skip(index).Take(count))
         {
-            var extent = (horizontal ? controller.Settings.ThumbnailSize : Math.Clamp(controller.Settings.ThumbnailSize * (double)capture.Height / Math.Max(1, capture.Width), 72, controller.Settings.ThumbnailSize * 0.65) + 40) + 10;
+            var extent = (horizontal ? controller.Settings.ThumbnailSize : Math.Clamp(controller.Settings.ThumbnailSize * (double)capture.Height / Math.Max(1, capture.Width), 72, controller.Settings.ThumbnailSize * 0.65)) + 10;
             if (used > 0 && used + extent > budget) break;
             children.Add(Card(capture)); used += extent;
         }
@@ -179,7 +179,7 @@ internal sealed class DockWindow : Window
         var stamp = new CardStamp(capture.Id, capture.FileName, capture.Width, capture.Height, controller.Settings.ThumbnailSize, PreviewPixels(), visible.IndexOf(capture) + 1, visible.Count, capture.Pinned, capture.ExportPath, (Brush)FindResource("Surface"), (Brush)FindResource("Accent"));
         if (cards.TryGetValue(stamp, out var old) && !old.Available) cards.Remove(stamp);
         var card = cards.GetOrAdd(stamp, () => CreateCard(capture));
-        card.Frame.BorderBrush = (Brush)FindResource(selected.Contains(capture.Id) ? "Accent" : "Border");
+        card.Frame.BorderBrush = selected.Contains(capture.Id) ? Ui.Brush("Accent") : SystemParameters.HighContrast ? Ui.Brush("Border") : Brushes.Transparent;
         card.Frame.HorizontalAlignment = controller.Settings.Corner is DockCorner.Top or DockCorner.Bottom ? HorizontalAlignment.Center : DockLayout.Right(controller.Settings.Corner) ? HorizontalAlignment.Right : HorizontalAlignment.Left;
         card.Frame.VerticalAlignment = controller.Settings.Corner is DockCorner.Left or DockCorner.Right ? VerticalAlignment.Center : DockLayout.Bottom(controller.Settings.Corner) ? VerticalAlignment.Bottom : VerticalAlignment.Top;
         var focused = keyboardMode && selection.Focused == capture.Id;
@@ -187,9 +187,8 @@ internal sealed class DockWindow : Window
         card.State.Visibility = card.State.Text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
         AutomationProperties.SetName(card.Frame, $"Screenshot {stamp.Number} of {stamp.Total}, {capture.Width} by {capture.Height}{(capture.Pinned ? ", pinned" : "")}{(selected.Contains(capture.Id) ? ", selected" : "")}. Space selects, Enter edits, Delete dismisses.");
         card.Controls.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
-        // The collapsed preview fills the action-strip space. Constant card dimensions
-        // keep the hovered primary card under the pointer when the shelf expands.
-        card.ImageArea.Height = card.ImageHeight + (expanded ? 0 : 40);
+        // Actions overlay the image; hover never changes the image/card dimensions.
+        card.ImageArea.Height = card.ImageHeight;
         return card.Frame;
     }
     private int PreviewPixels() => ImageService.PreviewPixels((int)Math.Ceiling(controller.Settings.ThumbnailSize * VisualTreeHelper.GetDpi(this).DpiScaleX), controller.Settings.PreviewQuality);
@@ -198,7 +197,6 @@ internal sealed class DockWindow : Window
         CardBuildCount++;
         var size = controller.Settings.ThumbnailSize;
         var grid = new Grid { Width = size, ClipToBounds = true };
-        grid.RowDefinitions.Add(new() { Height = GridLength.Auto }); grid.RowDefinitions.Add(new() { Height = GridLength.Auto });
         var imageArea = new Grid { Height = Math.Clamp(size * (double)capture.Height / Math.Max(1, capture.Width), 72, size * 0.65), ClipToBounds = true };
         imageArea.SizeChanged += (_, _) => imageArea.Clip = new RectangleGeometry(new Rect(0, 0, size, imageArea.ActualHeight), 7, 7); grid.Children.Add(imageArea);
         var available = true;
@@ -212,14 +210,17 @@ internal sealed class DockWindow : Window
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or InvalidDataException or ArgumentException)
         { available = false; imageArea.Children.Add(Ui.Text("Image unavailable", 12)); }
-        var border = new Border { Child = grid, CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1), BorderBrush = Ui.Brush("Border"), Background = Ui.Brush("Raised"), Margin = new Thickness(3), Focusable = true, Tag = capture.Id };
+        var border = new Border { Child = grid, CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1), BorderBrush = Brushes.Transparent, Background = Brushes.Transparent, Margin = new Thickness(3), Focusable = true, Tag = capture.Id };
+        var overlayColor = ((SolidColorBrush)Ui.Brush("Surface")).Color;
+        var overlayBrush = SystemParameters.HighContrast ? Ui.Brush("Surface") : new SolidColorBrush(Color.FromArgb(205, overlayColor.R, overlayColor.G, overlayColor.B));
         AutomationProperties.SetName(border, $"Screenshot {capture.Width} by {capture.Height}{(capture.Pinned ? ", pinned" : "")}. Click to edit; drag to attach.");
         var badge = Ui.Button($"{visible.IndexOf(capture) + 1}/{visible.Count}{(capture.Pinned ? " · pin" : "")}", $"Focus screenshot {visible.IndexOf(capture) + 1} of {visible.Count} without opening the editor. Selected file transfers use ascending shelf numbers.", () => FocusCapture(capture.Id));
+        badge.Background = overlayBrush; badge.BorderThickness = new Thickness(0);
         badge.SetResourceReference(Control.FontSizeProperty, "TextSize.11"); badge.MinHeight = 24; badge.MinWidth = 0; badge.Padding = new Thickness(8, 2, 8, 2); badge.HorizontalAlignment = HorizontalAlignment.Left; badge.VerticalAlignment = VerticalAlignment.Top; badge.Opacity = 0.95; imageArea.Children.Add(badge);
         var state = Ui.Text("", 10); state.HorizontalAlignment = HorizontalAlignment.Left; state.VerticalAlignment = VerticalAlignment.Top;
-        state.Background = (Brush)FindResource("Surface"); state.IsHitTestVisible = false; state.HorizontalAlignment = HorizontalAlignment.Right; imageArea.Children.Add(state);
+        state.Background = overlayBrush; state.IsHitTestVisible = false; state.HorizontalAlignment = HorizontalAlignment.Right; imageArea.Children.Add(state);
         state.MaxWidth = size * 0.55;
-        var controls = new StackPanel { Height = 40, Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom, Background = (Brush)FindResource("Raised") };
+        var controls = new StackPanel { Height = 40, Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom, Background = Brushes.Transparent };
         var actions = new (string, string, Action)[]
         {
                 ("edit", "Edit (Enter)", () => controller.Edit(capture)),
@@ -228,11 +229,14 @@ internal sealed class DockWindow : Window
                 ("export", "Save as (Ctrl+S)", () => controller.Run(() => controller.Save(capture))),
                 ("ocr", "OCR and copy text", () => controller.Run(() => controller.Ocr(capture)))
         };
-        foreach (var (icon, hint, action) in actions.Take(size < 210 ? 2 : actions.Length))
+        var delete = ("trash", "Delete from shelf (Delete)", (Action)(() => controller.Dismiss(SelectedOr(capture))));
+        foreach (var (icon, hint, action) in actions.Take(size < 210 ? 2 : actions.Length).Append(delete))
         { var b = Ui.IconButton(icon, hint, action); b.Padding = new Thickness(3); b.MinWidth = 28; b.MinHeight = 34; b.Margin = new Thickness(1); controls.Children.Add(b); }
         var more = Ui.IconButton("more", "All screenshot actions", () => { border.ContextMenu.PlacementTarget = border; border.ContextMenu.IsOpen = true; });
         more.Padding = new Thickness(3); more.MinWidth = 28; more.Margin = new Thickness(1); controls.Children.Add(more);
-        Grid.SetRow(controls, 1); grid.Children.Add(controls);
+        var strip = new Border { Background = overlayBrush, CornerRadius = new CornerRadius(0, 0, 7, 7), VerticalAlignment = VerticalAlignment.Bottom, Height = 40, IsHitTestVisible = false };
+        strip.SetBinding(VisibilityProperty, new System.Windows.Data.Binding("Visibility") { Source = controls }); imageArea.Children.Add(strip);
+        imageArea.Children.Add(controls);
         border.ContextMenu = Menu(capture);
         border.PreviewMouseLeftButtonDown += (_, e) =>
         {
@@ -242,7 +246,7 @@ internal sealed class DockWindow : Window
             if ((Keyboard.Modifiers & ModifierKeys.Control) != 0)
             {
                 ToggleSelection(capture.Id);
-                border.BorderBrush = (Brush)FindResource(selected.Contains(capture.Id) ? "Accent" : "Border");
+                border.BorderBrush = selected.Contains(capture.Id) ? Ui.Brush("Accent") : SystemParameters.HighContrast ? Ui.Brush("Border") : Brushes.Transparent;
             }
             border.Focus(); border.CaptureMouse(); e.Handled = true;
         };
@@ -280,7 +284,7 @@ internal sealed class DockWindow : Window
         border.LostMouseCapture += (_, _) => { if (pressed == capture && !dragging) { pressed = null; collapseTimer.Start(); } };
         border.AllowDrop = true;
         border.DragOver += (_, e) => { e.Effects = e.Data.GetDataPresent("SnippyGrab.Reorder") ? DragDropEffects.Move : DragDropEffects.None; if (e.Effects == DragDropEffects.Move) { border.BorderBrush = (Brush)FindResource("Accent"); border.ToolTip = "Move screenshot to this position"; } e.Handled = true; };
-        border.DragLeave += (_, _) => { border.BorderBrush = (Brush)FindResource(selected.Contains(capture.Id) ? "Accent" : "Border"); border.ToolTip = null; };
+        border.DragLeave += (_, _) => { border.BorderBrush = selected.Contains(capture.Id) ? Ui.Brush("Accent") : SystemParameters.HighContrast ? Ui.Brush("Border") : Brushes.Transparent; border.ToolTip = null; };
         border.Drop += (_, e) =>
         {
             if (e.Data.GetData("SnippyGrab.Reorder") is string id && Guid.TryParse(id, out var guid)) controller.Reorder(guid, capture.Id);
@@ -312,7 +316,6 @@ internal sealed class DockWindow : Window
         menu.Items.Add(Ui.Menu(record.Pinned ? "Unpin" : "Pin", "pin", () => controller.Pin(record), "Ctrl+P"));
         menu.Items.Add(Ui.Menu("Detach pin", "detach", () => controller.Detach(record)));
         menu.Items.Add(new Separator());
-        menu.Items.Add(Ui.Menu("Dismiss", "trash", () => controller.Dismiss(SelectedOr(record)), "Delete"));
         menu.Items.Add(Ui.Menu("Recent captures", "history", controller.ShowHistory, "Ctrl+H"));
         menu.Items.Add(Ui.Menu("Focus this screenshot", "keyboard", () => FocusCapture(record.Id)));
         return menu;

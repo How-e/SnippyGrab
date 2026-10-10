@@ -246,7 +246,7 @@ internal static class RuntimeChecks
                         {
                             Ui.Theme(AppTheme.Dark, scale); window.UpdateLayout();
                             var content = (FrameworkElement)window.Content;
-                            Assert(content is ScrollViewer { VerticalScrollBarVisibility: ScrollBarVisibility.Auto }, "Improvement options remain scrollable at larger text scales");
+                            Assert(content is ScrollViewer { VerticalScrollBarVisibility: ScrollBarVisibility.Auto } || Descendants<ScrollViewer>(content).Any(s => s.VerticalScrollBarVisibility == ScrollBarVisibility.Auto), "Improvement options remain scrollable at larger text scales");
                             foreach (var input in Descendants<Control>(content).Where(c => c is TextBox or ComboBox or Slider))
                                 Assert(!string.IsNullOrWhiteSpace(System.Windows.Automation.AutomationProperties.GetName(input)), "Improvement input exposes accessible name");
                             Snapshot(window, destination + $".improvement-{i}-text{(int)(scale * 100)}.png");
@@ -422,14 +422,17 @@ internal static class RuntimeChecks
             dock.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = Mouse.MouseEnterEvent });
             Assert(dock.FocusedCapture == focusedBeforeHover && !dock.IsKeyboardFocusWithin, "Raised hover does not acquire keyboard focus");
             dock.CommandSinkOverride = null;
-            foreach (var thumbnailSize in new[] { 120, 180, 224 })
+            foreach (var thumbnailSize in new[] { 120, 180, 210, 224, 400 })
             {
                 controller.Settings.ThumbnailSize = thumbnailSize; dock.Refresh(); dock.SetExpanded(true); dock.UpdateLayout();
                 foreach (var card in ((StackPanel)((Border)dock.Content).Child).Children.OfType<Border>().Where(b => b.Tag is Guid))
                 {
-                    var grid = (Grid)card.Child; var toolbar = grid.Children.OfType<StackPanel>().Single();
+                    var grid = (Grid)card.Child; var toolbar = Descendants<StackPanel>(grid).Single();
                     Assert(toolbar.ActualWidth <= grid.ActualWidth, "Compact action toolbar fits screenshot width");
-                    Assert(toolbar.Children.Count == (thumbnailSize < 210 ? 3 : 6), "Compact shelf keeps edit/copy and full action menu");
+                    Assert(toolbar.TranslatePoint(new Point(0, toolbar.ActualHeight), grid).Y <= grid.ActualHeight + 1, "Actions overlay the bottom of the image without a separate footer");
+                    Assert(toolbar.Children.Count == (thumbnailSize < 210 ? 4 : 7), "Shelf keeps Delete on the main toolbar at every size");
+                    Assert(toolbar.Children.OfType<Button>().Any(b => System.Windows.Automation.AutomationProperties.GetName(b) == "Delete from shelf (Delete)"), "Delete is directly accessible");
+                    Assert(!card.ContextMenu.Items.OfType<MenuItem>().Any(m => m.InputGestureText == "Delete"), "Delete has moved out of More");
                 }
             }
             Snapshot(dock, Path.Combine(Path.GetDirectoryName(Path.GetFullPath(destination))!, "dock-layout-synthetic.png"));

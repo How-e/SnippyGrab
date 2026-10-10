@@ -1,8 +1,12 @@
 # Releasing
 
+The development version remains **0.1.0-alpha**. The latest published build is `v0.1.0-alpha.design.20261008.1`; newer source work is unreleased. Stable packaging remains blocked by the open acceptance gates. Commit/push and local packaging do not publish a release.
+
+For future alpha releases, use monotonically dated tags such as `v0.1.0-alpha.20261009.1`, incrementing the final revision for another build that day. Do not reuse a published tag. The updater compares legacy `alpha.<label>.<date>.<revision>` tags by date/revision so the old descriptive labels do not cause a downgrade. Beta, release-candidate and stable promotion require a separate readiness decision.
+
 1. Provision OCR, locked restore, Release build with warnings as errors, tests, format verification.
 2. Complete docs/ACCEPTANCE.md and update scripts/release-gates.json. Keep detailed results outside Git. Keep incomplete builds prerelease.
-3. Update CHANGELOG.md; run `pwsh ./scripts/package.ps1 -Version 0.1.0-alpha`.
+3. Move the relevant Unreleased changelog entries into the reviewed version section; run `pwsh ./scripts/package.ps1 -Version <reviewed-alpha-version>`. Keep source defaults alpha and preserve the command-line release version override.
 4. Run the bundle executable with `--self-test` on an interactive desktop; test install/removal in a disposable user profile.
 5. For the configured How-e/SnippyGrab remote, push an authorized reviewed version tag. The tag workflow builds/tests and publishes ZIP/setup + SHA-256 using the ephemeral GitHub token. Ordinary PR builds need no signing credentials or application secrets. The corrected upload was verified for the acceptance prerelease; independently download and verify every new release before announcing it.
 
@@ -16,6 +20,8 @@ Release metadata derives from assembly informational version, including commit i
 
 
 Installation/upgrade stages and verifies the entire bundle before switching directories. An older application directory is moved to a SnippyGrab-backup-<id> sibling, keeping obsolete sidecars out of the active installation and preserving unknown files for rollback. Failed registration restores the previous files/shortcut/registry values. User captures/settings remain in their separate data directory. Successful upgrade backups are retained for deliberate review/removal. The isolated file lab covers fresh install, obsolete sidecars, rollback, checksum failure and user-data preservation; it does not prove Windows 10/11 clean-profile/login or Apps uninstall acceptance.
+
+Packaged builds include `update-helper.ps1` and `install-files.ps1`. The in-app updater verifies the repository ZIP digest before extraction, then copies the installed helper and validator into its staging directory. The helper uses that validator before invoking a downloaded installer. Run `scripts/test-update-helper.ps1` alongside installer fixtures; source builds cannot update in place. Successful updates retain sibling backups and downloads; failed updates retain a local error report. Review these temporary folders deliberately rather than deleting unknown user files.
 
 
 Packaging retains the latest three registered build groups. Cleanup checks direct-child paths, rejects redirects, compares full file inventories/hashes and skips running or modified outputs. Run pwsh scripts/artifact-retention.ps1 to review a plan; -Apply executes it. Older unregistered bundles and failed staging directories are left for explicit review. The isolated fixture verifies dry-run behavior, three-build retention, modified/unowned preservation and path rejection. Cleanup never targets application cache/settings or installed backups.

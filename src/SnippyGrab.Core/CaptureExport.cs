@@ -36,7 +36,12 @@ public static class CaptureExport
         }, cancellation);
         // A write is durable even when metadata is stale or persistence fails.
         if (!repository.Captures.Contains(capture) || capture.FileName != revision) return new(path, false);
-        return Remember(repository, capture, path);
+        return await RememberAsync(repository, capture, path, revision);
+    }
+    internal static async Task<CaptureExportResult> RememberAsync(CaptureRepository repository, CaptureRecord capture, string path, string? revision = null)
+    {
+        try { await repository.RememberExportAsync(capture, path, revision); return new(path, true); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or InvalidOperationException) { return new(path, false); }
     }
     private static void EnsureCurrent(CaptureRepository repository, CaptureRecord capture, string revision)
     {

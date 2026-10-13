@@ -2,38 +2,58 @@ using System.Runtime.InteropServices;
 
 namespace SnippyGrab.App.Services;
 
-internal sealed class ClipboardService(Action<DataObject>? write = null, Func<int, Task>? delay = null)
+internal sealed class ClipboardService(Action<DataObject>? write = null, Func<int, Task>? delay = null,
+    Func<string, bool, CancellationToken, (BitmapSource Image, byte[]? Png)>? prepareStored = null)
 {
     private readonly ClipboardWriter writer = new();
-    public void Invalidate() => writer.Invalidate();
+    private readonly LatestOperation preparation = new();
+    private readonly SemaphoreSlim serial = new(1);
+    public void Invalidate() { preparation.Cancel(); writer.Invalidate(); }
     public async Task<bool> ImageAsync(BitmapSource image, bool png, byte[]? encoded = null, CancellationToken cancellation = default)
     {
         var operation = writer.BeginOperation();
+        var token = preparation.Begin(cancellation);
         try
         {
-            if (png && encoded is null)
+            if (!image.IsFrozen) { image = image.CloneCurrentValue(); image.Freeze(); }
+            await serial.WaitAsync(token);
+            try
             {
-                if (!image.IsFrozen) { image = image.CloneCurrentValue(); image.Freeze(); }
-                encoded = await Task.Run(() => ImageService.Png(image), cancellation);
+                if (png && encoded is null)
+                {
+                    encoded = await ImageWorker.RunAsync(() => ImageService.Png(image), token);
+                }
+                token.ThrowIfCancellationRequested();
+                if (png && encoded is not null) ImageLimits.ValidateEncoded(encoded.Length);
+                return await PublishImageAsync(image, png ? encoded : null, token, operation);
             }
-            return await PublishImageAsync(image, png ? encoded : null, cancellation, operation);
+            finally { serial.Release(); }
         }
-        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { return false; }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { return false; }
     }
     internal async Task<bool> StoredImageAsync(string path, bool png, CancellationToken cancellation = default)
     {
         // Reserve before yielding: a slower decode must never overwrite a newer copy/OCR action.
         var operation = writer.BeginOperation();
+        var token = preparation.Begin(cancellation);
         try
         {
-            var prepared = await Task.Run(() =>
+            await serial.WaitAsync(token);
+            try
             {
-                cancellation.ThrowIfCancellationRequested(); ManagedPath.RejectRedirects(path);
-                return (Image: ImageService.Load(path), Png: png ? ImageService.ReadEncoded(path) : null);
-            }, cancellation);
-            return await PublishImageAsync(prepared.Image, prepared.Png, cancellation, operation);
+                var prepared = await ImageWorker.RunAsync(() =>
+                {
+                    token.ThrowIfCancellationRequested();
+                    if (prepareStored is not null) return prepareStored(path, png, token);
+                    ManagedPath.RejectRedirects(path);
+                    return (Image: ImageService.Load(path), Png: png ? ImageService.ReadEncoded(path) : null);
+                }, token);
+                token.ThrowIfCancellationRequested();
+                return await PublishImageAsync(prepared.Image, prepared.Png, token, operation);
+            }
+            finally { serial.Release(); }
         }
-        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { return false; }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { return false; }
     }
     private Task<bool> PublishImageAsync(BitmapSource image, byte[]? png, CancellationToken cancellation, int operation)
     {
@@ -41,8 +61,8 @@ internal sealed class ClipboardService(Action<DataObject>? write = null, Func<in
         if (png is not null) data.SetData("PNG", new MemoryStream(png, writable: false));
         return SetAsync(data, cancellation, operation);
     }
-    public Task<bool> TextAsync(string text, CancellationToken cancellation = default) => SetAsync(new DataObject(DataFormats.UnicodeText, text), cancellation);
-    public Task<bool> FilesAsync(string[] paths) => SetAsync(new DataObject(DataFormats.FileDrop, paths));
+    public Task<bool> TextAsync(string text, CancellationToken cancellation = default) { preparation.Cancel(); return SetAsync(new DataObject(DataFormats.UnicodeText, text), cancellation); }
+    public Task<bool> FilesAsync(string[] paths) { preparation.Cancel(); return SetAsync(new DataObject(DataFormats.FileDrop, paths)); }
     private Task<bool> SetAsync(DataObject data, CancellationToken cancellation = default, int? operation = null) =>
         writer.WriteAsync(() => { if (write is null) Clipboard.SetDataObject(data, true); else write(data); }, delay, cancellation, operation);
 
@@ -50,6 +70,26 @@ internal sealed class ClipboardService(Action<DataObject>? write = null, Func<in
 
 internal sealed class DragDropService(CaptureRepository repository)
 {
+    private bool preparing;
+    internal async Task DragAsync(DependencyObject source, IReadOnlyList<CaptureRecord> records)
+    {
+        if (preparing) return; preparing = true;
+        try
+        {
+            var ordered = TransferPayload.Ordered(repository, records);
+            using var pending = repository.Lease(ordered);
+            var revisions = ordered.Select(c => c.FileName).ToArray();
+            await using var lease = await repository.TransferLeaseAsync(ordered);
+            if (!ordered.Select(c => c.FileName).SequenceEqual(revisions)) throw new InvalidOperationException("Capture changed while preparing the drag. Retry dragging.");
+            var paths = TransferPayload.Files(repository, ordered);
+            (BitmapSource Image, byte[] Png)? prepared = ordered.Count == 1 ? await ImageWorker.RunAsync(() => (ImageService.Load(paths[0]), ImageService.ReadEncoded(paths[0]))) : null;
+            if (source is FrameworkElement { IsLoaded: false }) return;
+            var data = new DataObject(); data.SetData(DataFormats.FileDrop, paths);
+            if (prepared is { } image) { data.SetImage(image.Image); data.SetData("PNG", new MemoryStream(image.Png, writable: false)); }
+            DragDrop.DoDragDrop(source, data, DragDropEffects.Copy);
+        }
+        finally { preparing = false; }
+    }
     public void Drag(DependencyObject source, IReadOnlyList<CaptureRecord> records)
     {
         var ordered = TransferPayload.Ordered(repository, records);

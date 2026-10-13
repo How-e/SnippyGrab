@@ -14,7 +14,7 @@ internal sealed class PreviewLoader(Func<string, int, int, BitmapSource>? decode
         await serial.WaitAsync(token);
         try
         {
-            var image = await Task.Run(() => (decode ?? ImageService.LoadPreview)(path, width, height), token);
+            var image = await ImageWorker.RunAsync(() => (decode ?? ImageService.LoadPreview)(path, width, height), token);
             token.ThrowIfCancellationRequested(); return image;
         }
         finally { serial.Release(); }

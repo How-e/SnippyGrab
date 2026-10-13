@@ -178,9 +178,10 @@ public sealed class UiRedesignTests
                 VerifyIconTextAlignment();
                 var png = ImageService.Png(EditorDocumentTests.Fixture());
                 for (var index = 0; index < 70; index++) controller.Repository.Add(png, 160, 100);
+                RunUiTask(async () => { await VerifyStorageAndHistoryCollection(controller, root); return true; });
                 var previousSessionOnly = controller.Settings.SessionOnly;
                 controller.Settings.SessionOnly = true;
-                Assert.Throws<IOException>(() => controller.ExitForUpdateAsync(() => throw new IOException("Update launcher fixture failure")).GetAwaiter().GetResult());
+                Assert.Throws<IOException>(() => RunUiTask(async () => { await controller.ExitForUpdateAsync(() => throw new IOException("Update launcher fixture failure")); return true; }));
                 Assert.False(controller.Exiting);
                 Assert.Equal(70, controller.Repository.Captures.Count);
                 Assert.All(controller.Repository.Captures, record => Assert.True(File.Exists(controller.Repository.PathFor(record))));
@@ -244,6 +245,7 @@ public sealed class UiRedesignTests
                         Assert.False(buttons["Capture next frame"].IsEnabled); Assert.False(buttons["Create screenshot"].IsEnabled);
                         Assert.True(buttons["Keep this frame"].IsEnabled); Assert.True(buttons["Discard this frame"].IsEnabled);
                         buttons["Discard this frame"].RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                        RunUiTask(async () => { await scroll.PendingWork(); return true; });
                         Assert.Null(session.Pending); Assert.Single(session.Frames);
                         Assert.True(buttons["Capture next frame"].IsEnabled); Assert.True(buttons["Create screenshot"].IsEnabled);
                     }
@@ -253,6 +255,7 @@ public sealed class UiRedesignTests
                 try
                 {
                     var view = (FrameworkElement)history.Content; view.Measure(new Size(1080, 720)); view.Arrange(new Rect(0, 0, 1080, 720)); view.UpdateLayout();
+                    RunUiTask(async () => { await history.DrainPreviewAsync(); return true; });
                     Assert.True(VirtualizingPanel.GetIsVirtualizing(history.CaptureList)); Assert.InRange(history.CachedThumbnailCount, 1, 24);
                     history.CaptureList.SelectedIndex = 0; var id = controller.Repository.Captures[0].Id;
                     controller.Repository.Replace(controller.Repository.Captures[0], png, 160, 100);
@@ -351,5 +354,43 @@ public sealed class UiRedesignTests
         _ = task.ContinueWith(_ => dispatcher.BeginInvoke(new Action(() => frame.Continue = false)));
         System.Windows.Threading.Dispatcher.PushFrame(frame); timeout.Stop();
         Assert.True(task.IsCompleted, "UI operation did not complete within 15 seconds."); return task.GetAwaiter().GetResult();
+    }
+    private static async Task VerifyStorageAndHistoryCollection(AppController controller, string root)
+    {
+        var owner = Environment.CurrentManagedThreadId;
+        using var entered = new ManualResetEventSlim(); using var release = new ManualResetEventSlim();
+        var writerThreads = new List<int>(); var changedThread = 0;
+        var repository = new CaptureRepository(Path.Combine(root, "async-storage"), (path, bytes) =>
+        {
+            writerThreads.Add(Environment.CurrentManagedThreadId);
+            entered.Set(); if (!release.Wait(TimeSpan.FromSeconds(10))) throw new TimeoutException(); AtomicFile.Write(path, bytes);
+        });
+        repository.Changed += () => changedThread = Environment.CurrentManagedThreadId;
+        var capture = repository.AddAsync([1], 1, 1);
+        try
+        {
+            var heartbeat = new TaskCompletionSource();
+            _ = Application.Current.Dispatcher.BeginInvoke(new Action(() => heartbeat.SetResult()));
+            await heartbeat.Task; Assert.False(capture.IsCompleted);
+        }
+        finally { release.Set(); }
+        await capture; Assert.NotEmpty(writerThreads); Assert.All(writerThreads, thread => Assert.NotEqual(owner, thread)); Assert.Equal(owner, changedThread);
+        var references = new List<WeakReference>();
+        for (var i = 0; i < 12; i++) await CloseHistory(controller, references);
+        await Task.Delay(200);
+        GC.Collect(); GC.WaitForPendingFinalizers(); GC.Collect();
+        await System.Windows.Threading.Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+        GC.Collect();
+        Assert.All(references, reference => Assert.False(reference.IsAlive, "Closed History window is still rooted."));
+    }
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static async Task CloseHistory(AppController controller, List<WeakReference> references)
+    {
+        var history = new HistoryWindow(controller) { Left = -30000, Top = -30000, ShowActivated = false, WindowStartupLocation = WindowStartupLocation.Manual };
+        history.Show(); history.CaptureList.SelectedIndex = 0; await history.PreviewWork;
+        references.Add(new WeakReference(history)); history.Close(); await history.DrainPreviewAsync();
+        // Release the async helper's own local before forcing GC in its caller.
+        history = null!;
+        await System.Windows.Threading.Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.ApplicationIdle);
     }
 }

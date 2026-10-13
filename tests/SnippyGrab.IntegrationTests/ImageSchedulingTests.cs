@@ -1,0 +1,54 @@
+using System.Buffers.Binary;
+using System.IO;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using SnippyGrab.App.Services;
+using SnippyGrab.Core;
+
+namespace SnippyGrab.IntegrationTests;
+
+public sealed class ImageSchedulingTests
+{
+    [Fact]
+    public async Task CopyBurstRunsOnlyFirstAndLatestPreparationAndTextCancelsQueuedCopies()
+    {
+        var image = ImageIntegrationTests.Sta(() => { var bitmap = BitmapSource.Create(2, 2, 96, 96, PixelFormats.Bgra32, null, new byte[16], 8); bitmap.Freeze(); return bitmap; });
+        using var entered = new ManualResetEventSlim(); using var release = new ManualResetEventSlim(); var calls = new List<string>(); var writes = 0;
+        var service = new ClipboardService(_ => writes++, prepareStored: (path, _, _) =>
+        {
+            lock (calls) calls.Add(path);
+            if (path == "first") { entered.Set(); if (!release.Wait(TimeSpan.FromSeconds(10))) throw new TimeoutException(); }
+            return (image, null);
+        });
+        var first = service.StoredImageAsync("first", false); Assert.True(entered.Wait(TimeSpan.FromSeconds(10)));
+        var queued = Enumerable.Range(0, 25).Select(i => service.StoredImageAsync("queued-" + i, false)).ToArray();
+        release.Set(); Assert.False(await first); var results = await Task.WhenAll(queued);
+        Assert.Equal(1, results.Count(result => result)); Assert.Equal(1, writes); Assert.Equal(new[] { "first", "queued-24" }, calls);
+        entered.Reset(); release.Reset(); calls.Clear(); writes = 0;
+        first = service.StoredImageAsync("first", false); Assert.True(entered.Wait(TimeSpan.FromSeconds(10)));
+        var old = service.StoredImageAsync("obsolete", false); Assert.True(await service.TextAsync("new text")); release.Set();
+        Assert.False(await first); Assert.False(await old); Assert.Equal(new[] { "first" }, calls); Assert.Equal(1, writes);
+    }
+    [Fact]
+    public async Task ImagingReusesOneStaThreadAndReturnsFrozenCrossThreadResults()
+    {
+        var threads = new HashSet<int>();
+        for (var i = 0; i < 50; i++)
+        {
+            var result = await ImageWorker.RunAsync(() =>
+            {
+                Assert.Equal(ApartmentState.STA, Thread.CurrentThread.GetApartmentState());
+                var bitmap = BitmapSource.Create(2, 2, 96, 96, PixelFormats.Bgra32, null, new byte[16], 8); bitmap.Freeze(); return (Thread.CurrentThread.ManagedThreadId, bitmap);
+            });
+            threads.Add(result.ManagedThreadId); Assert.True(result.bitmap.IsFrozen);
+        }
+        Assert.Single(threads);
+    }
+    [Fact]
+    public void OcrRejectsOversizedPngHeaderBeforeDecodingOrNativeAllocation()
+    {
+        var bytes = ImageIntegrationTests.Sta(() => ImageService.Png(BitmapSource.Create(2, 2, 96, 96, PixelFormats.Bgra32, null, new byte[16], 8)));
+        BinaryPrimitives.WriteUInt32BigEndian(bytes.AsSpan(16), 16_000_001); BinaryPrimitives.WriteUInt32BigEndian(bytes.AsSpan(20), 1);
+        Assert.Contains("16 megapixels", Assert.Throws<InvalidDataException>(() => OcrService.DecodePixels(bytes)).Message);
+    }
+}

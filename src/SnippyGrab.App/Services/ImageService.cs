@@ -7,8 +7,10 @@ namespace SnippyGrab.App.Services;
 
 internal static class ImageService
 {
-    public const long MaxPixels = 80_000_000;
+    public const long MaxPixels = ImageLimits.MaxPixels;
     internal static byte[] EncodeExport(string path, ExportFormat format, int quality, CancellationToken cancellation)
+        => ImageWorker.Run(() => EncodeExportCore(path, format, quality, cancellation), cancellation);
+    private static byte[] EncodeExportCore(string path, ExportFormat format, int quality, CancellationToken cancellation)
     {
         if (format is ExportFormat.WebpLossless or ExportFormat.WebpLossy)
         {
@@ -26,6 +28,7 @@ internal static class ImageService
     internal static byte[] Jpeg(BitmapSource image, int quality, CancellationToken cancellation = default)
     {
         if (quality is < 1 or > 100 || (long)image.PixelWidth * image.PixelHeight > MaxPixels) throw new InvalidDataException("Invalid JPEG quality or dimensions.");
+        ImageLimits.Validate((long)image.PixelWidth * image.PixelHeight, 8, "JPEG export");
         cancellation.ThrowIfCancellationRequested();
         // Flatten one scanline at a time into a single opaque native buffer. A full
         // WPF render plus format conversion retained several copies of large images.
@@ -53,8 +56,9 @@ internal static class ImageService
         cancellation.ThrowIfCancellationRequested();
         using var options = new EncoderParameters(1);
         options.Param[0] = new EncoderParameter(System.Drawing.Imaging.Encoder.Quality, (long)quality);
-        using var stream = new MemoryStream();
-        opaque.Save(stream, ImageCodecInfo.GetImageEncoders().Single(codec => codec.FormatID == ImageFormat.Jpeg.Guid), options);
+        using var stream = new BoundedImageStream();
+        try { opaque.Save(stream, ImageCodecInfo.GetImageEncoders().Single(codec => codec.FormatID == ImageFormat.Jpeg.Guid), options); }
+        catch (Exception ex) when (stream.LimitExceeded) { throw new InvalidDataException("Encoded image exceeds 100 MiB. Choose a smaller area.", ex); }
         cancellation.ThrowIfCancellationRequested(); return stream.ToArray();
     }
     internal static int PreviewPixels(int pixels, PreviewQuality quality) => quality switch
@@ -120,7 +124,7 @@ internal static class ImageService
     }
     internal static void ValidateEncoded(Stream stream)
     {
-        if (stream.Length > 100 * 1024 * 1024) throw new InvalidDataException("Image file exceeds 100 MB.");
+        if (stream.Length > ImageLimits.MaxEncodedBytes) throw new InvalidDataException("Image file exceeds 100 MiB. Select a smaller image.");
         Span<byte> header = stackalloc byte[24];
         if (stream.Length < 24) throw new InvalidDataException("Image is truncated.");
         stream.ReadExactly(header);
@@ -150,8 +154,12 @@ internal static class ImageService
     }
     public static byte[] Png(BitmapSource image)
     {
+        ImageLimits.Validate((long)image.PixelWidth * image.PixelHeight);
         var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(image));
-        using var stream = new MemoryStream(); encoder.Save(stream); return stream.ToArray();
+        using var stream = new BoundedImageStream();
+        try { encoder.Save(stream); }
+        catch (Exception ex) when (stream.LimitExceeded) { throw new InvalidDataException("PNG exceeds 100 MiB. Select a smaller capture area or reduce the image before importing or applying edits.", ex); }
+        return stream.ToArray();
     }
     public static BitmapSource Crop(BitmapSource image, PixelRect rect)
     {

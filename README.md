@@ -45,6 +45,7 @@ Initial builds are unsigned; Windows or browsers may warn. Compare `Get-FileHash
 The app lives in the tray. Closing a window keeps it running; **Exit** stops it. Double-click the tray icon to capture. First run explains the Windows Print Screen prerequisite, opens Keyboard settings on request, and lets you choose a Pictures / PNG export folder and optional login startup. The export folder defaults to your Windows Pictures folder; Browse chooses another location. Captures remain in the temporary cache until explicitly exported.
 
 - Capture and immediately **Ctrl+V** into an application accepting clipboard images.
+- OCR reads up to **16 MP per operation**. Use **OCR selected area** or crop larger captures; text is not silently downscaled. Generated PNGs stop at 100 MiB before storage. See [processing and resource boundaries](docs/PERFORMANCE-BOUNDARIES.md).
 - Tray → **Capture monitor…** captures an explicitly chosen display's complete physical bounds, including its taskbar. Choose display opens a keyboard-accessible picker. The optional Monitor picker shortcut is disabled by default. A disconnected target cancels; shelf placement stays independent. Entire desktop still captures the virtual desktop.
 - Drag a thumbnail to attach its temporary PNG file.
 - **Export selected…** on the shelf menu or in Recent captures saves up to 200 selected captures in shelf order. Choose format, folder and keep-both/skip/replace policy once. Progress can be cancelled; completed files stay in place and the result reports failures and history warnings.

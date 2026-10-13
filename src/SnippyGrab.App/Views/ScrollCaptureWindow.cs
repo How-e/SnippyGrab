@@ -9,7 +9,13 @@ internal sealed class ScrollCaptureWindow : Window
     private readonly CancellationTokenSource cancellation = new();
     private bool busy, finished;
     private readonly List<Button> commands = [];
+    private readonly LatestOperation previewLatest = new();
+    private Task previewWork = Task.CompletedTask;
+    private Task commandWork = Task.CompletedTask;
+    internal async Task PendingWork() { await previewWork; await commandWork; }
     internal ScrollCaptureWindow(ScrollSession prepared, BitmapSource first, Func<Task<BitmapSource>> captureNext, Action<BitmapSource, byte[]> commit)
+        : this(prepared, first, captureNext, (image, png) => { commit(image, png); return Task.CompletedTask; }) { }
+    internal ScrollCaptureWindow(ScrollSession prepared, BitmapSource first, Func<Task<BitmapSource>> captureNext, Func<BitmapSource, byte[], Task> commit)
     {
         session = prepared;
         int frameWidth = first.PixelWidth, frameHeight = first.PixelHeight;
@@ -47,25 +53,38 @@ internal sealed class ScrollCaptureWindow : Window
         }
         void Preview()
         {
-            var previous = ImageService.Load(session.Frames[^1], 600, 240);
-            var scale = previous.PixelHeight / (double)frameHeight;
-            var start = Math.Min(previous.PixelHeight - 1, (int)Math.Round(trimTop * scale));
-            var end = Math.Min(previous.PixelHeight, Math.Max(start + 1, previous.PixelHeight - (int)Math.Round(trimBottom * scale)));
-            if (session.Pending is null)
+            var token = previewLatest.Begin(cancellation.Token);
+            var previousPath = session.Frames[^1]; var nextPath = session.Pending; var chosenOverlap = overlap.Value; var currentTop = trimTop; var currentBottom = trimBottom;
+            previewWork = PreviewAsync();
+            async Task PreviewAsync()
             {
-                preview.Source = ImageService.Crop(previous, new(0, start, previous.PixelWidth, end - start)); return;
+                try
+                {
+                    var previous = await ImageWorker.RunAsync(() => ImageService.LoadPreview(previousPath, 600, 240), token);
+                    token.ThrowIfCancellationRequested();
+                    var scale = previous.PixelHeight / (double)frameHeight;
+                    var start = Math.Min(previous.PixelHeight - 1, (int)Math.Round(currentTop * scale));
+                    var end = Math.Min(previous.PixelHeight, Math.Max(start + 1, previous.PixelHeight - (int)Math.Round(currentBottom * scale)));
+                    if (nextPath is null)
+                    {
+                        preview.Source = ImageService.Crop(previous, new(0, start, previous.PixelWidth, end - start)); return;
+                    }
+                    var next = await ImageWorker.RunAsync(() => ImageService.LoadPreview(nextPath, 600, 240), token);
+                    token.ThrowIfCancellationRequested();
+                    var skip = Math.Min(next.PixelHeight - 1, (int)Math.Round((currentTop + chosenOverlap) * scale));
+                    var tail = Math.Min(120, end - start);
+                    var head = Math.Min(120, Math.Max(1, next.PixelHeight - skip - (int)Math.Round(currentBottom * scale)));
+                    var visual = new DrawingVisual();
+                    using (var drawing = visual.RenderOpen())
+                    {
+                        drawing.DrawImage(ImageService.Crop(previous, new(0, end - tail, previous.PixelWidth, tail)), new Rect(0, 0, previous.PixelWidth, tail));
+                        drawing.DrawImage(ImageService.Crop(next, new(0, skip, next.PixelWidth, head)), new Rect(0, tail, next.PixelWidth, head));
+                    }
+                    var bitmap = new RenderTargetBitmap(previous.PixelWidth, tail + head, 96, 96, PixelFormats.Pbgra32); bitmap.Render(visual); bitmap.Freeze(); preview.Source = bitmap;
+                }
+                catch (OperationCanceledException) { }
+                catch (Exception ex) when (ex is IOException or InvalidDataException or NotSupportedException or UnauthorizedAccessException) { status.Text = OperationFailure.From(ex).Message; }
             }
-            var next = ImageService.Load(session.Pending, 600, 240);
-            var skip = Math.Min(next.PixelHeight - 1, (int)Math.Round((trimTop + overlap.Value) * scale));
-            var tail = Math.Min(120, end - start);
-            var head = Math.Min(120, Math.Max(1, next.PixelHeight - skip - (int)Math.Round(trimBottom * scale)));
-            var visual = new DrawingVisual();
-            using (var drawing = visual.RenderOpen())
-            {
-                drawing.DrawImage(ImageService.Crop(previous, new(0, end - tail, previous.PixelWidth, tail)), new Rect(0, 0, previous.PixelWidth, tail));
-                drawing.DrawImage(ImageService.Crop(next, new(0, skip, next.PixelWidth, head)), new Rect(0, tail, next.PixelWidth, head));
-            }
-            var bitmap = new RenderTargetBitmap(previous.PixelWidth, tail + head, 96, 96, PixelFormats.Pbgra32); bitmap.Render(visual); bitmap.Freeze(); preview.Source = bitmap;
         }
         top.TextChanged += (_, _) => { if (!top.IsEnabled) return; try { ReadTrim(); Preview(); status.Text = "Exclusions previewed. Scroll down, leaving some repeated content visible."; } catch (Exception ex) when (ex is FormatException or OverflowException or InvalidDataException) { status.Text = ex.Message; } };
         bottom.TextChanged += (_, _) => { if (!bottom.IsEnabled) return; try { ReadTrim(); Preview(); status.Text = "Exclusions previewed. Scroll down, leaving some repeated content visible."; } catch (Exception ex) when (ex is FormatException or OverflowException or InvalidDataException) { status.Text = ex.Message; } };
@@ -96,13 +115,13 @@ internal sealed class ScrollCaptureWindow : Window
         }
         void Command(string label, Func<Task> action, bool primary = false)
         {
-            var button = Ui.Button(label, label, () => Run(action)); commands.Add(button); actions.Children.Add(button);
+            var button = Ui.Button(label, label, () => commandWork = RunAsync(action)); commands.Add(button); actions.Children.Add(button);
             if (primary) button.Style = (Style)FindResource("PrimaryButton");
         }
-        async void Run(Func<Task> action)
+        async Task RunAsync(Func<Task> action)
         {
             if (busy || finished) return; busy = true; foreach (var b in commands) b.IsEnabled = false;
-            try { cancellation.Token.ThrowIfCancellationRequested(); await action(); }
+            try { cancellation.Token.ThrowIfCancellationRequested(); await previewWork; await action(); }
             catch (OperationCanceledException) { finished = true; }
             catch (Exception ex) { status.Text = ex is InvalidOperationException or InvalidDataException ? ex.Message : OperationFailure.From(ex).Message; }
             finally
@@ -121,8 +140,8 @@ internal sealed class ScrollCaptureWindow : Window
             catch { cancellation.Cancel(); throw; }
             finally { if (!cancellation.IsCancellationRequested) Show(); }
             cancellation.Token.ThrowIfCancellationRequested();
-            await Task.Run(() => session.Stage(image), cancellation.Token);
-            match = await Task.Run(() =>
+            await ImageWorker.RunAsync(() => { session.Stage(image); return true; }, cancellation.Token);
+            match = await ImageWorker.RunAsync(() =>
             {
                 byte[] Pixels(string path)
                 {
@@ -148,13 +167,13 @@ internal sealed class ScrollCaptureWindow : Window
         Command("Create screenshot", async () =>
         {
             ReadTrim(); if (!DialogWindow.Confirm("Create scrolling screenshot?", "Your saved frames will become one new image and open in the editor. Your existing screenshots and clipboard stay unchanged.", "Create screenshot", this)) return;
-            var image = await Task.Run(() => session.Build(trimTop, trimBottom, cancellation.Token), cancellation.Token);
-            var png = await Task.Run(() => ImageService.Png(image), cancellation.Token); cancellation.Token.ThrowIfCancellationRequested(); commit(image, png); finished = true;
+            var image = await ImageWorker.RunAsync(() => session.Build(trimTop, trimBottom, cancellation.Token), cancellation.Token);
+            var png = await ImageWorker.RunAsync(() => ImageService.Png(image), cancellation.Token); cancellation.Token.ThrowIfCancellationRequested(); await commit(image, png); finished = true;
         });
         var cancel = Ui.Button("Cancel session", "Discard all staged frames", () => { cancellation.Cancel(); if (!busy) { finished = true; Close(); } }); actions.Children.Add(cancel);
         PreviewKeyDown += (_, e) => { if (e.Key == Key.Escape) { cancellation.Cancel(); if (!busy) { finished = true; Close(); } e.Handled = true; } };
         Closing += (_, e) => { cancellation.Cancel(); if (busy) e.Cancel = true; };
-        Closed += (_, _) => session.Dispose(); Preview(); RefreshCommands();
+        Closed += async (_, _) => { previewLatest.Dispose(); await previewWork; try { await ImageWorker.RunAsync(() => { session.Dispose(); return true; }); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException) { } cancellation.Dispose(); }; Preview(); RefreshCommands();
     }
     internal void CancelSession() { cancellation.Cancel(); if (!busy) Close(); }
 }

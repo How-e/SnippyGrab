@@ -109,7 +109,7 @@ public sealed class ImageIntegrationTests
         {
             File.WriteAllBytes(path, png); Assert.Equal(png, ImageService.ReadEncoded(path));
             using (var oversized = new FileStream(path, FileMode.Open, FileAccess.Write)) oversized.SetLength(100 * 1024 * 1024 + 1);
-            var error = Assert.Throws<InvalidDataException>(() => ImageService.ReadEncoded(path)); Assert.Contains("100 MB", error.Message);
+            var error = Assert.Throws<InvalidDataException>(() => ImageService.ReadEncoded(path)); Assert.Contains("100 MiB", error.Message);
         }
         finally { File.Delete(path); }
     }

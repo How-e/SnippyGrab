@@ -21,13 +21,13 @@ internal static class ResourceStressChecks
             var png = ImageService.Png(image); var process = Process.GetCurrentProcess();
             object Sample()
             {
-                process.Refresh(); return new { Seconds = clock.Elapsed.TotalSeconds, Captures = controller.Repository.Captures.Count, WorkingBytes = process.WorkingSet64, PrivateBytes = process.PrivateMemorySize64, CpuMs = process.TotalProcessorTime.TotalMilliseconds, Handles = process.HandleCount, GdiHandles = GetGuiResources(process.Handle, 0), UserHandles = GetGuiResources(process.Handle, 1), ManagedBytes = GC.GetTotalMemory(false) };
+                process.Refresh(); return new { Seconds = clock.Elapsed.TotalSeconds, Captures = controller.Repository.Captures.Count, WorkingBytes = process.WorkingSet64, PrivateBytes = process.PrivateMemorySize64, CpuMs = process.TotalProcessorTime.TotalMilliseconds, Handles = process.HandleCount, Threads = process.Threads.Count, GdiHandles = GetGuiResources(process.Handle, 0), UserHandles = GetGuiResources(process.Handle, 1), ManagedBytes = GC.GetTotalMemory(false) };
             }
-            void Report(string result) => AtomicFile.Write(destination, JsonSerializer.SerializeToUtf8Bytes(new { Result = result, RequestedSeconds = seconds, ElapsedSeconds = clock.Elapsed.TotalSeconds, Cycles = cycles, OcrRuns = ocrRuns, Samples = samples, Scope = "Synthetic 640x360 storage/history=never, hidden dock rebuild, worker effects, three offscreen pin windows per 25 cycles and real local OCR. No input, desktop capture or OS clipboard writes. A short run is not hours-long acceptance." }, new JsonSerializerOptions { WriteIndented = true }));
+            void Report(string result) => AtomicFile.Write(destination, JsonSerializer.SerializeToUtf8Bytes(new { Result = result, RequestedSeconds = seconds, ElapsedSeconds = clock.Elapsed.TotalSeconds, Cycles = cycles, OcrRuns = ocrRuns, Samples = samples, Scope = "Synthetic 640x360 asynchronous storage/history=never, hidden dock rebuild, worker effects, three offscreen pins per 25 cycles, History open/close per 100 cycles and real local OCR. Delayed post-disposal recovery and thread counters included. No input, desktop capture or OS clipboard writes. A short run is not hours-long acceptance." }, new JsonSerializerOptions { WriteIndented = true }));
             samples.Add(Sample()); Report("RUNNING");
             do
             {
-                var record = controller.Repository.Add(png, 640, 360); controller.Dock.Refresh(); cycles++;
+                var record = await controller.Repository.AddAsync(png, 640, 360); controller.Dock.Refresh(); cycles++;
                 if (cycles % 25 == 0)
                 {
                     var pins = controller.Repository.Captures.Take(3).Select(c => new PinWindow(controller, c) { Left = -30000, Top = -30000, Topmost = false }).ToArray();
@@ -38,16 +38,24 @@ internal static class ResourceStressChecks
                         var effect = new Annotation(EditTool.Blur, new Point(10, 10), new Point(110, 90), Colors.Black, 3, 24, "", []);
                         var edited = await EditorWindow.BuildStateAsync(state, effect);
                         var rendered = await EditorWindow.RenderAsync(edited);
-                        controller.Repository.Replace(record, await Task.Run(() => ImageService.Png(rendered)), 640, 360, record.FileName);
+                        await controller.Repository.ReplaceAsync(record, await ImageWorker.RunAsync(() => ImageService.Png(rendered)), 640, 360, record.FileName);
                     }
                     finally { foreach (var pin in pins) pin.Close(); }
-                    if (cycles % 100 == 0) { await controller.OcrService.ReadAsync(png); ocrRuns++; }
+                    if (cycles % 100 == 0)
+                    {
+                        var history = new HistoryWindow(controller) { Left = -30000, Top = -30000, ShowActivated = false, WindowStartupLocation = WindowStartupLocation.Manual };
+                        history.Show(); history.CaptureList.SelectedIndex = 0; await history.PreviewWork;
+                        history.Close(); await history.DrainPreviewAsync();
+                        await controller.OcrService.ReadAsync(png); ocrRuns++;
+                    }
                     samples.Add(Sample()); Report("RUNNING");
                 }
                 await Task.Delay(cycles < 300 ? 1 : 1000);
             } while (cycles < 300 || clock.Elapsed.TotalSeconds < seconds);
-            GC.Collect(); GC.WaitForPendingFinalizers(); await Task.Delay(100); samples.Add(Sample());
-            controller.Dispose(); controller.Dock.Close(); samples.Add(Sample()); Report("PASS");
+            await controller.Repository.DrainAsync(); GC.Collect(); GC.WaitForPendingFinalizers(); await Task.Delay(100); samples.Add(Sample());
+            controller.Dispose(); controller.Dock.Close(); await controller.Dock.DrainThumbnailsAsync();
+            await Task.Delay(1000); GC.Collect(); GC.WaitForPendingFinalizers(); await Task.Delay(100);
+            samples.Add(Sample()); Report("PASS"); process.Dispose();
         }
         finally { Directory.Delete(root, true); }
     }

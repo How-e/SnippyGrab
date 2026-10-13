@@ -192,7 +192,7 @@ internal sealed class EditorWindow : Window
     {
         var state = journal.Current;
         var area = new PixelRect(Math.Clamp((int)point.X, 0, state.Base.PixelWidth - 1), Math.Clamp((int)point.Y, 0, state.Base.PixelHeight - 1), 1, 1);
-        var image = await Task.Run(() => RenderRegion(state, area));
+        var image = await ImageWorker.RunAsync(() => RenderRegion(state, area));
         var picked = SampleColor(image, new(0, 0));
         color.Text = $"#{picked.R:X2}{picked.G:X2}{picked.B:X2}";
         status.Text = "Annotation color: " + color.Text + ". Sampled from the edited image; select a drawing tool to use it.";
@@ -246,7 +246,8 @@ internal sealed class EditorWindow : Window
         if (mark.Tool is not (EditTool.Crop or EditTool.Blur or EditTool.Pixelate)) return Task.FromResult(state with { Marks = [.. state.Marks, mark] });
         var area = PixelRect.Between((int)mark.Start.X, (int)mark.Start.Y, (int)mark.End.X, (int)mark.End.Y).Intersect(new(0, 0, state.Base.PixelWidth, state.Base.PixelHeight));
         if (area.Width < 2 || area.Height < 2) return Task.FromResult(state);
-        return Task.Run(() =>
+        ImageLimits.Validate((long)area.Width * area.Height, mark.Tool == EditTool.Crop ? state.Marks.Length == 0 ? 0 : 12 : 24, "Editor operation");
+        return ImageWorker.RunAsync(() =>
         {
             // Create the drawing on this worker; all input bitmaps are frozen and cross-thread safe.
             var crop = RenderRegion(state, area);
@@ -263,8 +264,8 @@ internal sealed class EditorWindow : Window
     private async Task<BitmapSource> ApplyAsync()
     {
         var image = await RenderAsync(journal.Current);
-        var png = await Task.Run(() => ImageService.Png(image));
-        controller.Repository.Replace(record, png, image.PixelWidth, image.PixelHeight, expectedRevision);
+        var png = await ImageWorker.RunAsync(() => ImageService.Png(image));
+        await controller.Repository.ReplaceAsync(record, png, image.PixelWidth, image.PixelHeight, expectedRevision);
         expectedRevision = record.FileName;
         dirty = false; controller.Dock.Refresh(); return image;
     }
@@ -335,7 +336,9 @@ internal sealed class EditorWindow : Window
     private async Task CopyDocumentOcr(PixelRect? area = null)
     {
         var token = ocrLifetime.Token; var state = journal.Current;
-        var image = await Task.Run(() => area is { } crop ? RenderRegion(state, crop) : Render(state));
+        var bounds = area?.Intersect(new(0, 0, state.Base.PixelWidth, state.Base.PixelHeight)) ?? new PixelRect(0, 0, state.Base.PixelWidth, state.Base.PixelHeight);
+        if ((long)bounds.Width * bounds.Height > ImageLimits.MaxOcrPixels) { status.Text = "OCR supports up to 16 megapixels. Use OCR selected area or crop the image first."; return; }
+        var image = await ImageWorker.RunAsync(() => area is { } crop ? RenderRegion(state, crop) : Render(state));
         if (!token.IsCancellationRequested) await CopyOcr(image);
     }
     private async Task CopyOcr(BitmapSource image)
@@ -379,7 +382,7 @@ internal sealed class EditorWindow : Window
         }
         var bitmap = new RenderTargetBitmap(area.Width, area.Height, 96, 96, PixelFormats.Pbgra32); bitmap.Render(drawing); bitmap.Freeze(); return bitmap;
     }
-    internal static Task<BitmapSource> RenderAsync(EditorState state) => Task.Run(() => Render(state));
+    internal static Task<BitmapSource> RenderAsync(EditorState state) => ImageWorker.RunAsync(() => Render(state));
     internal static void Draw(DrawingContext dc, Annotation m, int width, int height)
     {
         var brush = new SolidColorBrush(m.Color); var pen = new Pen(brush, m.Stroke) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round, LineJoin = PenLineJoin.Round };

@@ -55,6 +55,7 @@ internal sealed class AppController : IDisposable
     private readonly LatestOperation ocr = new();
     private bool exitRequested;
     private bool choosingMonitor;
+    private bool deliveringCapture;
     private bool exporting;
     private readonly CancellationTokenSource exportLifetime = new();
     private Task<int>? cleanupWork;
@@ -114,6 +115,13 @@ internal sealed class AppController : IDisposable
     }
     public async Task Capture(CaptureMode mode, CaptureTarget? target = null)
     {
+        if (deliveringCapture) return;
+        deliveringCapture = true;
+        try { await CaptureCore(mode, target); }
+        finally { deliveringCapture = false; }
+    }
+    private async Task CaptureCore(CaptureMode mode, CaptureTarget? target)
+    {
         if (capture.Busy || choosingMonitor || exitRequested || Exiting) return;
         if (mode == CaptureMode.Monitor && target is null)
         {
@@ -134,13 +142,14 @@ internal sealed class AppController : IDisposable
         { Notify("Monitor capture cancelled. The selected display is unavailable or ambiguous; choose a display again."); return; }
         if (result is null || exitRequested || Exiting) return;
         var ready = Stopwatch.StartNew();
-        var png = await Task.Run(() => ImageService.Png(result.Image));
+        var png = await ImageWorker.RunAsync(() => ImageService.Png(result.Image));
         await PreserveCaptureAsync(result.Image, png, string.Join(",", Forms.Screen.AllScreens.Where(screen => !result.Bounds.Intersect(new PixelRect(screen.Bounds.X, screen.Bounds.Y, screen.Bounds.Width, screen.Bounds.Height)).IsEmpty).Select(screen => screen.DeviceName)), () => Dock.Refresh(newCapture: true));
         Log($"capture_ready_ms={ready.ElapsedMilliseconds}; capture_total_ms={result.ElapsedMilliseconds + ready.ElapsedMilliseconds}");
     }
     internal async Task PreserveCaptureAsync(BitmapSource image, byte[] png, string monitor, Action refreshDock)
     {
-        try { Repository.Add(png, image.PixelWidth, image.PixelHeight, monitor); refreshDock(); }
+        ImageLimits.ValidateEncoded(png.Length);
+        try { await Repository.AddAsync(png, image.PixelWidth, image.PixelHeight, monitor); if (!disposed) refreshDock(); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
         {
             if (Settings.AutoCopy && await Clipboard.ImageAsync(image, Settings.ClipboardPng, png)) Notify("Capture copied, but cache storage failed. Paste it now; check cache permissions/free space before retrying capture.");
@@ -170,12 +179,12 @@ internal sealed class AppController : IDisposable
     {
         ocr.Cancel();
         var ordered = TransferPayload.Ordered(Repository, records);
-        using var lease = Repository.Lease(ordered, transfer: true);
+        await using var lease = await Repository.TransferLeaseAsync(ordered);
         if (!await Clipboard.FilesAsync(TransferPayload.Files(Repository, ordered))) Notify("Clipboard is busy. Try Copy again.");
     }
     public async Task CopyPath(CaptureRecord record, bool filename = false)
     {
-        using var lease = Repository.Lease([record], transfer: true);
+        await using var lease = await Repository.TransferLeaseAsync([record]);
         await CopyText(filename ? record.FileName : Repository.PathFor(record));
     }
     public async Task<bool> CopyText(string text, CancellationToken cancellation = default)
@@ -188,7 +197,7 @@ internal sealed class AppController : IDisposable
     public Task<string> OcrText(BitmapSource image, CancellationToken lifetime = default)
     {
         if (!image.IsFrozen) { image = image.CloneCurrentValue(); image.Freeze(); }
-        return OcrPng(token => Task.Run(() => ImageService.Png(image), token), lifetime);
+        return OcrPng(token => ImageWorker.RunAsync(() => ImageService.Png(image), token), lifetime);
     }
     private async Task<string> OcrPng(Func<CancellationToken, Task<byte[]>> prepare, CancellationToken lifetime = default)
     {
@@ -202,7 +211,7 @@ internal sealed class AppController : IDisposable
             return await CopyText(text, token) ? "OCR text copied." : "OCR text was not copied. Retry OCR when the clipboard is available.";
         }
         catch (OperationCanceledException) { return "OCR cancelled."; }
-        catch (Exception ex) { Log("failure_category=Ocr; exception_type=" + ex.GetType().Name); return ex is InvalidDataException ? "OCR input is invalid or too large. Use a smaller valid image; capture remains available." : (ex is OcrUnavailableException unavailable ? unavailable.Readiness.Message : OcrReadiness.From(ex).Message) + " Capture remains available. Settings → Editor & OCR → Check OCR readiness provides guidance."; }
+        catch (Exception ex) { Log("failure_category=Ocr; exception_type=" + ex.GetType().Name); return ex is InvalidDataException ? ex.Message + " Capture remains available." : (ex is OcrUnavailableException unavailable ? unavailable.Readiness.Message : OcrReadiness.From(ex).Message) + " Capture remains available. Settings → Editor & OCR → Check OCR readiness provides guidance."; }
     }
     public async Task Ocr(CaptureRecord record)
     {
@@ -224,7 +233,7 @@ internal sealed class AppController : IDisposable
                 var revision = record.FileName; var path = Repository.PathFor(record);
                 BitmapSource image;
                 await editorLoads.WaitAsync(exportLifetime.Token);
-                try { image = await Task.Run(() => ImageService.Load(path), exportLifetime.Token); }
+                try { image = await ImageWorker.RunAsync(() => ImageService.Load(path), exportLifetime.Token); }
                 finally { editorLoads.Release(); }
                 if (exitRequested || Exiting || !Repository.Captures.Contains(record)) return null;
                 if (revision != record.FileName) continue;
@@ -297,7 +306,7 @@ internal sealed class AppController : IDisposable
         var session = new ScrollSession(Path.Combine(dataDirectory, "scroll-sessions"));
         try
         {
-            await Task.Run(() => session.Stage(first.Image), exportLifetime.Token); exportLifetime.Token.ThrowIfCancellationRequested();
+            await ImageWorker.RunAsync(() => { session.Stage(first.Image); return true; }, exportLifetime.Token); exportLifetime.Token.ThrowIfCancellationRequested();
             scrollWindow = new ScrollCaptureWindow(session, first.Image, async () =>
             {
                 try
@@ -312,15 +321,15 @@ internal sealed class AppController : IDisposable
                         if (Exiting || exitRequested || exportLifetime.IsCancellationRequested) throw new OperationCanceledException();
                         if (!Native.GetWindowRect(target, out current) || current.Pixels != windowBounds.Pixels || Native.GetDpiForWindow(target) != dpi || Topology() != topology || Native.GetAncestor(Native.GetForegroundWindow(), 2) != target)
                             throw new InvalidOperationException("Scrolling cancelled: target changed before capture.");
-                        return ImageService.Capture(viewport, false);
+                        return await ImageWorker.RunAsync(() => ImageService.Capture(viewport, false), exportLifetime.Token);
                     }
                     finally { if (visible && !disposed) Dock.Reveal(); foreach (var pin in pins.Values) pin.Show(); }
                 }
                 catch (Exception ex) { if (!disposed) Notify(ex is InvalidOperationException ? ex.Message : "Scrolling capture failed. Start a new session."); throw; }
-            }, (image, png) =>
+            }, async (image, png) =>
             {
                 if (exitRequested || Exiting) throw new OperationCanceledException();
-                var record = Repository.Add(png, image.PixelWidth, image.PixelHeight); Dock.Refresh(newCapture: true); Edit(record);
+                var record = await Repository.AddAsync(png, image.PixelWidth, image.PixelHeight); if (!disposed) { Dock.Refresh(newCapture: true); Edit(record); }
             });
             scrollWindow.Closed += (_, _) => scrollWindow = null; scrollWindow.Show();
         }
@@ -354,34 +363,34 @@ internal sealed class AppController : IDisposable
         {
             var ordered = TransferPayload.Ordered(Repository, selected);
             using var leases = Repository.Lease(ordered);
-            var dialog = new CompositionWindow(ordered.Select(c => new CompositionInput(Repository.PathFor(c), c.Width, c.Height)).ToArray(), owner);
+            var previewPaths = ordered.Select(Repository.PathFor).ToArray();
+            var thumbs = await ImageWorker.RunAsync(() => previewPaths.ToDictionary(path => path, path => ImageService.LoadPreview(path, 160, 160)), exportLifetime.Token);
+            if (disposed) return;
+            var dialog = new CompositionWindow(ordered.Select(c => new CompositionInput(Repository.PathFor(c), c.Width, c.Height)).ToArray(), owner, thumbs);
             if (dialog.ShowDialog() != true || dialog.Layout is not { } layout) return;
             progress = new OperationWindow("Combining captures", owner); progress.Show();
             using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(progress.Cancellation, exportLifetime.Token);
             var paths = dialog.Inputs.Select(i => i.Path).ToArray(); var background = dialog.BackgroundColor;
-            var image = await Task.Run(() => CompositionService.Render(paths, layout, background, lifetime.Token), lifetime.Token);
-            var png = await Task.Run(() => ImageService.Png(image), lifetime.Token); lifetime.Token.ThrowIfCancellationRequested();
-            var combined = Repository.Add(png, image.PixelWidth, image.PixelHeight); Dock.Refresh(newCapture: true);
+            var image = await ImageWorker.RunAsync(() => CompositionService.Render(paths, layout, background, lifetime.Token), lifetime.Token);
+            var png = await ImageWorker.RunAsync(() => ImageService.Png(image), lifetime.Token); lifetime.Token.ThrowIfCancellationRequested();
+            var combined = await Repository.AddAsync(png, image.PixelWidth, image.PixelHeight); if (!disposed) Dock.Refresh(newCapture: true);
             progress.Complete("Created a new managed PNG. Original captures are unchanged."); Edit(combined);
         }
         catch (OperationCanceledException) { progress?.Complete("Combination cancelled. Original captures are unchanged."); }
         catch (Exception ex) { progress?.Complete(OperationFailure.From(ex).Message); if (!disposed) Failure(ex); }
         finally { exporting = false; }
     }
-    public void Pin(CaptureRecord record) => Try(() => { Repository.SetPinned(record, !record.Pinned); Dock.Refresh(); });
-    public void Detach(CaptureRecord record) => Try(() =>
+    public void Pin(CaptureRecord record) => Run(async () => { await Repository.SetPinnedAsync(record, !record.Pinned); if (!disposed) Dock.Refresh(); });
+    public void Detach(CaptureRecord record) => Run(async () =>
     {
-        Repository.SetPinned(record, true);
+        await Repository.SetPinnedAsync(record, true); if (disposed) return;
         if (pins.TryGetValue(record.Id, out var existing)) { existing.RestoreInteraction(); return; }
         var pin = new PinWindow(this, record); pins[record.Id] = pin; pin.Closed += (_, _) => pins.Remove(record.Id); pin.Show();
     });
-    public void Dismiss(IEnumerable<CaptureRecord> records) => Try(() => { Repository.Dismiss(records); Dock.Refresh(); });
-    public void Reorder(Guid from, Guid target) => Try(() =>
+    public void Dismiss(IEnumerable<CaptureRecord> records) => Run(async () => { await Repository.DismissAsync(records); if (!disposed) Dock.Refresh(); });
+    public void Reorder(Guid from, Guid target) => Run(async () =>
     {
-        // Shelf order is persisted directly in the repository list; history sorts by timestamp independently.
-        var items = (List<CaptureRecord>)Repository.Captures;
-        if (!ShelfOrder.Move(items, from, target)) return;
-        Repository.Persist(); Dock.Refresh();
+        await Repository.ReorderAsync(from, target); if (!disposed) Dock.Refresh();
     });
     public void Import(string path) => Run(() => ImportAsync(path));
     internal async Task ImportAsync(string path)
@@ -394,9 +403,9 @@ internal sealed class AppController : IDisposable
             await imports.WaitAsync(exportLifetime.Token);
             try
             {
-                var prepared = await Task.Run(() => { var image = ImageService.Load(path); return (Png: ImageService.Png(image), Width: image.PixelWidth, Height: image.PixelHeight); }, exportLifetime.Token);
+                var prepared = await ImageWorker.RunAsync(() => { var image = ImageService.Load(path); return (Png: ImageService.Png(image), Width: image.PixelWidth, Height: image.PixelHeight); }, exportLifetime.Token);
                 if (exitRequested || Exiting) return;
-                Repository.Add(prepared.Png, prepared.Width, prepared.Height); Dock.Refresh(true);
+                await Repository.AddAsync(prepared.Png, prepared.Width, prepared.Height); if (!disposed) Dock.Refresh(true);
             }
             finally { imports.Release(); }
         }
@@ -450,7 +459,7 @@ internal sealed class AppController : IDisposable
         if (Diagnostic) { settings.LaunchOnStartup = false; settingsService.Save(settings); }
         else StartupService.Apply(settings, settingsService.Save);
         Settings = settings;
-        Repository.HistoryEnabled = settings.HistoryEnabled; Try(Repository.Persist);
+        Repository.HistoryEnabled = settings.HistoryEnabled; Run(Repository.PersistAsync);
         Ui.Theme(settings.Theme); ConfigureHotkeys(Hotkeys.Paused); cleanup.Interval = TimeSpan.FromMinutes(settings.CleanupMinutes); Dock.Refresh(); BuildTray();
         SettingsChanged?.Invoke();
         if (Hotkeys.Warnings.Count > 0) Notify(string.Join("\n", Hotkeys.Warnings));
@@ -493,7 +502,7 @@ internal sealed class AppController : IDisposable
         menu.Items.Add(new Forms.ToolStripSeparator());
         var maintenance = Item("Maintenance", "settings", () => { });
         Item("Clear temporary captures…", "trash", ClearTemporary, target: maintenance.DropDownItems);
-        Item("Retry history save", "history", () => { Repository.Persist(); Notify("History saved. Cleanup can resume."); }, target: maintenance.DropDownItems);
+        Item("Retry history save", "history", () => Run(async () => { await Repository.PersistAsync(); if (!disposed) Notify("History saved. Cleanup can resume."); }), target: maintenance.DropDownItems);
         var help = Item("Help & about", "info", () => { });
         var updateStatus = Item("Updates…", "info", ShowUpdates, target: help.DropDownItems);
         help.DropDownItems.Add(new Forms.ToolStripSeparator());
@@ -524,7 +533,7 @@ internal sealed class AppController : IDisposable
         updatesWindow = new(this, updates); updatesWindow.Closed += (_, _) => updatesWindow = null; updatesWindow.Show();
         if (updates.State is UpdateState.Unknown or UpdateState.Failed) _ = updates.CheckAsync();
     }
-    private void PowerChanged(object sender, PowerModeChangedEventArgs e) { if (e.Mode == PowerModes.Resume) lifecycle.Post(() => Try(() => { ConfigureHotkeys(Hotkeys.Paused); Repository.Cleanup(DateTimeOffset.UtcNow, Settings.RetentionHours); Dock.TopologyChanged(); BuildTray(); if (Hotkeys.Warnings.Count > 0) Notify(string.Join("\n", Hotkeys.Warnings)); })); }
+    private void PowerChanged(object sender, PowerModeChangedEventArgs e) { if (e.Mode == PowerModes.Resume) lifecycle.Post(() => Run(async () => { ConfigureHotkeys(Hotkeys.Paused); await CleanupRepositoryAsync(); if (disposed) return; Dock.TopologyChanged(); BuildTray(); if (Hotkeys.Warnings.Count > 0) Notify(string.Join("\n", Hotkeys.Warnings)); })); }
     private void PreferencesChanged(object sender, UserPreferenceChangedEventArgs e) => lifecycle.Post(() => { Ui.Theme(Settings.Theme); Dock.Refresh(); BuildTray(); });
     public async void Run(Func<Task> action) { try { await action(); } catch (Exception ex) { Failure(ex); } }
     public void Try(Action action) { try { action(); } catch (Exception ex) { Failure(ex); } }
@@ -564,8 +573,10 @@ internal sealed class AppController : IDisposable
         {
             foreach (var editor in editors.Values.ToArray())
                 if (!await editor.RequestCloseAsync()) return;
-            if (Settings.SessionOnly && launch is null) { foreach (var pin in pins.Values.ToArray()) pin.Close(); await CleanupRepositoryAsync(clear: true, sessionOnly: true); }
-            else Repository.Persist();
+            foreach (var pin in pins.Values.ToArray()) pin.Close();
+            await Repository.DrainAsync();
+            if (Settings.SessionOnly && launch is null) { await CleanupRepositoryAsync(clear: true, sessionOnly: true); }
+            else await Repository.PersistAsync();
             launch?.Invoke();
             Exiting = true;
             Application.Current.Shutdown();

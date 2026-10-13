@@ -57,7 +57,7 @@ public static class BatchExport
                 else
                 {
                     success++;
-                    if (item.Capture.FileName != item.Revision || !repository.Captures.Contains(item.Capture) || !CaptureExport.Remember(repository, item.Capture, item.Destination).MetadataSaved) warnings++;
+                    if (item.Capture.FileName != item.Revision || !repository.Captures.Contains(item.Capture) || !(await CaptureExport.RememberAsync(repository, item.Capture, item.Destination, item.Revision)).MetadataSaved) warnings++;
                 }
             }
             catch (OperationCanceledException) { break; }

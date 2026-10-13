@@ -377,6 +377,7 @@ internal static class RuntimeChecks
                             Assert(dock.InputHitTest(local) is not null, "Card is reachable through the hover surface");
                         }
                         var rebuilds = dock.RebuildCount;
+                        await dock.DrainThumbnailsAsync();
                         var warmBuilds = dock.CardBuildCount; var warmDecodes = dock.ThumbnailDecodeCount;
                         for (var i = 0; i < 5; i++) dock.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = Mouse.MouseEnterEvent });
                         Assert(dock.RebuildCount == rebuilds, "Repeated enter does not rebuild expanded cards");
@@ -399,8 +400,10 @@ internal static class RuntimeChecks
                 Assert(dock.CachedCardCount <= 5 && dock.CachedThumbnailCount <= 12, "Scrolling keeps caches bounded");
             }
             dock.Scroll(-20);
+            await dock.DrainThumbnailsAsync();
             var beforeEditDecode = dock.ThumbnailDecodeCount;
             controller.Repository.Replace(controller.Repository.Captures[0], png, 720, 360); dock.Refresh();
+            await dock.DrainThumbnailsAsync();
             Assert(dock.ThumbnailDecodeCount == beforeEditDecode + 1, "New revision invalidates the cached image");
             var actions = new List<(ShelfAction Action, Guid[] Ids)>();
             dock.CommandSinkOverride = (action, captures) => actions.Add((action, captures.Select(c => c.Id).ToArray()));

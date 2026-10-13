@@ -12,7 +12,7 @@ internal sealed class DockWindow : Window
     private readonly StackPanel shelf = new() { Background = Brushes.Transparent };
     private readonly ShelfSelection selection = new();
     private HashSet<Guid> selected => selection.Selected;
-    private readonly BoundedCache<(string File, int Pixels), BitmapSource> thumbnails = new(12);
+    private readonly ThumbnailLoader thumbnails;
     private readonly BoundedCache<CardStamp, CardVisual> cards = new(5);
     private sealed record CardStamp(Guid Id, string File, int Width, int Height, int Size, int PreviewPixels, int Number, int Total, bool Pinned, string ExportPath, Brush Surface, Brush Accent);
     private sealed record CardVisual(Border Frame, Grid ImageArea, double ImageHeight, StackPanel Controls, TextBlock State, bool Available);
@@ -32,10 +32,11 @@ internal sealed class DockWindow : Window
     private List<CaptureRecord> visible = [];
     internal int RebuildCount { get; private set; }
     internal int CardBuildCount { get; private set; }
-    internal int ThumbnailDecodeCount { get; private set; }
+    internal int ThumbnailDecodeCount => thumbnails.DecodeCount;
+    internal Task DrainThumbnailsAsync() => thumbnails.DrainAsync();
     internal void ResetPreviewCachesForCheck()
     {
-        cards.RemoveWhere(_ => true); thumbnails.RemoveWhere(_ => true);
+        cards.RemoveWhere(_ => true); thumbnails.Clear();
     }
     internal bool Expanded => expanded;
     internal int SelectionCount => selected.Count;
@@ -51,6 +52,7 @@ internal sealed class DockWindow : Window
     {
         Ui.StyleWindow(this);
         this.controller = controller;
+        thumbnails = new(controller.Repository, 12);
         Title = "SnippyGrab shelf"; WindowStyle = WindowStyle.None; AllowsTransparency = true;
         Background = Brushes.Transparent; ResizeMode = ResizeMode.NoResize; ShowInTaskbar = false;
         ShowActivated = false; Focusable = true; SizeToContent = SizeToContent.WidthAndHeight;
@@ -75,7 +77,7 @@ internal sealed class DockWindow : Window
         DpiChanged += (_, e) => { if (ReferenceEquals(e.Source, this)) Dispatcher.BeginInvoke(new Action(() => { if (IsLoaded) controller.Try(() => Refresh()); })); };
         LostKeyboardFocus += (_, _) => { if (!IsKeyboardFocusWithin) { keyboardMode = false; collapseTimer.Start(); } };
         IsVisibleChanged += (_, _) => { if (!IsVisible) { hideTimer.Stop(); collapseTimer.Stop(); } };
-        Closed += (_, _) => { hideTimer.Stop(); collapseTimer.Stop(); };
+        Closed += (_, _) => { hideTimer.Stop(); collapseTimer.Stop(); thumbnails.Dispose(); cards.RemoveWhere(_ => true); shelf.Children.Clear(); };
         Closing += (_, e) => { if (!controller.Exiting) { e.Cancel = true; Hide(); } };
     }
     public void Refresh(bool newCapture = false)
@@ -86,7 +88,7 @@ internal sealed class DockWindow : Window
         visible = controller.Repository.Captures.Where(c => CaptureLifetime.Visible(c, controller.Settings.DockLifetimeMinutes, DateTimeOffset.UtcNow)).ToList();
         selection.Update(visible, visible.ElementAtOrDefault(index)?.Id);
         var files = visible.Select(c => c.FileName).ToHashSet();
-        thumbnails.RemoveWhere(k => !files.Contains(k.File));
+        thumbnails.Prune(files.Contains);
         cards.RemoveWhere(k => !files.Contains(k.File));
         index = Math.Clamp(index, 0, Math.Max(0, visible.Count - 1));
         Rebuild();
@@ -199,17 +201,11 @@ internal sealed class DockWindow : Window
         var grid = new Grid { Width = size, ClipToBounds = true };
         var imageArea = new Grid { Height = Math.Clamp(size * (double)capture.Height / Math.Max(1, capture.Width), 72, size * 0.65), ClipToBounds = true };
         imageArea.SizeChanged += (_, _) => imageArea.Clip = new RectangleGeometry(new Rect(0, 0, size, imageArea.ActualHeight), 7, 7); grid.Children.Add(imageArea);
-        var available = true;
-        try
-        {
-            var pixels = PreviewPixels();
-            var thumb = thumbnails.GetOrAdd((capture.FileName, pixels), () => { var decoded = ImageService.LoadPreview(controller.Repository.PathFor(capture), pixels, pixels); ThumbnailDecodeCount++; return decoded; });
-            var image = new Image { Source = thumb, Stretch = Stretch.Uniform };
-            RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.HighQuality);
-            imageArea.Children.Add(image);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or InvalidDataException or ArgumentException)
-        { available = false; imageArea.Children.Add(Ui.Text("Image unavailable", 12)); }
+        var pixels = PreviewPixels();
+        var image = new Image { Stretch = Stretch.Uniform };
+        RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.HighQuality); imageArea.Children.Add(image);
+        if (thumbnails.TryGet(capture.FileName, pixels, pixels, out var thumb)) image.Source = thumb;
+        else _ = FillThumbnailAsync(capture, pixels, image, imageArea);
         var border = new Border { Child = grid, CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1), BorderBrush = Brushes.Transparent, Background = Brushes.Transparent, Margin = new Thickness(3), Focusable = true, Tag = capture.Id };
         var overlayColor = ((SolidColorBrush)Ui.Brush("Surface")).Color;
         var overlayBrush = SystemParameters.HighContrast ? Ui.Brush("Surface") : new SolidColorBrush(Color.FromArgb(205, overlayColor.R, overlayColor.G, overlayColor.B));
@@ -251,7 +247,7 @@ internal sealed class DockWindow : Window
             border.Focus(); border.CaptureMouse(); e.Handled = true;
         };
         border.GotKeyboardFocus += (_, _) => { selection.Focus(capture.Id); PaintStates(); };
-        border.MouseMove += (_, e) =>
+        border.MouseMove += async (_, e) =>
         {
             if (pressed != capture || e.LeftButton != MouseButtonState.Pressed || dragging) return;
             var now = e.GetPosition(this);
@@ -267,11 +263,11 @@ internal sealed class DockWindow : Window
                 else
                 {
                     if (!selected.Contains(capture.Id)) { selected.Clear(); selected.Add(capture.Id); }
-                    controller.DragDrop.Drag(border, visible.Where(c => selected.Contains(c.Id)).ToList());
+                    await controller.DragDrop.DragAsync(border, visible.Where(c => selected.Contains(c.Id)).ToList());
                 }
             }
             catch (Exception ex) { controller.Failure(ex); }
-            finally { pressed = null; dragging = false; Rebuild(); collapseTimer.Start(); }
+            finally { pressed = null; dragging = false; if (!controller.Exiting && IsLoaded) { Rebuild(); collapseTimer.Start(); } }
         };
         border.MouseLeftButtonUp += (_, e) =>
         {
@@ -290,7 +286,13 @@ internal sealed class DockWindow : Window
             if (e.Data.GetData("SnippyGrab.Reorder") is string id && Guid.TryParse(id, out var guid)) controller.Reorder(guid, capture.Id);
             e.Handled = true;
         };
-        return new(border, imageArea, imageArea.Height, controls, state, available);
+        return new(border, imageArea, imageArea.Height, controls, state, true);
+    }
+    private async Task FillThumbnailAsync(CaptureRecord capture, int pixels, Image image, Grid imageArea)
+    {
+        try { image.Source = await thumbnails.LoadAsync(capture, pixels, pixels); }
+        catch (OperationCanceledException) { }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or InvalidDataException or ArgumentException or ObjectDisposedException) { imageArea.Children.Add(Ui.Text("Image unavailable", 12)); }
     }
     private static bool FindButton(DependencyObject? source)
     {

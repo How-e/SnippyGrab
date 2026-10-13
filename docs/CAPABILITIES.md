@@ -1,5 +1,7 @@
 # Capabilities and evidence
 
+Current source adds History-window/session-name leak fixes, bounded superseded copies, one STA image worker, asynchronous durable capture/revision commits and previews. OCR now rejects inputs above 16 MP before full decoding; generated image output is limited to 100 MiB before commit. See [processing boundaries](PERFORMANCE-BOUNDARIES.md). Earlier owner attestations below describe their stated builds; they do not establish physical acceptance or all-day behavior for these changes.
+
 Current performance release: `0.1.0-alpha.20261010.1`, reviewed 2026-10-10. The [gate manifest](../scripts/release-gates.json) has **41 closed / 10 open** gates: Q1/Q12/Q20/Q24/Q29/Q30/Q32/Q34/Q35/Q41 were reopened after substantial copy/import/editor/history/preview/export/OCR changes. Publication of this unsigned alpha was authorized separately from acceptance. See [local implementation status](IMPLEMENTATION-STATUS.md) for current automated scope and historical failed/skipped checks.
 
 The previous release `0.1.0-alpha.20261009.3` had 51 closed gates within its reviewed unsigned alpha scope. Historical owner observations in the table below target `0.1.0-alpha.acceptance.20261009.2`, source `80edee6683ef055f073be2f6dc976a15a862f04d`; they do not renew affected acceptance for the performance release.

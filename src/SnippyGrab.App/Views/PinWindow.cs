@@ -53,7 +53,7 @@ internal sealed class PinWindow : Window
         menu.Items.Add(new MenuItem { Header = opacityRow, StaysOpenOnClick = true });
         var through = Ui.Menu("Click-through", "capture", () => { SetClickThrough(!clickThrough); SaveLayout(); }); through.IsCheckable = true; through.ToolTip = "Restore interaction through tray → Restore pins."; menu.Items.Add(through);
         menu.Items.Add(new Separator());
-        menu.Items.Add(Ui.Menu("Return to shelf", "left", () => { controller.Repository.Restore([record], DateTimeOffset.UtcNow); controller.Dock.Reveal(); Close(); }));
+        menu.Items.Add(Ui.Menu("Return to shelf", "left", () => controller.Run(async () => { await controller.Repository.RestoreAsync([record], DateTimeOffset.UtcNow); if (!controller.Exiting) controller.Dock.Reveal(); if (!closed) Close(); })));
         menu.Items.Add(Ui.Menu("Close pin window", "close", Close));
         menu.Opened += (_, _) => { onTop.IsChecked = Topmost; through.IsChecked = clickThrough; opacity.Value = Opacity; opacityLabel.Text = $"Opacity {Opacity:P0}"; };
         menu.Closed += (_, _) => { if (!IsMouseOver) chrome.Visibility = Visibility.Collapsed; };
@@ -116,7 +116,7 @@ internal sealed class PinWindow : Window
             var monitor = MonitorService.All().OrderByDescending(m => m.Bounds.Intersect(rect.Pixels).Width * (long)m.Bounds.Intersect(rect.Pixels).Height).First();
             var layout = new PinLayout(monitor.Identity, DpiGeometry.ToDip(rect.Left - monitor.Work.X, monitor.Dpi), DpiGeometry.ToDip(rect.Top - monitor.Work.Y, monitor.Dpi),
                 DpiGeometry.ToDip(rect.Pixels.Width, monitor.Dpi), DpiGeometry.ToDip(rect.Pixels.Height, monitor.Dpi), Opacity, Topmost, clickThrough);
-            if (record.PinLayout != layout) controller.Repository.SetPinLayout(record, layout);
+            if (record.PinLayout != layout) controller.Run(() => controller.Repository.SetPinLayoutAsync(record, layout));
         });
     }
     private void RefreshPreview()

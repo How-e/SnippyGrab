@@ -22,8 +22,8 @@ internal static class PipelineLatencyChecks
                 var samples = new List<double>();
                 for (var i = 0; i < 10; i++)
                 {
-                    var watch = Stopwatch.StartNew(); var png = await Task.Run(() => ImageService.Png(image));
-                    controller.Repository.Add(png, width, height); controller.Dock.Refresh();
+                    var watch = Stopwatch.StartNew(); var png = await ImageWorker.RunAsync(() => ImageService.Png(image));
+                    await controller.Repository.AddAsync(png, width, height); controller.Dock.Refresh(); await controller.Dock.DrainThumbnailsAsync();
                     if (!await controller.Clipboard.ImageAsync(image, true, png)) throw new InvalidOperationException("Synthetic clipboard sink failed.");
                     samples.Add(watch.Elapsed.TotalMilliseconds);
                 }

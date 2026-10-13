@@ -68,7 +68,7 @@ public sealed partial class CaptureRepository
     public CaptureRepository(string directory, Action<string, byte[]>? writer = null, Func<DateTimeOffset>? utcNow = null)
     {
         write = writer ?? AtomicFile.Write; clock = utcNow ?? (() => DateTimeOffset.UtcNow);
-        root = Path.GetFullPath(directory);
+        root = ManagedPath.StorageRoot(directory);
         if (root.StartsWith(@"\\", StringComparison.Ordinal) || root == Path.GetPathRoot(root))
             throw new InvalidDataException("Cache must be a dedicated local directory.");
         ManagedPath.RejectRedirects(root);
@@ -393,15 +393,29 @@ public sealed partial class CaptureRepository
     }
     private IEnumerable<int> CleanupSteps(DateTimeOffset now, int retentionHours, bool clear, bool sessionOnly, bool deferPersist = false)
     {
+        using var steps = CleanupStepsCore(now, retentionHours, clear, sessionOnly, deferPersist).GetEnumerator();
+        while (true)
+        {
+            // Acquire only for a slice; never hold the mutation gate across a yield.
+            if (!mutationSerial.Wait(0)) yield break;
+            bool more; int removed;
+            try { more = steps.MoveNext(); removed = more ? steps.Current : 0; }
+            finally { mutationSerial.Release(); }
+            if (!more) yield break;
+            yield return removed;
+        }
+    }
+    private IEnumerable<int> CleanupStepsCore(DateTimeOffset now, int retentionHours, bool clear, bool sessionOnly, bool deferPersist)
+    {
         ManagedPath.RejectRedirects(root);
         // An async mutation may temporarily expose a state that still needs to
         // roll back. Never delete against an uncommitted pin/restore snapshot.
-        if (CleanupBlocked || PersistencePending || mutationSerial.CurrentCount == 0) yield break;
+        if (CleanupBlocked || PersistencePending) yield break;
         var records = state.Captures.ToDictionary(c => c.FileName);
         foreach (var path in Directory.EnumerateFiles(root, "capture-*.png"))
         {
             yield return 0;
-            if (CleanupBlocked || PersistencePending || mutationSerial.CurrentCount == 0) yield break;
+            if (CleanupBlocked || PersistencePending) yield break;
             var name = Path.GetFileName(path);
             var record = records.GetValueOrDefault(name);
             if (record?.FileName != name) record = state.Captures.FirstOrDefault(c => c.FileName == name);
@@ -420,7 +434,7 @@ public sealed partial class CaptureRepository
         foreach (var path in Directory.EnumerateFiles(root, "*.tmp"))
         {
             yield return 0;
-            if (CleanupBlocked || PersistencePending || mutationSerial.CurrentCount == 0) yield break;
+            if (CleanupBlocked || PersistencePending) yield break;
             if (SafeFile(path) && File.GetLastWriteTimeUtc(path) < now.UtcDateTime.AddDays(-1) &&
                 TemporaryPattern().IsMatch(Path.GetFileName(path)))
                 try { File.Delete(path); } catch (IOException) { } catch (UnauthorizedAccessException) { }
@@ -432,7 +446,7 @@ public sealed partial class CaptureRepository
         foreach (var path in hasArchivedHistory ? Enumerable.Empty<string>() : Directory.EnumerateFiles(root, "history-page-*.json"))
         {
             yield return 0;
-            if (CleanupBlocked || PersistencePending || mutationSerial.CurrentCount == 0) yield break;
+            if (CleanupBlocked || PersistencePending) yield break;
             if (PagePattern().IsMatch(Path.GetFileName(path)) && !committedPages.Contains(Path.GetFileName(path)) && SafeFile(path) && File.GetLastWriteTimeUtc(path) < now.UtcDateTime.AddDays(-1))
                 try { File.Delete(path); } catch (IOException) { } catch (UnauthorizedAccessException) { }
         }

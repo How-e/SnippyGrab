@@ -79,7 +79,7 @@ internal static class MonitorService
         Native.EnumDisplayMonitors(0, 0, (nint monitor, nint dc, ref Native.RECT rect, nint data) =>
         {
             var info = new Native.MONITORINFO { Size = Marshal.SizeOf<Native.MONITORINFO>() };
-            Native.GetMonitorInfo(monitor, ref info);
+            if (!Native.GetMonitorInfo(monitor, ref info) || info.Monitor.Pixels.IsEmpty) return true;
             Native.GetDpiForMonitor(monitor, 0, out var dpi, out _);
             var device = new Native.DISPLAY_DEVICE { Size = Marshal.SizeOf<Native.DISPLAY_DEVICE>() };
             var identity = Native.EnumDisplayDevices(info.Device, 0, ref device, 1) && !string.IsNullOrEmpty(device.Identity) ? device.Identity : info.Device;
@@ -91,10 +91,21 @@ internal static class MonitorService
     public static MonitorInfo ForPointer(int configured = -1, string identity = "")
     {
         var monitors = All();
+        var desktop = Native.Desktop;
+        if (desktop.IsEmpty) desktop = new(0, 0, Math.Max(1, Native.GetSystemMetrics(0)), Math.Max(1, Native.GetSystemMetrics(1)));
+        Native.GetCursorPos(out var p);
+        return Select(monitors, desktop, p, configured, identity);
+    }
+    internal static MonitorInfo Select(IReadOnlyList<MonitorInfo> monitors, PixelRect desktop, Native.POINT p, int configured = -1, string identity = "")
+    {
+        if (monitors.Count == 0)
+        {
+            var bounds = desktop.IsEmpty ? new PixelRect(0, 0, 1, 1) : desktop;
+            return new(0, bounds, bounds, 96, 0, Primary: true);
+        }
         var primary = monitors.FirstOrDefault(m => m.Primary)?.Index ?? 0;
         var index = MonitorIdentity.ConfiguredIndex(monitors.Select(m => m.Identity).ToArray(), configured, identity, primary);
-        if (index >= 0) return monitors[index];
-        Native.GetCursorPos(out var p);
+        if (index >= 0 && index < monitors.Count) return monitors[index];
         return monitors.FirstOrDefault(m => p.X >= m.Bounds.X && p.X < m.Bounds.Right && p.Y >= m.Bounds.Y && p.Y < m.Bounds.Bottom) ?? monitors[0];
     }
 }

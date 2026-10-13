@@ -219,23 +219,34 @@ internal sealed class OcrService(string? modelDirectory = null, Func<Settings>? 
     private delegate nint CreatePix(int width, int height, int depth);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate int SetSamples(nint pix, int samples);
-    private static Pix CreateRgba(int width, int height)
+    private sealed record PixCodec(nint Library, CreatePix Create, SetSamples Samples, SetSamples InputFormat);
+    private static readonly Lazy<PixCodec> NativePixels = new(() =>
     {
         var library = NativeLibrary.Load(Path.Combine(AppContext.BaseDirectory, "x64", "leptonica-1.82.0.dll"));
         try
         {
-            var handle = Marshal.GetDelegateForFunctionPointer<CreatePix>(NativeLibrary.GetExport(library, "pixCreate"))(width, height, 32);
-            var pix = Pix.Create(handle);
-            try
-            {
-                // pixCreate defaults to RGB. Preserve the PNG reader's RGBA semantics for OCR.
-                if (Marshal.GetDelegateForFunctionPointer<SetSamples>(NativeLibrary.GetExport(library, "pixSetSpp"))(handle, 4) != 0) throw new InvalidOperationException("Could not initialize OCR pixels.");
-                if (Marshal.GetDelegateForFunctionPointer<SetSamples>(NativeLibrary.GetExport(library, "pixSetInputFormat"))(handle, 3) != 0) throw new InvalidOperationException("Could not initialize OCR alpha handling."); // IFF_PNG
-                return pix;
-            }
-            catch { pix.Dispose(); throw; }
+            // Keep the module loaded for the process lifetime, including returned Pix objects.
+            return new(library,
+                Marshal.GetDelegateForFunctionPointer<CreatePix>(NativeLibrary.GetExport(library, "pixCreate")),
+                Marshal.GetDelegateForFunctionPointer<SetSamples>(NativeLibrary.GetExport(library, "pixSetSpp")),
+                Marshal.GetDelegateForFunctionPointer<SetSamples>(NativeLibrary.GetExport(library, "pixSetInputFormat")));
         }
-        finally { NativeLibrary.Free(library); }
+        catch { NativeLibrary.Free(library); throw; }
+    });
+    private static Pix CreateRgba(int width, int height)
+    {
+        var codec = NativePixels.Value;
+        var handle = codec.Create(width, height, 32);
+        if (handle == 0) throw new InvalidOperationException("Could not allocate OCR pixels.");
+        var pix = Pix.Create(handle);
+        try
+        {
+            // pixCreate defaults to RGB. Preserve the PNG reader's RGBA semantics for OCR.
+            if (codec.Samples(handle, 4) != 0) throw new InvalidOperationException("Could not initialize OCR pixels.");
+            if (codec.InputFormat(handle, 3) != 0) throw new InvalidOperationException("Could not initialize OCR alpha handling."); // IFF_PNG
+            return pix;
+        }
+        catch { pix.Dispose(); throw; }
     }
     internal static bool HasNativeLoaderFailure(Exception error) => error is DllNotFoundException or BadImageFormatException || error.InnerException is { } inner && HasNativeLoaderFailure(inner);
     internal static void ValidateModel(string path)

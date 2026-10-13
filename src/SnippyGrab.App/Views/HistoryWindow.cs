@@ -83,7 +83,7 @@ internal sealed class HistoryWindow : Window
         Button Action(string label, string icon, string hint, Action action) { var b = Ui.ActionButton(label, icon, hint, action, "QuietButton"); selectionActions.Add(b); toolbar.Children.Add(b); return b; }
         Action("To shelf", "image", "Restore selected captures to shelf", () => controller.Run(async () => { await controller.Repository.RestoreAsync(Selected(), DateTimeOffset.UtcNow); if (!controller.Exiting) controller.Dock.Reveal(); }));
         copy = Action("Copy image", "copy", "Copy image or selected PNG files", () => controller.Run(async () => { var selected = Selected(); if (selected.Count == 1) await controller.Copy(selected[0]); else if (selected.Count > 1) await controller.CopyFiles(selected); }));
-        Action("Pin", "pin", "Toggle pins on selected captures", () => { foreach (var capture in Selected()) controller.Pin(capture); Refresh(); });
+        Action("Pin", "pin", "Toggle pins on selected captures", () => controller.Pin(Selected()));
         Action("Export selected…", "export", "Export selected captures in shelf order", () => controller.Run(() => controller.ExportSelected(Selected(), this)));
         Action("Combine selected…", "image", "Combine 2–20 selected captures into a new image", () => controller.Run(() => controller.CombineSelected(Selected(), this)));
         Action("More", "more", "More selected capture actions", () =>
@@ -157,9 +157,10 @@ internal sealed class HistoryWindow : Window
         try
         {
             page = Math.Min(page, Math.Max(0, (controller.Repository.Captures.Count - 1) / HistoryPage.Size));
-            var files = HistoryPage.Read(controller.Repository.Captures, page).Select(c => c.FileName).ToHashSet(); thumbnails.Prune(files.Contains);
+            var captures = HistoryPage.Read(controller.Repository.Captures, page);
+            var files = captures.Select(c => c.FileName).ToHashSet(); thumbnails.Prune(files.Contains);
             var owner = new WeakReference<HistoryWindow>(this);
-            list.ItemsSource = HistoryPage.Read(controller.Repository.Captures, page).Select(c => new Row(c, owner)).ToArray();
+            list.ItemsSource = captures.Select(c => new Row(c, owner)).ToArray();
             pageStatus.Text = $"Page {page + 1}"; count.Text = $"{controller.Repository.Captures.Count} captures"; previous.IsEnabled = page > 0; next.IsEnabled = (page + 1) * HistoryPage.Size < controller.Repository.Captures.Count;
             foreach (var row in list.Items.Cast<Row>().Where(r => selected.Contains(r.Capture.Id))) list.SelectedItems.Add(row);
             empty.Visibility = list.Items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;

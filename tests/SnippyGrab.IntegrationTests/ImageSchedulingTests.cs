@@ -45,6 +45,27 @@ public sealed class ImageSchedulingTests
         Assert.Single(threads);
     }
     [Fact]
+    public async Task CaptureWorkCompletesWhileBackgroundImagingIsBlockedAndReusesItsSta()
+    {
+        using var entered = new ManualResetEventSlim(); using var release = new ManualResetEventSlim();
+        var background = ImageWorker.RunAsync(() => { entered.Set(); if (!release.Wait(TimeSpan.FromSeconds(10))) throw new TimeoutException(); return Thread.CurrentThread.ManagedThreadId; });
+        Assert.True(entered.Wait(TimeSpan.FromSeconds(10)));
+        int captureThread;
+        try
+        {
+            captureThread = await ImageWorker.RunCaptureAsync(() =>
+            {
+                Assert.Equal(ApartmentState.STA, Thread.CurrentThread.GetApartmentState());
+                var image = BitmapSource.Create(2, 2, 96, 96, PixelFormats.Bgra32, null, new byte[16], 8); image.Freeze();
+                return Thread.CurrentThread.ManagedThreadId;
+            }).WaitAsync(TimeSpan.FromSeconds(3));
+            Assert.False(background.IsCompleted);
+            for (var i = 0; i < 20; i++) Assert.Equal(captureThread, await ImageWorker.RunCaptureAsync(() => Thread.CurrentThread.ManagedThreadId));
+        }
+        finally { release.Set(); }
+        Assert.NotEqual(captureThread, await background);
+    }
+    [Fact]
     public void OcrRejectsOversizedPngHeaderBeforeDecodingOrNativeAllocation()
     {
         var bytes = ImageIntegrationTests.Sta(() => ImageService.Png(BitmapSource.Create(2, 2, 96, 96, PixelFormats.Bgra32, null, new byte[16], 8)));

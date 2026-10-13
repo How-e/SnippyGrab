@@ -67,7 +67,7 @@ internal sealed class AppController : IDisposable
     {
         Diagnostic = diagnostic;
         lifecycle = new(action => Application.Current.Dispatcher.BeginInvoke(action));
-        dataDirectory = isolatedDataDirectory ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SnippyGrab");
+        dataDirectory = ManagedPath.StorageRoot(isolatedDataDirectory ?? Path.Combine(ManagedPath.ResolveDirectory(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)), "SnippyGrab"));
         ManagedPath.RejectRedirects(dataDirectory);
         Directory.CreateDirectory(dataDirectory);
         settingsService = new(Path.Combine(dataDirectory, "settings.json")); Settings = settingsService.Load();
@@ -321,7 +321,7 @@ internal sealed class AppController : IDisposable
                         if (Exiting || exitRequested || exportLifetime.IsCancellationRequested) throw new OperationCanceledException();
                         if (!Native.GetWindowRect(target, out current) || current.Pixels != windowBounds.Pixels || Native.GetDpiForWindow(target) != dpi || Topology() != topology || Native.GetAncestor(Native.GetForegroundWindow(), 2) != target)
                             throw new InvalidOperationException("Scrolling cancelled: target changed before capture.");
-                        return await ImageWorker.RunAsync(() => ImageService.Capture(viewport, false), exportLifetime.Token);
+                        return await ImageWorker.RunCaptureAsync(() => ImageService.Capture(viewport, false), exportLifetime.Token);
                     }
                     finally { if (visible && !disposed) Dock.Reveal(); foreach (var pin in pins.Values) pin.Show(); }
                 }
@@ -381,6 +381,11 @@ internal sealed class AppController : IDisposable
         finally { exporting = false; }
     }
     public void Pin(CaptureRecord record) => Run(async () => { await Repository.SetPinnedAsync(record, !record.Pinned); if (!disposed) Dock.Refresh(); });
+    public void Pin(IEnumerable<CaptureRecord> records)
+    {
+        var selected = records.ToArray();
+        Run(async () => { await Repository.TogglePinnedAsync(selected); if (!disposed) Dock.Refresh(); });
+    }
     public void Detach(CaptureRecord record) => Run(async () =>
     {
         await Repository.SetPinnedAsync(record, true); if (disposed) return;

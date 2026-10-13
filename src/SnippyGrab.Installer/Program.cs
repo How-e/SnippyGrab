@@ -169,7 +169,7 @@ internal static class Program
             using var process = Process.Start(info) ?? throw new InvalidOperationException("Installer process unavailable.");
             var output = process.StandardOutput.ReadToEndAsync(); var error = process.StandardError.ReadToEndAsync(); process.WaitForExit();
             Task.WaitAll(output, error);
-            if (process.ExitCode != 0) throw new InvalidOperationException("Installation failed: " + error.Result);
+            if (process.ExitCode != 0) throw new InvalidOperationException("Installation failed: " + (string.IsNullOrWhiteSpace(error.Result) ? string.IsNullOrWhiteSpace(output.Result) ? $"Installer exited with code {process.ExitCode}." : output.Result : error.Result));
         }
         finally { Directory.Delete(root, true); }
     }

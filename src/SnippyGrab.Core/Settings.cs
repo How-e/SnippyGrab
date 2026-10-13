@@ -116,15 +116,17 @@ public static class AtomicFile
 {
     public static void Write(string path, byte[] data) => Write(path, data, true);
     public static void Write(string path, byte[] data, bool overwrite)
+        => WriteChecked(path, data, overwrite, () => ManagedPath.RejectRedirects(path));
+    internal static void WriteChecked(string path, byte[] data, bool overwrite, Action validate)
     {
-        ManagedPath.RejectRedirects(path);
+        validate();
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
         var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {
             using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
             { stream.Write(data); stream.Flush(true); }
-            ManagedPath.RejectRedirects(path);
+            validate();
             File.Move(temporary, path, overwrite);
         }
         finally { if (File.Exists(temporary)) File.Delete(temporary); }

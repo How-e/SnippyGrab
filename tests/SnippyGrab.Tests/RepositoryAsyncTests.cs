@@ -111,5 +111,33 @@ public sealed class RepositoryAsyncTests : IDisposable
         Assert.Throws<InvalidDataException>(() => repo.Add(new byte[ImageLimits.MaxEncodedBytes + 1], 1, 1)); Assert.Equal(0, writes); Assert.Empty(repo.Captures);
         Assert.Throws<InvalidDataException>(() => ImageLimits.Validate(80_000_000, 24, "Blur"));
     }
+    [Fact]
+    public async Task BatchPinTogglesMixedSelectionInOneCommitAndRollsBackTogether()
+    {
+        var writes = 0; var changes = 0; var fail = false;
+        var repo = new CaptureRepository(root, (path, bytes) => { if (path.EndsWith("history.json")) { writes++; if (fail) throw new IOException("injected metadata failure"); } AtomicFile.Write(path, bytes); });
+        var first = await repo.AddAsync([1], 1, 1); var second = await repo.AddAsync([2], 1, 1); await repo.SetPinnedAsync(first, true);
+        writes = 0; repo.Changed += () => changes++;
+        await repo.TogglePinnedAsync([first, second, first]); Assert.Equal(1, writes); Assert.Equal(1, changes); Assert.False(first.Pinned); Assert.True(second.Pinned);
+        var reopened = new CaptureRepository(root); reopened.Load(); Assert.True(reopened.Captures.Single(c => c.Id == second.Id).Pinned);
+        fail = true; await Assert.ThrowsAsync<IOException>(() => repo.TogglePinnedAsync([first, second])); Assert.False(first.Pinned); Assert.True(second.Pinned); Assert.Equal(1, changes);
+        fail = false; await repo.PersistAsync();
+        await repo.SetPinnedAsync([first, second], true); Assert.True(first.Pinned && second.Pinned);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => repo.SetPinnedAsync([first, new CaptureRecord()], false)); Assert.True(first.Pinned && second.Pinned);
+    }
+    [Fact]
+    public async Task CleanupSlicesAndConcurrentAddsKeepPinsAndHistoryConsistent()
+    {
+        var now = DateTimeOffset.UtcNow.AddDays(-2);
+        var repo = new CaptureRepository(root, utcNow: () => now); var pin = await repo.AddAsync([1], 1, 1); await repo.SetPinnedAsync(pin, true);
+        for (var i = 0; i < 30; i++) await repo.AddAsync([2], 1, 1);
+        now = DateTimeOffset.UtcNow;
+        var cleanup = repo.CleanupAsync(now, 1, batchSize: 1);
+        var added = await Task.WhenAll(Enumerable.Range(0, 20).Select(i => Task.Run(() => repo.AddAsync([(byte)i], 1, 1))));
+        await cleanup; await repo.CleanupAsync(now, 1);
+        var reopened = new CaptureRepository(root); reopened.Load();
+        Assert.Equal(21, reopened.Captures.Count); Assert.True(reopened.Captures.Single(c => c.Id == pin.Id).Pinned);
+        Assert.All(added, c => Assert.Contains(reopened.Captures, saved => saved.Id == c.Id)); Assert.True(File.Exists(repo.PathFor(pin)));
+    }
     public void Dispose() { if (Directory.Exists(root)) Directory.Delete(root, true); }
 }

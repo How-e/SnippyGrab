@@ -113,10 +113,18 @@ public sealed partial class CaptureRepository
         }
         finally { mutationSerial.Release(); }
     }
-    public Task SetPinnedAsync(CaptureRecord record, bool pinned)
+    public Task SetPinnedAsync(CaptureRecord record, bool pinned) => SetPinnedAsync([record], pinned);
+    public Task SetPinnedAsync(IEnumerable<CaptureRecord> records, bool pinned) => ChangePinsAsync(records, _ => pinned);
+    public Task TogglePinnedAsync(IEnumerable<CaptureRecord> records) => ChangePinsAsync(records, c => !c.Pinned);
+    private Task ChangePinsAsync(IEnumerable<CaptureRecord> records, Func<CaptureRecord, bool> value)
     {
-        var prior = false;
-        return ChangeAsync(() => { prior = record.Pinned; record.Pinned = pinned; }, () => record.Pinned = prior);
+        var items = records.DistinctBy(c => c.Id).ToArray(); (CaptureRecord Record, bool Pinned)[] prior = [];
+        if (items.Length == 0) return Task.CompletedTask;
+        return ChangeAsync(() =>
+        {
+            if (items.Any(c => !state.Captures.Contains(c))) throw new InvalidOperationException("Capture is no longer available.");
+            prior = items.Select(c => (c, c.Pinned)).ToArray(); foreach (var c in items) c.Pinned = value(c);
+        }, () => { foreach (var (c, pinned) in prior) c.Pinned = pinned; });
     }
     public Task SetPinLayoutAsync(CaptureRecord record, PinLayout layout)
     {
@@ -150,6 +158,20 @@ public sealed partial class CaptureRepository
         {
             if (!state.Captures.Contains(record) || record.FileName != revision) throw new InvalidOperationException("Capture changed before export history could be updated.");
             record.Saved = true; record.ExportPath = path; await PersistSnapshotAsync(); Changed?.Invoke();
+        }
+        finally { mutationSerial.Release(); }
+    }
+    public async Task<int> RememberExportsAsync(IEnumerable<(CaptureRecord Capture, string Revision, string Path)> exports)
+    {
+        var items = exports.ToArray();
+        if (items.Length == 0) return 0;
+        await mutationSerial.WaitAsync();
+        try
+        {
+            var current = items.Where(item => state.Captures.Contains(item.Capture) && item.Capture.FileName == item.Revision).ToArray();
+            foreach (var item in current) { item.Capture.Saved = true; item.Capture.ExportPath = item.Path; }
+            if (current.Length > 0) { await PersistSnapshotAsync(); Changed?.Invoke(); }
+            return items.Length - current.Length;
         }
         finally { mutationSerial.Release(); }
     }

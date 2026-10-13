@@ -6,6 +6,30 @@ namespace SnippyGrab.Tests;
 public sealed class ManagedPathTests
 {
     [Fact]
+    public void RedirectedProfileAncestorResolvesOnceWithoutFollowingLaterRetargets()
+    {
+        var workspace = Path.Combine(Path.GetTempPath(), "SnippyGrab-profile-test-" + Guid.NewGuid().ToString("N"));
+        var profile = Path.Combine(workspace, "profile"); var actual = Path.Combine(workspace, "actual"); var other = Path.Combine(workspace, "other");
+        Directory.CreateDirectory(actual); Directory.CreateDirectory(other);
+        try
+        {
+            Junction(profile, actual);
+            var root = Path.Combine(profile, "AppData", "Local", "SnippyGrab", "cache");
+            var repository = new CaptureRepository(root); var record = repository.Add([1], 1, 1);
+            Assert.Equal(Path.Combine(actual, "AppData", "Local", "SnippyGrab", "cache"), repository.Root);
+            Directory.Delete(profile); Junction(profile, other);
+            Assert.Equal(new byte[] { 1 }, File.ReadAllBytes(repository.PathFor(record)));
+            repository.Add([2], 1, 1); Assert.Empty(Directory.GetFileSystemEntries(other));
+        }
+        finally { if (Directory.Exists(profile)) Directory.Delete(profile); if (Directory.Exists(workspace)) Directory.Delete(workspace, true); }
+    }
+    internal static void Junction(string path, string target)
+    {
+        var start = new ProcessStartInfo("cmd.exe") { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
+        foreach (var argument in new[] { "/c", "mklink", "/J", path, target }) start.ArgumentList.Add(argument);
+        using var process = Process.Start(start)!; process.WaitForExit(); Assert.Equal(0, process.ExitCode);
+    }
+    [Fact]
     public void RootReplacedByJunctionAfterStartupCannotRedirectWritesReadsOrCleanup()
     {
         var workspace = Path.Combine(Path.GetTempPath(), "SnippyGrab-path-test-" + Guid.NewGuid().ToString("N"));

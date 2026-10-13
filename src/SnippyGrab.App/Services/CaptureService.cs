@@ -24,12 +24,12 @@ internal sealed class CaptureService
             {
                 if (target is null) throw new InvalidOperationException("Choose a display before capturing.");
                 var monitorBounds = MonitorCapture.Resolve(MonitorService.All().Select(m => (m.Identity, m.Bounds)), target);
-                return new(await ImageWorker.RunAsync(() => ImageService.Capture(monitorBounds, cursor)), monitorBounds, stopwatch.ElapsedMilliseconds);
+                return new(await ImageWorker.RunCaptureAsync(() => ImageService.Capture(monitorBounds, cursor)), monitorBounds, stopwatch.ElapsedMilliseconds);
             }
             var bounds = mode == CaptureMode.ActiveWindow ? WindowBounds(previous).Intersect(desktop) : desktop;
             if (mode is CaptureMode.Desktop or CaptureMode.ActiveWindow)
-                return new(await ImageWorker.RunAsync(() => ImageService.Capture(bounds, cursor)), bounds, stopwatch.ElapsedMilliseconds);
-            frozen = await ImageWorker.RunAsync(() => ImageService.Capture(desktop, cursor));
+                return new(await ImageWorker.RunCaptureAsync(() => ImageService.Capture(bounds, cursor)), bounds, stopwatch.ElapsedMilliseconds);
+            frozen = await ImageWorker.RunCaptureAsync(() => ImageService.Capture(desktop, cursor));
             var overlay = new CaptureOverlay(frozen, desktop, mode == CaptureMode.Window);
             var completion = new TaskCompletionSource();
             overlay.Closed += (_, _) => completion.TrySetResult();
@@ -43,10 +43,10 @@ internal sealed class CaptureService
                 bounds = WindowBounds(windowTarget).Intersect(desktop);
                 if (bounds.IsEmpty) return null;
                 // Freeze-to-select also prevents hover UI from becoming part of the selected window.
-                return new(await ImageWorker.RunAsync(() => ImageService.Crop(frozen, bounds.RelativeTo(desktop))), bounds, stopwatch.ElapsedMilliseconds);
+                return new(await ImageWorker.RunCaptureAsync(() => ImageService.Crop(frozen, bounds.RelativeTo(desktop))), bounds, stopwatch.ElapsedMilliseconds);
             }
             if (overlay.Selection is not { } selection) return null;
-            var cropped = await ImageWorker.RunAsync(() => ImageService.Crop(frozen, selection.RelativeTo(desktop)));
+            var cropped = await ImageWorker.RunCaptureAsync(() => ImageService.Crop(frozen, selection.RelativeTo(desktop)));
             Timing?.Invoke($"selection_to_crop_ms={selectionWork.ElapsedMilliseconds}");
             // Resolve while shelf/pins are still hidden, before restore can cover the viewport.
             var selectedWindow = Native.GetAncestor(Native.WindowFromPoint(new Native.POINT { X = selection.X + selection.Width / 2, Y = selection.Y + selection.Height / 2 }), 2);

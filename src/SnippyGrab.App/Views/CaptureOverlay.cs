@@ -32,6 +32,7 @@ internal sealed class CaptureOverlay : Window
         };
         Loaded += (_, _) => { if (this.activate) { Activate(); Focus(); } };
         KeyDown += (_, e) => { if (e.Key == Key.Escape) Close(); };
+        MouseRightButtonDown += (_, e) => { selecting = false; ReleaseMouseCapture(); Selection = null; WindowPoint = null; e.Handled = true; Close(); };
         MouseLeftButtonDown += (_, e) =>
         {
             Native.GetCursorPos(out origin); selecting = true; CaptureMouse();

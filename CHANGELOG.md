@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.0-alpha.20261017.1 — 2026-10-17
+
+- Refreshed native windows, dialogs, menus, shelf and installer with neutral Dark/Light/System themes, clearer page headings, quieter controls and screenshot previews. Retained keyboard focus, text scaling and Windows high-contrast support.
+- Bounded image work, moved thumbnail preparation off the UI thread, released closed view resources and reduced history persistence churn. Isolated capture acquisition from background image processing.
+- Hardened redirected storage/export paths, cleanup synchronization, second-instance activation and bounded diagnostics.
+- Preserved files that appear during export unless replacement was approved, and reserved OCR ordering before editor rendering so a newer Copy cancels older OCR.
+- Rejected checksum path aliases and unlisted installer payloads, resolved all recovered selections before composition, and deferred pin layout when display enumeration is empty.
+- This remains an unsigned alpha prerelease with ten open acceptance gates. Automated and offscreen checks do not renew physical desktop, external receiver, hardware, clean-profile or prolonged-resource acceptance.
+
 ## 0.1.0-alpha.20261010.1 — 2026-10-10
 
 - Reused exact stored PNG bytes for Copy and moved image preparation onto workers while preserving immutable revisions, clipboard request ordering, retries and cancellation. Import and editor opening also prepare images asynchronously.

@@ -5,7 +5,7 @@ A native Windows screenshot shelf with annotation, local OCR, and clipboard or d
 
 **Print Screen → select → release → paste or drag.** Captures land on the clipboard and a small transparent shelf. Click to annotate, Ctrl-click several images to attach together, or copy terminal errors with local OCR.
 
-.NET 10, WPF and Win32. No Electron, account, telemetry or cloud dependency.
+.NET 10, WPF and Win32. No account, telemetry or cloud dependency.
 
 **0.1.0 alpha:** runnable implementation with unit, integration and interactive synthetic checks. Current acceptance has open gates in the manifest; older owner acceptance applies to its recorded build and available scope. [Capabilities and evidence](docs/CAPABILITIES.md) · [Architecture](docs/ARCHITECTURE.md) · [Desktop acceptance](docs/ACCEPTANCE.md)
 

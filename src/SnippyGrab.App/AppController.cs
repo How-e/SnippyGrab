@@ -199,6 +199,12 @@ internal sealed class AppController : IDisposable
         if (!image.IsFrozen) { image = image.CloneCurrentValue(); image.Freeze(); }
         return OcrPng(token => ImageWorker.RunAsync(() => ImageService.Png(image), token), lifetime);
     }
+    internal Task<string> OcrPreparedImage(Func<CancellationToken, Task<BitmapSource>> prepare, CancellationToken lifetime = default)
+        => OcrPng(async token =>
+        {
+            var image = await prepare(token); token.ThrowIfCancellationRequested();
+            return await ImageWorker.RunAsync(() => ImageService.Png(image), token);
+        }, lifetime);
     private async Task<string> OcrPng(Func<CancellationToken, Task<byte[]>> prepare, CancellationToken lifetime = default)
     {
         var token = ocr.Begin(lifetime); Clipboard.Invalidate();

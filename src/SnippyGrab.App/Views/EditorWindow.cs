@@ -338,14 +338,8 @@ internal sealed class EditorWindow : Window
         var token = ocrLifetime.Token; var state = journal.Current;
         var bounds = area?.Intersect(new(0, 0, state.Base.PixelWidth, state.Base.PixelHeight)) ?? new PixelRect(0, 0, state.Base.PixelWidth, state.Base.PixelHeight);
         if ((long)bounds.Width * bounds.Height > ImageLimits.MaxOcrPixels) { status.Text = "OCR supports up to 16 megapixels. Use OCR selected area or crop the image first."; return; }
-        var image = await ImageWorker.RunAsync(() => area is { } crop ? RenderRegion(state, crop) : Render(state));
-        if (!token.IsCancellationRequested) await CopyOcr(image);
-    }
-    private async Task CopyOcr(BitmapSource image)
-    {
         status.Text = "Reading text locally…";
-        var token = ocrLifetime.Token;
-        var outcome = await controller.OcrText(image, token);
+        var outcome = await controller.OcrPreparedImage(cancellation => ImageWorker.RunAsync(() => area is { } crop ? RenderRegion(state, crop) : Render(state), cancellation), token);
         if (!token.IsCancellationRequested) status.Text = outcome;
     }
     internal static long RetainedBytes(IReadOnlyList<EditorState> states)

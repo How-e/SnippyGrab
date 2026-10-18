@@ -125,6 +125,20 @@ public sealed class UiRedesignTests
             {
                 using var controller = new AppController(true, root, diagnostic: true);
                 VerifyUpdatesView(controller);
+                RunUiTask(async () =>
+                {
+                    var writes = new List<string>();
+                    controller.Clipboard = new ClipboardService(data => writes.Add((string)data.GetData(DataFormats.UnicodeText)!));
+                    var preparation = new TaskCompletionSource<System.Windows.Media.Imaging.BitmapSource>();
+                    var pendingOcr = controller.OcrPreparedImage(_ => preparation.Task);
+                    Assert.True(await controller.CopyText("NEWER_COPY"));
+                    var image = System.Windows.Media.Imaging.BitmapSource.Create(1, 1, 96, 96, PixelFormats.Bgra32, null, new byte[4], 4); image.Freeze();
+                    preparation.SetResult(image);
+                    Assert.Equal("OCR cancelled.", await pendingOcr);
+                    Assert.Equal(new[] { "NEWER_COPY" }, writes);
+                    controller.Clipboard = new ClipboardService();
+                    return true;
+                });
                 VerifyRedesignPreviews(controller);
                 var original = JsonSerializer.Serialize(controller.Settings);
                 var settings = new SettingsWindow(controller);

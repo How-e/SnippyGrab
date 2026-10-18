@@ -30,6 +30,18 @@ try {
     $rejected = $false; try { Assert-SnippyInstallPath (Join-Path $root '../escape') $root } catch { $rejected = $true }
     if (-not $rejected) { throw 'Escaped target accepted.' }
     Write-Output 'PASS: hidden ancestor entry guard, fresh install, upgrade/obsolete isolation, rollback, checksum rejection, data preservation and path containment.'
+    Write-Fixture 'alias-test'
+    $manifestPath = Join-Path $source 'SHA256SUMS.txt'
+    $originalManifest = Get-Content -LiteralPath $manifestPath -Raw
+    New-Item -ItemType Directory -Path (Join-Path $source 'nested') | Out-Null
+    Set-Content -LiteralPath (Join-Path $source 'unlisted.dll') 'unlisted'
+    foreach ($alias in @('nested/../SnippyGrab.exe', './SnippyGrab.exe', 'nested//../SnippyGrab.exe')) {
+        Set-Content -LiteralPath $manifestPath -Value ($originalManifest.TrimEnd() + "`n" + (Get-FileHash -LiteralPath (Join-Path $source 'SnippyGrab.exe')).Hash + '  ' + $alias)
+        $rejected = $false; try { Test-SnippyBundle $source } catch { $rejected = $true }
+        if (-not $rejected) { throw 'Checksum alias concealed an unlisted payload.' }
+    }
+    Remove-Item -LiteralPath (Join-Path $source 'unlisted.dll')
+    Write-Output 'PASS: checksum aliases cannot conceal unlisted payload files.'
     Write-Fixture 'portable-new'
     $portableTarget = Join-Path $root 'portable folder with spaces'
     New-Item -ItemType Directory -Path $portableTarget | Out-Null

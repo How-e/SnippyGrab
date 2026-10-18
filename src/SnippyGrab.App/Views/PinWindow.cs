@@ -98,7 +98,8 @@ internal sealed class PinWindow : Window
         if (record.PinLayout is { } saved)
         {
             var layout = saved.Normalize(); var monitors = MonitorService.All();
-            var monitor = monitors.FirstOrDefault(m => m.Identity == layout.MonitorIdentity) ?? monitors.FirstOrDefault(m => m.Primary) ?? monitors[0];
+            var monitor = RestoreMonitor(monitors, layout.MonitorIdentity);
+            if (monitor is null) { ready = true; return; }
             var bounds = layout.Place(monitor.Work, monitor.Dpi);
             Width = DpiGeometry.ToDip(bounds.Width, monitor.Dpi); Height = DpiGeometry.ToDip(bounds.Height, monitor.Dpi);
             Topmost = layout.Topmost; Opacity = layout.Opacity;
@@ -113,12 +114,17 @@ internal sealed class PinWindow : Window
         controller.Try(() =>
         {
             if (!Native.GetWindowRect(new WindowInteropHelper(this).Handle, out var rect)) return;
-            var monitor = MonitorService.All().OrderByDescending(m => m.Bounds.Intersect(rect.Pixels).Width * (long)m.Bounds.Intersect(rect.Pixels).Height).First();
+            var monitor = LayoutMonitor(MonitorService.All(), rect.Pixels);
+            if (monitor is null) return;
             var layout = new PinLayout(monitor.Identity, DpiGeometry.ToDip(rect.Left - monitor.Work.X, monitor.Dpi), DpiGeometry.ToDip(rect.Top - monitor.Work.Y, monitor.Dpi),
                 DpiGeometry.ToDip(rect.Pixels.Width, monitor.Dpi), DpiGeometry.ToDip(rect.Pixels.Height, monitor.Dpi), Opacity, Topmost, clickThrough);
             if (record.PinLayout != layout) controller.Run(() => controller.Repository.SetPinLayoutAsync(record, layout));
         });
     }
+    internal static MonitorInfo? RestoreMonitor(IReadOnlyList<MonitorInfo> monitors, string identity)
+        => monitors.FirstOrDefault(m => m.Identity == identity) ?? monitors.FirstOrDefault(m => m.Primary) ?? monitors.FirstOrDefault();
+    internal static MonitorInfo? LayoutMonitor(IReadOnlyList<MonitorInfo> monitors, PixelRect bounds)
+        => monitors.OrderByDescending(m => m.Bounds.Intersect(bounds).Width * (long)m.Bounds.Intersect(bounds).Height).FirstOrDefault();
     private void RefreshPreview()
     {
         if (closed) return;

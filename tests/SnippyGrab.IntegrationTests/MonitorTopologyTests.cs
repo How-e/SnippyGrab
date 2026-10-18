@@ -5,6 +5,16 @@ namespace SnippyGrab.IntegrationTests;
 
 public sealed class MonitorTopologyTests
 {
+    [Fact]
+    public void PinsDeferLayoutDuringMissingTopologyAndSelectReconnectedDisplay()
+    {
+        var bounds = new PixelRect(0, 0, 1920, 1080);
+        Assert.Null(SnippyGrab.App.Views.PinWindow.RestoreMonitor([], "pin-display"));
+        Assert.Null(SnippyGrab.App.Views.PinWindow.LayoutMonitor([], bounds));
+        MonitorInfo[] monitors = [new(1, bounds, bounds, 144, 0, "pin-display", true)];
+        Assert.Same(monitors[0], SnippyGrab.App.Views.PinWindow.RestoreMonitor(monitors, "pin-display"));
+        Assert.Same(monitors[0], SnippyGrab.App.Views.PinWindow.LayoutMonitor(monitors, bounds));
+    }
     [Theory]
     [InlineData(-1)]
     [InlineData(0)]

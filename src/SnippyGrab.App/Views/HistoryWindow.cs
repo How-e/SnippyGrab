@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Windows.Automation;
 using System.Windows.Markup;
 using Microsoft.Win32;
@@ -12,12 +13,12 @@ internal sealed class HistoryWindow : Window
     internal int CachedThumbnailCount => thumbnails.Count;
     internal double PreviewWidth => Math.Max(600, previewPane.ActualWidth);
     internal Task PreviewWork { get; private set; } = Task.CompletedTask;
-    internal Task DrainPreviewAsync() => previewLoader.DrainAsync();
+    internal async Task DrainPreviewAsync() { await previewLoader.DrainAsync(); await thumbnails.DrainAsync(); }
     private readonly PreviewLoader previewLoader = new();
     private (Guid Id, string File, int Pixels)? previewStamp;
     private readonly AppController controller;
     private readonly ListBox list = new() { SelectionMode = SelectionMode.Extended };
-    private readonly BoundedCache<(string File, int Pixels), BitmapSource> thumbnails = new(24);
+    private readonly ThumbnailLoader thumbnails;
     private readonly Image preview = new() { Stretch = Stretch.Uniform, Margin = new Thickness(12) };
     private readonly TextBlock pageStatus = Ui.Text("", 12, true);
     private readonly TextBlock count = Ui.Text("", 14, true);
@@ -34,17 +35,33 @@ internal sealed class HistoryWindow : Window
     private int page;
     private bool refreshing;
     private bool closed;
-    private sealed record Row(CaptureRecord Capture, Func<CaptureRecord, BitmapSource?> Load)
+    // WPF's default collection-view cache can retain its last CurrentItem after
+    // ItemsSource is cleared. A cached row must never own its History window.
+    private sealed class Row(CaptureRecord capture, WeakReference<HistoryWindow> owner) : INotifyPropertyChanged
     {
+        public CaptureRecord Capture { get; } = capture;
+        public event PropertyChangedEventHandler? PropertyChanged;
+        private BitmapSource? thumbnail;
+        private bool requested;
         public string Title => "Screenshot · " + Capture.CreatedUtc.LocalDateTime.ToString("t");
         public string Details => Capture.DimensionsPending ? "Dimensions pending" : $"{Capture.Width} × {Capture.Height}";
         public string State => string.Join(" · ", new[] { Capture.Pinned ? "Pinned" : "", Capture.Edited ? "Edited" : "", Capture.Saved ? "Exported" : "" }.Where(s => s.Length > 0));
-        public BitmapSource? Thumbnail => Load(Capture);
+        public BitmapSource? Thumbnail { get { if (!requested) { requested = true; _ = LoadAsync(); } return thumbnail; } }
+        private async Task LoadAsync()
+        {
+            try
+            {
+                if (!owner.TryGetTarget(out var window) || window.closed) return;
+                var work = window.LoadThumbnail(Capture); window = null;
+                thumbnail = await work; PropertyChanged?.Invoke(this, new(nameof(Thumbnail)));
+            }
+            catch (Exception ex) when (ex is OperationCanceledException or IOException or UnauthorizedAccessException or InvalidDataException or NotSupportedException or ArgumentException or ObjectDisposedException) { }
+        }
     }
     public HistoryWindow(AppController controller)
     {
-        Ui.StyleWindow(this); this.controller = controller; Title = "SnippyGrab · Recent captures"; Width = 1100; Height = 760; MinWidth = 560; MinHeight = 460;
-        var root = new DockPanel { Margin = new Thickness(24) }; Content = root;
+        Ui.StyleWindow(this); this.controller = controller; thumbnails = new(controller.Repository, 24); Title = "SnippyGrab · Recent captures"; Width = 1100; Height = 760; MinWidth = 560; MinHeight = 460;
+        var root = new DockPanel { Margin = new Thickness(28) }; Content = root;
         var header = new DockPanel { Margin = new Thickness(0, 0, 0, 18) };
         var headerActions = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
         headerActions.Children.Add(Ui.ActionButton("Import…", "export", "Import local PNG, JPEG or BMP images", Import));
@@ -55,18 +72,18 @@ internal sealed class HistoryWindow : Window
         if (controller.Repository.CleanupBlocked)
         {
             var recovery = new StackPanel(); recovery.Children.Add(Ui.Heading("History needs recovery", 16)); recovery.Children.Add(Ui.Text("Unknown old captures are pinned to keep them safe. Cleanup stays disabled until you confirm recovery.", 12, true));
-            recovery.Children.Add(Ui.Button("Confirm recovered history…", "Preserve original history and enable cleanup", () => controller.Try(() =>
+            recovery.Children.Add(Ui.Button("Confirm recovered history…", "Preserve original history and enable cleanup", () => controller.Run(async () =>
             {
                 if (!DialogWindow.Confirm("Keep recovered history?", "The unreadable original will be preserved in the cache.\n\nUnknown old captures remain pinned; review them before unpinning. Cleanup will be enabled after recovery succeeds.", "Keep recovered history", this)) return;
-                controller.Repository.ConfirmHistoryRecovery(); ((FrameworkElement)recovery.Parent).Visibility = Visibility.Collapsed; Refresh(); controller.Dock.Refresh();
+                await controller.Repository.ConfirmHistoryRecoveryAsync(); if (closed) return; ((FrameworkElement)recovery.Parent).Visibility = Visibility.Collapsed; Refresh(); controller.Dock.Refresh();
             })));
             var group = Ui.Group(recovery); DockPanel.SetDock(group, Dock.Top); root.Children.Add(group);
         }
         var toolbar = new WrapPanel { VerticalAlignment = VerticalAlignment.Center }; selectionStatus.Margin = new Thickness(4, 8, 18, 8); toolbar.Children.Add(selectionStatus);
         Button Action(string label, string icon, string hint, Action action) { var b = Ui.ActionButton(label, icon, hint, action, "QuietButton"); selectionActions.Add(b); toolbar.Children.Add(b); return b; }
-        Action("To shelf", "image", "Restore selected captures to shelf", () => { controller.Repository.Restore(Selected(), DateTimeOffset.UtcNow); controller.Dock.Reveal(); });
+        Action("To shelf", "image", "Restore selected captures to shelf", () => controller.Run(async () => { await controller.Repository.RestoreAsync(Selected(), DateTimeOffset.UtcNow); if (!controller.Exiting) controller.Dock.Reveal(); }));
         copy = Action("Copy image", "copy", "Copy image or selected PNG files", () => controller.Run(async () => { var selected = Selected(); if (selected.Count == 1) await controller.Copy(selected[0]); else if (selected.Count > 1) await controller.CopyFiles(selected); }));
-        Action("Pin", "pin", "Toggle pins on selected captures", () => { foreach (var capture in Selected()) controller.Pin(capture); Refresh(); });
+        Action("Pin", "pin", "Toggle pins on selected captures", () => controller.Pin(Selected()));
         Action("Export selected…", "export", "Export selected captures in shelf order", () => controller.Run(() => controller.ExportSelected(Selected(), this)));
         Action("Combine selected…", "image", "Combine 2–20 selected captures into a new image", () => controller.Run(() => controller.CombineSelected(Selected(), this)));
         Action("More", "more", "More selected capture actions", () =>
@@ -82,25 +99,26 @@ internal sealed class HistoryWindow : Window
         split.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(0.42, GridUnitType.Star) }); split.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(0.58, GridUnitType.Star) }); root.Children.Add(split);
         var listPane = new Grid { Margin = new Thickness(0, 0, 18, 0) }; listPane.Children.Add(list); empty.Margin = new Thickness(18, 38, 18, 0); listPane.Children.Add(empty); split.Children.Add(listPane);
         list.ItemTemplate = (DataTemplate)XamlReader.Parse("""
-            <DataTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="130"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Border Background="{DynamicResource Canvas}" CornerRadius="5" Margin="0,0,14,0"><Image Source="{Binding Thumbnail}" Height="82" Stretch="Uniform"/></Border><StackPanel Grid.Column="1" VerticalAlignment="Center"><TextBlock Text="{Binding Title}" FontWeight="SemiBold" Margin="0,0,0,7"/><TextBlock Text="{Binding Details}" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/><TextBlock Text="{Binding State}" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Margin="0,5,0,0"/></StackPanel></Grid></DataTemplate>
+            <DataTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="130"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Border Background="{DynamicResource Canvas}" CornerRadius="8" Margin="0,0,14,0"><Image Source="{Binding Thumbnail, Mode=OneWay}" Height="82" Stretch="Uniform"/></Border><StackPanel Grid.Column="1" VerticalAlignment="Center"><TextBlock Text="{Binding Title, Mode=OneTime}" FontWeight="SemiBold" Margin="0,0,0,7"/><TextBlock Text="{Binding Details, Mode=OneTime}" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/><TextBlock Text="{Binding State, Mode=OneTime}" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Margin="0,5,0,0"/></StackPanel></Grid></DataTemplate>
             """);
         AutomationProperties.SetName(list, "Recent captures. Ctrl-click selects several; Enter edits; Delete dismisses; Alt-drag attaches PNG files.");
         VirtualizingPanel.SetIsVirtualizing(list, true); VirtualizingPanel.SetVirtualizationMode(list, VirtualizationMode.Recycling); ScrollViewer.SetCanContentScroll(list, true);
-        var detail = new DockPanel { Margin = new Thickness(22, 0, 0, 0) };
+        var detail = new DockPanel { Margin = new Thickness(20) };
+        var previewTitle = Ui.Heading("Preview", 18); previewTitle.Margin = new Thickness(0, 0, 0, 14); DockPanel.SetDock(previewTitle, Dock.Top); detail.Children.Add(previewTitle);
         var detailActions = new WrapPanel { Margin = new Thickness(0, 12, 0, 0) };
         void Detail(string label, string icon, Action action) { var b = Ui.ActionButton(label, icon, label + " selected capture", action); selectionActions.Add(b); detailActions.Children.Add(b); }
         Detail("Edit", "edit", () => { if (Selected().FirstOrDefault() is { } c) controller.Edit(c); }); Detail("Copy image", "copy", () => { if (Selected().FirstOrDefault() is { } c) controller.Run(() => controller.Copy(c)); }); Detail("Export image…", "export", () => { if (Selected().FirstOrDefault() is { } c) controller.Run(() => controller.Save(c, this)); });
         DockPanel.SetDock(detailActions, Dock.Bottom); detail.Children.Add(detailActions); metadata.Margin = new Thickness(0, 12, 0, 0); DockPanel.SetDock(metadata, Dock.Bottom); detail.Children.Add(metadata);
         var previewContainer = new Grid(); previewContainer.SetResourceReference(Panel.BackgroundProperty, "Canvas"); previewContainer.Children.Add(preview); previewHint.VerticalAlignment = VerticalAlignment.Center; previewHint.HorizontalAlignment = HorizontalAlignment.Center; previewContainer.Children.Add(previewHint); detail.Children.Add(previewContainer);
-        previewPane = new Border { Child = detail, BorderThickness = new Thickness(1, 0, 0, 0) }; previewPane.SetResourceReference(Border.BorderBrushProperty, "Border"); Grid.SetColumn(previewPane, 1); split.Children.Add(previewPane);
+        previewPane = new Border { Child = detail, CornerRadius = new CornerRadius(12), BorderThickness = new Thickness(1) }; previewPane.SetResourceReference(Border.BackgroundProperty, "Raised"); previewPane.SetResourceReference(Border.BorderBrushProperty, "Border"); Grid.SetColumn(previewPane, 1); split.Children.Add(previewPane);
         SizeChanged += (_, _) => Responsive(); Ui.ThemeChanged += Responsive; Closed += (_, _) => Ui.ThemeChanged -= Responsive;
         list.SelectionChanged += (_, _) => { if (!refreshing) controller.Try(RefreshPreview); };
         list.MouseDoubleClick += (_, _) => { if (Selected().FirstOrDefault() is { } c) controller.Edit(c); };
-        list.PreviewMouseMove += (_, e) => { if (e.LeftButton == MouseButtonState.Pressed && Selected().Count > 0 && (Keyboard.Modifiers & ModifierKeys.Alt) != 0) controller.Try(() => controller.DragDrop.Drag(list, Selected())); };
+        list.PreviewMouseMove += (_, e) => { if (e.LeftButton == MouseButtonState.Pressed && Selected().Count > 0 && (Keyboard.Modifiers & ModifierKeys.Alt) != 0) controller.Run(() => controller.DragDrop.DragAsync(list, Selected())); };
         PreviewKeyDown += (_, e) => { if (e.Key == Key.Escape) Close(); if (e.Key == Key.Delete && Keyboard.Modifiers == ModifierKeys.None) { controller.Dismiss(Selected()); Refresh(); e.Handled = true; } if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.None && Selected().FirstOrDefault() is { } c) { controller.Edit(c); e.Handled = true; } };
         controller.Repository.Changed += RepositoryChanged; controller.SettingsChanged += RepositoryChanged;
-        DpiChanged += (_, e) => { if (ReferenceEquals(e.Source, this)) Dispatcher.BeginInvoke(new Action(() => { thumbnails.RemoveWhere(_ => true); if (IsLoaded) controller.Try(Refresh); })); };
-        Closed += (_, _) => { closed = true; controller.Repository.Changed -= RepositoryChanged; controller.SettingsChanged -= RepositoryChanged; previewLoader.Dispose(); thumbnails.RemoveWhere(_ => true); preview.Source = null; }; Refresh();
+        DpiChanged += (_, e) => { if (ReferenceEquals(e.Source, this)) Dispatcher.BeginInvoke(new Action(() => { thumbnails.Clear(); if (IsLoaded && !closed) controller.Try(Refresh); })); };
+        Closed += (_, _) => { closed = true; controller.Repository.Changed -= RepositoryChanged; controller.SettingsChanged -= RepositoryChanged; previewLoader.Dispose(); thumbnails.Dispose(); list.SelectedItems.Clear(); list.ItemsSource = null; list.ItemTemplate = null; preview.Source = null; PreviewWork = Task.CompletedTask; }; Refresh();
     }
     private void Responsive()
     {
@@ -109,11 +127,7 @@ internal sealed class HistoryWindow : Window
     }
     private void Import() { var dialog = new OpenFileDialog { Filter = "Images|*.png;*.jpg;*.jpeg;*.bmp", Multiselect = true }; if (dialog.ShowDialog(this) == true) controller.Run(async () => { foreach (var path in dialog.FileNames) await controller.ImportAsync(path); }); }
     private List<CaptureRecord> Selected() => list.SelectedItems.Cast<Row>().Select(r => r.Capture).ToList();
-    private BitmapSource? LoadThumbnail(CaptureRecord capture)
-    {
-        try { var pixels = Math.Max(120, (int)Math.Ceiling(120 * VisualTreeHelper.GetDpi(this).DpiScaleX)); return thumbnails.GetOrAdd((capture.FileName, pixels), () => ImageService.Load(controller.Repository.PathFor(capture), pixels, pixels)); }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or InvalidDataException or ArgumentException) { return null; }
-    }
+    private Task<BitmapSource> LoadThumbnail(CaptureRecord capture) { var pixels = Math.Max(120, (int)Math.Ceiling(120 * VisualTreeHelper.GetDpi(this).DpiScaleX)); return thumbnails.LoadAsync(capture, pixels, pixels); }
     private void RefreshPreview()
     {
         if (closed) return;
@@ -144,8 +158,10 @@ internal sealed class HistoryWindow : Window
         try
         {
             page = Math.Min(page, Math.Max(0, (controller.Repository.Captures.Count - 1) / HistoryPage.Size));
-            var files = controller.Repository.Captures.Select(c => c.FileName).ToHashSet(); thumbnails.RemoveWhere(key => !files.Contains(key.File));
-            list.ItemsSource = HistoryPage.Read(controller.Repository.Captures, page).Select(c => new Row(c, LoadThumbnail)).ToArray();
+            var captures = HistoryPage.Read(controller.Repository.Captures, page);
+            var files = captures.Select(c => c.FileName).ToHashSet(); thumbnails.Prune(files.Contains);
+            var owner = new WeakReference<HistoryWindow>(this);
+            list.ItemsSource = captures.Select(c => new Row(c, owner)).ToArray();
             pageStatus.Text = $"Page {page + 1}"; count.Text = $"{controller.Repository.Captures.Count} captures"; previous.IsEnabled = page > 0; next.IsEnabled = (page + 1) * HistoryPage.Size < controller.Repository.Captures.Count;
             foreach (var row in list.Items.Cast<Row>().Where(r => selected.Contains(r.Capture.Id))) list.SelectedItems.Add(row);
             empty.Visibility = list.Items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;

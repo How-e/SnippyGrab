@@ -11,11 +11,11 @@ public static class CaptureExport
         var path = ValidateDestination(repository.Root, destination, ExportFormat.Png);
         EnsureCurrent(repository, capture, capture.FileName);
         using var lease = repository.Lease([capture]);
-        AtomicFile.Write(path, File.ReadAllBytes(repository.PathFor(capture)));
+        WriteDestination(repository.Root, path, ExportFormat.Png, File.ReadAllBytes(repository.PathFor(capture)), true);
         return Remember(repository, capture, path);
     }
     public static async Task<CaptureExportResult> WriteAsync(CaptureRepository repository, CaptureRecord capture, string destination,
-        ExportFormat format, int quality, Func<string, int, byte[]> encodeJpeg, CancellationToken cancellation = default)
+        ExportFormat format, int quality, Func<string, int, byte[]> encodeJpeg, CancellationToken cancellation = default, bool overwrite = false)
     {
         if (quality is < 1 or > 100) throw new InvalidDataException("Export quality must be between 1 and 100.");
         var path = ValidateDestination(repository.Root, destination, format);
@@ -32,11 +32,16 @@ public static class CaptureExport
         {
             cancellation.ThrowIfCancellationRequested();
             ValidateDestination(cache, path, format); // Recheck policy immediately before the atomic write.
-            AtomicFile.Write(path, bytes);
+            WriteDestination(cache, path, format, bytes, overwrite);
         }, cancellation);
         // A write is durable even when metadata is stale or persistence fails.
         if (!repository.Captures.Contains(capture) || capture.FileName != revision) return new(path, false);
-        return Remember(repository, capture, path);
+        return await RememberAsync(repository, capture, path, revision);
+    }
+    internal static async Task<CaptureExportResult> RememberAsync(CaptureRepository repository, CaptureRecord capture, string path, string? revision = null)
+    {
+        try { await repository.RememberExportAsync(capture, path, revision); return new(path, true); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or InvalidOperationException) { return new(path, false); }
     }
     private static void EnsureCurrent(CaptureRepository repository, CaptureRecord capture, string revision)
     {
@@ -60,9 +65,17 @@ public static class CaptureExport
         var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(cache));
         if (path.Equals(root, StringComparison.OrdinalIgnoreCase) || path.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException("Choose a location outside the managed cache.");
-        for (var directory = new DirectoryInfo(Path.GetDirectoryName(path)!); directory is not null; directory = directory.Parent)
-            if (directory.Exists && (directory.Attributes & FileAttributes.ReparsePoint) != 0) throw new InvalidDataException("Export cannot use redirected directories.");
         if (File.Exists(path) && (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0) throw new InvalidDataException("Export cannot replace a redirected file.");
-        return path;
+        var resolved = Path.Combine(ManagedPath.ResolveDirectory(Path.GetDirectoryName(path)!), Path.GetFileName(path));
+        root = ManagedPath.ResolveDirectory(root);
+        if (resolved.Equals(root, StringComparison.OrdinalIgnoreCase) || resolved.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("Choose a location outside the managed cache.");
+        return resolved;
     }
+    internal static void WriteDestination(string cache, string path, ExportFormat format, byte[] bytes, bool overwrite)
+        => AtomicFile.WriteChecked(path, bytes, overwrite, () =>
+        {
+            if (!ValidateDestination(cache, path, format).Equals(path, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("Export directory changed. Choose the destination again.");
+        });
 }

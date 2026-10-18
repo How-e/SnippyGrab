@@ -118,5 +118,35 @@ public sealed class CaptureExportTests : IDisposable
         var result = await CaptureExport.WriteAsync(repository, capture, path, ExportFormat.Jpeg, 90, (_, _) => [2]);
         Assert.False(result.MetadataSaved); Assert.Equal(new byte[] { 2 }, File.ReadAllBytes(path)); Assert.Equal(path, capture.ExportPath);
     }
+    [Fact]
+    public async Task RedirectedExportFolderWorksButAliasesIntoCacheRemainRejected()
+    {
+        var actual = Path.Combine(root, "actual-exports"); Directory.CreateDirectory(actual);
+        var redirect = Path.Combine(root, "pictures"); var cacheAlias = Path.Combine(root, "cache-alias");
+        try
+        {
+            ManagedPathTests.Junction(redirect, actual); ManagedPathTests.Junction(cacheAlias, repository.Root);
+            var capture = repository.Add([1, 2], 1, 1);
+            var output = Path.Combine(redirect, "nested", "image.png");
+            var result = await CaptureExport.WriteAsync(repository, capture, output, ExportFormat.Png, 90, (_, _) => []);
+            Assert.True(result.MetadataSaved); Assert.Equal(new byte[] { 1, 2 }, File.ReadAllBytes(output));
+            Assert.Equal(Path.Combine(actual, "nested", "image.png"), result.Path);
+            Assert.Throws<InvalidDataException>(() => CaptureExport.ValidateDestination(repository.Root, Path.Combine(cacheAlias, "nested", "image.png"), ExportFormat.Png));
+            var plan = BatchExport.Plan(repository, [capture], redirect, ExportFormat.Png, ExportCollision.Unique);
+            Assert.Equal(1, (await BatchExport.RunAsync(repository, plan, ExportFormat.Png, 90, ExportCollision.Unique, (_, _) => [])).Successful);
+        }
+        finally { if (Directory.Exists(redirect)) Directory.Delete(redirect); if (Directory.Exists(cacheAlias)) Directory.Delete(cacheAlias); }
+    }
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task LateDestinationIsPreservedUnlessReplacementWasApproved(bool overwrite)
+    {
+        var capture = repository.Add([1], 1, 1); var path = Path.Combine(root, "late.jpg");
+        var export = CaptureExport.WriteAsync(repository, capture, path, ExportFormat.Jpeg, 90,
+            (_, _) => { File.WriteAllBytes(path, [9]); return [2]; }, overwrite: overwrite);
+        if (overwrite) { await export; Assert.Equal(new byte[] { 2 }, File.ReadAllBytes(path)); }
+        else { await Assert.ThrowsAsync<IOException>(() => export); Assert.Equal(new byte[] { 9 }, File.ReadAllBytes(path)); Assert.False(capture.Saved); }
+    }
     public void Dispose() { if (Directory.Exists(root)) Directory.Delete(root, true); }
 }

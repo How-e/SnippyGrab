@@ -8,6 +8,7 @@ namespace SnippyGrab.Core;
 
 public sealed class CaptureRecord
 {
+    internal CaptureRecord Snapshot() => (CaptureRecord)MemberwiseClone();
     public Guid Id { get; set; } = Guid.NewGuid();
     public string FileName { get; set; } = "";
     public DateTimeOffset CreatedUtc { get; set; } = DateTimeOffset.UtcNow;
@@ -48,6 +49,10 @@ public sealed partial class CaptureRepository
     private HashSet<string> committedPages = [];
     private readonly Dictionary<Guid, CachedPage> pageCache = [];
     private readonly SemaphoreSlim cleanupSerial = new(1);
+    private readonly SemaphoreSlim storageSerial = new(1);
+    private readonly SemaphoreSlim mutationSerial = new(1);
+    private long persistenceVersion;
+    private long writtenVersion;
     private readonly record struct CaptureStamp(Guid Id, string File, DateTimeOffset Created, DateTimeOffset? Restored, int Width, int Height,
         bool DimensionsPending, string Monitor, bool Pinned, bool Edited, bool Saved, string ExportPath, bool Dismissed, PinLayout? PinLayout)
     {
@@ -63,7 +68,7 @@ public sealed partial class CaptureRepository
     public CaptureRepository(string directory, Action<string, byte[]>? writer = null, Func<DateTimeOffset>? utcNow = null)
     {
         write = writer ?? AtomicFile.Write; clock = utcNow ?? (() => DateTimeOffset.UtcNow);
-        root = Path.GetFullPath(directory);
+        root = ManagedPath.StorageRoot(directory);
         if (root.StartsWith(@"\\", StringComparison.Ordinal) || root == Path.GetPathRoot(root))
             throw new InvalidDataException("Cache must be a dedicated local directory.");
         ManagedPath.RejectRedirects(root);
@@ -153,6 +158,7 @@ public sealed partial class CaptureRepository
     }
     public CaptureRecord Add(byte[] png, int width, int height, string monitor = "")
     {
+        ImageLimits.ValidateEncoded(png.Length); if (width <= 0 || height <= 0) throw new InvalidDataException("Invalid image dimensions."); ImageLimits.Validate((long)width * height);
         var record = new CaptureRecord { CreatedUtc = clock(), FileName = "capture-" + Guid.NewGuid().ToString("N") + ".png", Width = width, Height = height, Monitor = monitor };
         write(PathFor(record), png);
         sessionFiles.Add(record.FileName);
@@ -189,6 +195,7 @@ public sealed partial class CaptureRepository
     }
     public void Replace(CaptureRecord record, byte[] png, int width, int height, string? expectedRevision = null)
     {
+        ImageLimits.ValidateEncoded(png.Length); if (width <= 0 || height <= 0) throw new InvalidDataException("Invalid image dimensions."); ImageLimits.Validate((long)width * height);
         if (!state.Captures.Contains(record) || (expectedRevision is not null && record.FileName != expectedRevision)) throw new InvalidOperationException("Capture changed in another view. Reopen the editor before applying changes.");
         // Immutable file identity keeps existing receiver/clipboard payloads intact after editing.
         var name = "capture-" + Guid.NewGuid().ToString("N") + ".png";
@@ -205,7 +212,7 @@ public sealed partial class CaptureRepository
             (record.FileName, record.Width, record.Height, record.Edited, record.DimensionsPending) = previous;
             // This revision was never committed or published to views/transfers. Do not recover
             // its failed edit as a separate capture on the next launch.
-            try { if (SafeFile(revisionPath)) File.Delete(revisionPath); }
+            try { if (SafeFile(revisionPath)) File.Delete(revisionPath); sessionFiles.Remove(name); }
             catch (IOException) { }
             catch (UnauthorizedAccessException) { }
             throw;
@@ -220,6 +227,21 @@ public sealed partial class CaptureRepository
     }
     private void PersistState()
     {
+        var version = Interlocked.Increment(ref persistenceVersion);
+        var snapshot = SnapshotState();
+        storageSerial.Wait();
+        try { PersistStateCore(snapshot, version); }
+        finally { storageSerial.Release(); }
+    }
+    private RepositoryState SnapshotState() => new()
+    {
+        Captures = state.Captures.Where(c => HistoryEnabled || c.Pinned).Select(c => c.Snapshot()).ToList(),
+        Superseded = new(state.Superseded),
+        ProtectedUntil = new(state.ProtectedUntil)
+    };
+    private void PersistStateCore(RepositoryState snapshot, long version)
+    {
+        if (version < writtenVersion) return;
         ManagedPath.RejectRedirects(root);
         try
         {
@@ -230,8 +252,8 @@ public sealed partial class CaptureRepository
                 File.Copy(metadata, Path.Combine(root, "history-recovered.invalid-" + Guid.NewGuid().ToString("N") + ".json"));
                 recoveryNeedsBackup = false;
             }
-            var serialized = SerializeState(out var pages);
-            write(metadata, serialized); committedPages = pages; PersistencePending = false;
+            var serialized = SerializeState(out var pages, snapshot);
+            write(metadata, serialized); committedPages = pages; writtenVersion = version; PersistencePending = false;
         }
         catch { PersistencePending = true; throw; }
     }
@@ -242,9 +264,9 @@ public sealed partial class CaptureRepository
         finally { if (File.Exists(path)) File.Delete(path); }
     }
     private byte[] SerializeState() => SerializeState(out _);
-    private byte[] SerializeState(out HashSet<string> pages)
+    private byte[] SerializeState(out HashSet<string> pages, RepositoryState? snapshot = null)
     {
-        var saved = new RepositoryState
+        var saved = snapshot ?? new RepositoryState
         {
             Captures = state.Captures.Where(c => HistoryEnabled || c.Pinned).ToList(),
             Superseded = state.Superseded,
@@ -350,7 +372,7 @@ public sealed partial class CaptureRepository
             // State/lease decisions remain on the caller's context. Yield between bounded
             // slices and recheck protections, rather than deleting from a stale worker snapshot.
             var slice = Stopwatch.StartNew(); var count = 0;
-            foreach (var item in CleanupSteps(now, retentionHours, clear, sessionOnly))
+            foreach (var item in CleanupSteps(now, retentionHours, clear, sessionOnly, deferPersist: true))
             {
                 removed += item;
                 cancellation.ThrowIfCancellationRequested();
@@ -360,30 +382,48 @@ public sealed partial class CaptureRepository
                 cancellation.ThrowIfCancellationRequested();
                 count = 0; slice.Restart();
             }
+            if (!CleanupBlocked && !PersistencePending) await PersistAsync();
             finished = true; return removed;
         }
         finally
         {
-            try { if (!finished && removed > 0 && !CleanupBlocked && !PersistencePending) Persist(); }
+            try { if (!finished && removed > 0 && !CleanupBlocked && !PersistencePending) await PersistAsync(); }
             finally { cleanupSerial.Release(); }
         }
     }
-    private IEnumerable<int> CleanupSteps(DateTimeOffset now, int retentionHours, bool clear, bool sessionOnly)
+    private IEnumerable<int> CleanupSteps(DateTimeOffset now, int retentionHours, bool clear, bool sessionOnly, bool deferPersist = false)
+    {
+        using var steps = CleanupStepsCore(now, retentionHours, clear, sessionOnly, deferPersist).GetEnumerator();
+        while (true)
+        {
+            // Acquire only for a slice; never hold the mutation gate across a yield.
+            if (!mutationSerial.Wait(0)) yield break;
+            bool more; int removed;
+            try { more = steps.MoveNext(); removed = more ? steps.Current : 0; }
+            finally { mutationSerial.Release(); }
+            if (!more) yield break;
+            yield return removed;
+        }
+    }
+    private IEnumerable<int> CleanupStepsCore(DateTimeOffset now, int retentionHours, bool clear, bool sessionOnly, bool deferPersist)
     {
         ManagedPath.RejectRedirects(root);
-        if (CleanupBlocked || PersistencePending) yield break; // Corrupt pin metadata must never turn into permission to delete images.
+        // An async mutation may temporarily expose a state that still needs to
+        // roll back. Never delete against an uncommitted pin/restore snapshot.
+        if (CleanupBlocked || PersistencePending) yield break;
         var records = state.Captures.ToDictionary(c => c.FileName);
-        foreach (var path in Directory.GetFiles(root, "capture-*.png"))
+        foreach (var path in Directory.EnumerateFiles(root, "capture-*.png"))
         {
             yield return 0;
             if (CleanupBlocked || PersistencePending) yield break;
             var name = Path.GetFileName(path);
             var record = records.GetValueOrDefault(name);
+            if (record?.FileName != name) record = state.Captures.FirstOrDefault(c => c.FileName == name);
             if ((sessionOnly && !sessionFiles.Contains(name)) || !IsSafeName(name) || !SafeFile(path) || record?.Pinned == true || leases.ContainsKey(name) || state.ProtectedUntil.GetValueOrDefault(name) > now) continue;
             var created = record is null ? new DateTimeOffset(File.GetLastWriteTimeUtc(path)) : record.RestoredUtc ?? record.CreatedUtc;
             if (!clear && (retentionHours < 0 || created.AddHours(retentionHours) > now)) continue;
             var deleted = false;
-            try { File.Delete(path); state.Superseded.Remove(name); state.Captures.RemoveAll(c => c.FileName == name); deleted = true; }
+            try { File.Delete(path); sessionFiles.Remove(name); state.Superseded.Remove(name); if (record is not null) state.Captures.Remove(record); deleted = true; }
             catch (IOException) { }
             catch (UnauthorizedAccessException) { }
             if (deleted) yield return 1;
@@ -399,7 +439,8 @@ public sealed partial class CaptureRepository
                 TemporaryPattern().IsMatch(Path.GetFileName(path)))
                 try { File.Delete(path); } catch (IOException) { } catch (UnauthorizedAccessException) { }
         }
-        Persist();
+        if (!deferPersist) Persist();
+        if (sessionFiles.Count == 0) sessionFiles.TrimExcess();
         // Only owned pages unreferenced by the durable manifest and older than the crash grace are removable.
         var hasArchivedHistory = Directory.EnumerateFiles(root, "history.invalid-*.json").Any();
         foreach (var path in hasArchivedHistory ? Enumerable.Empty<string>() : Directory.EnumerateFiles(root, "history-page-*.json"))

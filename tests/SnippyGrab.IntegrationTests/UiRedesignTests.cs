@@ -125,6 +125,21 @@ public sealed class UiRedesignTests
             {
                 using var controller = new AppController(true, root, diagnostic: true);
                 VerifyUpdatesView(controller);
+                RunUiTask(async () =>
+                {
+                    var writes = new List<string>();
+                    controller.Clipboard = new ClipboardService(data => writes.Add((string)data.GetData(DataFormats.UnicodeText)!));
+                    var preparation = new TaskCompletionSource<System.Windows.Media.Imaging.BitmapSource>();
+                    var pendingOcr = controller.OcrPreparedImage(_ => preparation.Task);
+                    Assert.True(await controller.CopyText("NEWER_COPY"));
+                    var image = System.Windows.Media.Imaging.BitmapSource.Create(1, 1, 96, 96, PixelFormats.Bgra32, null, new byte[4], 4); image.Freeze();
+                    preparation.SetResult(image);
+                    Assert.Equal("OCR cancelled.", await pendingOcr);
+                    Assert.Equal(new[] { "NEWER_COPY" }, writes);
+                    controller.Clipboard = new ClipboardService();
+                    return true;
+                });
+                VerifyRedesignPreviews(controller);
                 var original = JsonSerializer.Serialize(controller.Settings);
                 var settings = new SettingsWindow(controller);
                 try
@@ -178,9 +193,15 @@ public sealed class UiRedesignTests
                 VerifyIconTextAlignment();
                 var png = ImageService.Png(EditorDocumentTests.Fixture());
                 for (var index = 0; index < 70; index++) controller.Repository.Add(png, 160, 100);
+                var recovered = controller.Repository.Captures.Take(2).ToArray();
+                foreach (var capture in recovered) { capture.Width = 1; capture.Height = 1; capture.DimensionsPending = true; }
+                var recoveredInputs = controller.PrepareCompositionInputs(recovered);
+                Assert.All(recoveredInputs, input => { Assert.Equal(160, input.Width); Assert.Equal(100, input.Height); });
+                Assert.All(recovered, capture => Assert.False(capture.DimensionsPending));
+                RunUiTask(async () => { await VerifyStorageAndHistoryCollection(controller, root); return true; });
                 var previousSessionOnly = controller.Settings.SessionOnly;
                 controller.Settings.SessionOnly = true;
-                Assert.Throws<IOException>(() => controller.ExitForUpdateAsync(() => throw new IOException("Update launcher fixture failure")).GetAwaiter().GetResult());
+                Assert.Throws<IOException>(() => RunUiTask(async () => { await controller.ExitForUpdateAsync(() => throw new IOException("Update launcher fixture failure")); return true; }));
                 Assert.False(controller.Exiting);
                 Assert.Equal(70, controller.Repository.Captures.Count);
                 Assert.All(controller.Repository.Captures, record => Assert.True(File.Exists(controller.Repository.PathFor(record))));
@@ -204,6 +225,7 @@ public sealed class UiRedesignTests
                 try
                 {
                     LayoutWindow(combine);
+                    RenderReview(combine, "combine-Dark");
                     Children<Expander>(combine).Single().IsExpanded = true; combine.UpdateLayout();
                     var layout = Children<ComboBox>(combine).Single(c => System.Windows.Automation.AutomationProperties.GetName(c) == "Composition layout");
                     var spacing = Children<TextBox>(combine).Single(c => System.Windows.Automation.AutomationProperties.GetName(c) == "Spacing in pixels");
@@ -224,6 +246,7 @@ public sealed class UiRedesignTests
                     try
                     {
                         LayoutWindow(scroll);
+                        RenderReview(scroll, "scroll-Dark");
                         var buttons = Children<Button>(scroll).Where(b => b.Content is string).ToDictionary(b => (string)b.Content);
                         Assert.True(buttons["Capture next frame"].IsEnabled);
                         Assert.False(buttons["Keep this frame"].IsEnabled);
@@ -240,10 +263,12 @@ public sealed class UiRedesignTests
                     try
                     {
                         LayoutWindow(scroll);
+                        RenderReview(scroll, "scroll-Dark");
                         var buttons = Children<Button>(scroll).Where(b => b.Content is string).ToDictionary(b => (string)b.Content);
                         Assert.False(buttons["Capture next frame"].IsEnabled); Assert.False(buttons["Create screenshot"].IsEnabled);
                         Assert.True(buttons["Keep this frame"].IsEnabled); Assert.True(buttons["Discard this frame"].IsEnabled);
                         buttons["Discard this frame"].RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                        RunUiTask(async () => { await scroll.PendingWork(); return true; });
                         Assert.Null(session.Pending); Assert.Single(session.Frames);
                         Assert.True(buttons["Capture next frame"].IsEnabled); Assert.True(buttons["Create screenshot"].IsEnabled);
                     }
@@ -253,6 +278,7 @@ public sealed class UiRedesignTests
                 try
                 {
                     var view = (FrameworkElement)history.Content; view.Measure(new Size(1080, 720)); view.Arrange(new Rect(0, 0, 1080, 720)); view.UpdateLayout();
+                    RunUiTask(async () => { await history.DrainPreviewAsync(); return true; });
                     Assert.True(VirtualizingPanel.GetIsVirtualizing(history.CaptureList)); Assert.InRange(history.CachedThumbnailCount, 1, 24);
                     history.CaptureList.SelectedIndex = 0; var id = controller.Repository.Captures[0].Id;
                     controller.Repository.Replace(controller.Repository.Captures[0], png, 160, 100);
@@ -296,6 +322,8 @@ public sealed class UiRedesignTests
                     Assert.Equal("Export cancelled before file commit.", form.Children.OfType<TextBlock>().Last().Text);
                 }
                 finally { operation.Complete("Completed"); operation.Close(); }
+                RenderReview(editor, "editor-Dark");
+                Ui.Theme(AppTheme.Light, 1); RenderReview(editor, "editor-Light"); Ui.Theme(AppTheme.Dark, 1);
                 foreach (var tool in Enum.GetValues<EditTool>()) { editor.ToolPicker.SelectedValue = tool; Assert.Equal(tool, editor.ToolPicker.SelectedValue); }
                 var closed = false; editor.Closed += (_, _) => closed = true;
                 editor.Close();
@@ -341,6 +369,60 @@ public sealed class UiRedesignTests
             return true;
         });
     }
+    // Opt-in rendered fixtures keep review artifacts outside the repository.
+    private static void VerifyRedesignPreviews(AppController controller)
+    {
+        var output = Environment.GetEnvironmentVariable("SNIPPYGRAB_REDESIGN_PREVIEWS");
+        foreach (var theme in new[] { AppTheme.Dark, AppTheme.Light })
+        {
+            Ui.Theme(theme, 1);
+            foreach (var key in new[] { "Surface", "Raised", "Canvas", "Hover", "Pressed", "Border", "Selected", "Primary", "Accent" })
+            {
+                var neutral = ((SolidColorBrush)Ui.Brush(key)).Color;
+                Assert.Equal(neutral.R, neutral.G); Assert.Equal(neutral.G, neutral.B);
+            }
+            static double Luminance(Brush brush)
+            {
+                var c = ((SolidColorBrush)brush).Color;
+                static double Linear(byte value) { var v = value / 255d; return v <= 0.04045 ? v / 12.92 : Math.Pow((v + 0.055) / 1.055, 2.4); }
+                return 0.2126 * Linear(c.R) + 0.7152 * Linear(c.G) + 0.0722 * Linear(c.B);
+            }
+            foreach (var (foreground, background) in new[] { ("Ink", "Surface"), ("Muted", "Surface"), ("Muted", "Raised"), ("PrimaryInk", "Primary") })
+            {
+                var a = Luminance(Ui.Brush(foreground)); var b = Luminance(Ui.Brush(background));
+                Assert.True((Math.Max(a, b) + 0.05) / (Math.Min(a, b) + 0.05) >= 4.5, $"{theme}: {foreground}/{background} text contrast");
+            }
+            if (string.IsNullOrWhiteSpace(output)) continue;
+            Directory.CreateDirectory(output);
+            var settings = new SettingsWindow(controller);
+            try { for (var i = 0; i < SettingsWindow.Categories.Length; i++) { settings.SelectCategory(i); RenderReview(settings, "settings-" + i + "-" + theme); } }
+            finally { settings.Close(); }
+            var welcome = new WelcomeWindow(controller); try { RenderReview(welcome, "welcome-" + theme); } finally { welcome.Close(); }
+            var history = new HistoryWindow(controller); try { RenderReview(history, "history-empty-" + theme); } finally { history.Close(); }
+            var export = new ExportWindow(new CaptureRecord(), "", "", null); try { RenderReview(export, "export-" + theme); } finally { export.Close(); }
+            var dialog = new DialogWindow("Keep this capture?", "Your screenshot stays on this device. Export it to keep a copy outside the temporary shelf."); try { RenderReview(dialog, "dialog-" + theme); } finally { dialog.Close(); }
+        }
+        Ui.Theme(AppTheme.Dark, 1);
+    }
+    private static void RenderReview(Window window, string name)
+    {
+        var output = Environment.GetEnvironmentVariable("SNIPPYGRAB_REDESIGN_PREVIEWS");
+        if (string.IsNullOrWhiteSpace(output)) return;
+        Directory.CreateDirectory(output);
+        window.ShowActivated = false; window.WindowStartupLocation = WindowStartupLocation.Manual; window.Left = -30000; window.Top = -30000;
+        window.Show(); window.UpdateLayout();
+        var content = (FrameworkElement)window.Content;
+        var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap((int)Math.Ceiling(content.ActualWidth), (int)Math.Ceiling(content.ActualHeight), 96, 96, PixelFormats.Pbgra32);
+        var visual = new DrawingVisual();
+        using (var drawing = visual.RenderOpen())
+        {
+            var bounds = new Rect(0, 0, bitmap.PixelWidth, bitmap.PixelHeight);
+            drawing.DrawRectangle(Ui.Brush("Surface"), null, bounds); drawing.DrawRectangle(new VisualBrush(content), null, bounds);
+        }
+        bitmap.Render(visual);
+        var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder(); encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
+        using var stream = File.Create(Path.Combine(output, $"{name}.png")); encoder.Save(stream);
+    }
     private static T RunUiTask<T>(Func<Task<T>> action)
     {
         var dispatcher = System.Windows.Threading.Dispatcher.CurrentDispatcher;
@@ -351,5 +433,43 @@ public sealed class UiRedesignTests
         _ = task.ContinueWith(_ => dispatcher.BeginInvoke(new Action(() => frame.Continue = false)));
         System.Windows.Threading.Dispatcher.PushFrame(frame); timeout.Stop();
         Assert.True(task.IsCompleted, "UI operation did not complete within 15 seconds."); return task.GetAwaiter().GetResult();
+    }
+    private static async Task VerifyStorageAndHistoryCollection(AppController controller, string root)
+    {
+        var owner = Environment.CurrentManagedThreadId;
+        using var entered = new ManualResetEventSlim(); using var release = new ManualResetEventSlim();
+        var writerThreads = new List<int>(); var changedThread = 0;
+        var repository = new CaptureRepository(Path.Combine(root, "async-storage"), (path, bytes) =>
+        {
+            writerThreads.Add(Environment.CurrentManagedThreadId);
+            entered.Set(); if (!release.Wait(TimeSpan.FromSeconds(10))) throw new TimeoutException(); AtomicFile.Write(path, bytes);
+        });
+        repository.Changed += () => changedThread = Environment.CurrentManagedThreadId;
+        var capture = repository.AddAsync([1], 1, 1);
+        try
+        {
+            var heartbeat = new TaskCompletionSource();
+            _ = Application.Current.Dispatcher.BeginInvoke(new Action(() => heartbeat.SetResult()));
+            await heartbeat.Task; Assert.False(capture.IsCompleted);
+        }
+        finally { release.Set(); }
+        await capture; Assert.NotEmpty(writerThreads); Assert.All(writerThreads, thread => Assert.NotEqual(owner, thread)); Assert.Equal(owner, changedThread);
+        var references = new List<WeakReference>();
+        for (var i = 0; i < 12; i++) await CloseHistory(controller, references);
+        await Task.Delay(200);
+        GC.Collect(); GC.WaitForPendingFinalizers(); GC.Collect();
+        await System.Windows.Threading.Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+        GC.Collect();
+        Assert.All(references, reference => Assert.False(reference.IsAlive, "Closed History window is still rooted."));
+    }
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static async Task CloseHistory(AppController controller, List<WeakReference> references)
+    {
+        var history = new HistoryWindow(controller) { Left = -30000, Top = -30000, ShowActivated = false, WindowStartupLocation = WindowStartupLocation.Manual };
+        history.Show(); history.CaptureList.SelectedIndex = 0; await history.PreviewWork;
+        references.Add(new WeakReference(history)); history.Close(); await history.DrainPreviewAsync();
+        // Release the async helper's own local before forcing GC in its caller.
+        history = null!;
+        await System.Windows.Threading.Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.ApplicationIdle);
     }
 }

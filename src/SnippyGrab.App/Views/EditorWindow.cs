@@ -63,13 +63,13 @@ internal sealed class EditorWindow : Window
         menu.Items.Add(Ui.Menu("Discard changes", "close", () => { discard = true; Close(); }));
         menu.Opened += (_, _) => openFolderItem.IsEnabled = openExportFolder.IsEnabled;
         more.ContextMenu = menu; menu.PlacementTarget = more; actions.Children.Add(more);
-        var header = new Grid { Margin = new Thickness(18, 12, 14, 12) };
+        var header = new Grid { Margin = new Thickness(22, 16, 18, 16) };
         header.ColumnDefinitions.Add(new() { Width = new GridLength(1, GridUnitType.Star) }); header.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
-        var title = Ui.Heading("Screenshot editor", 20); title.VerticalAlignment = VerticalAlignment.Center; header.Children.Add(title);
+        var title = Ui.Heading("Screenshot editor", 24); title.VerticalAlignment = VerticalAlignment.Center; header.Children.Add(title);
         Grid.SetColumn(actions, 1); header.Children.Add(actions);
         header.SizeChanged += (_, _) => { var compact = header.ActualWidth < 760 * Ui.TextScale; actions.MaxWidth = Math.Max(300, header.ActualWidth); Grid.SetColumn(actions, compact ? 0 : 1); title.Visibility = compact ? Visibility.Collapsed : Visibility.Visible; };
         DockPanel.SetDock(header, Dock.Top); root.Children.Add(header);
-        var toolbar = new WrapPanel { Margin = new Thickness(14, 8, 14, 8) };
+        var toolbar = new WrapPanel { Margin = new Thickness(18, 10, 18, 10) };
         tools = new ComboBox { MinWidth = 138, ItemsSource = Enum.GetValues<EditTool>().Select(t => new ToolChoice(t, ToolLabel(t))), DisplayMemberPath = nameof(ToolChoice.Label), SelectedValuePath = nameof(ToolChoice.Tool), SelectedValue = EditTool.Arrow, ToolTip = "Annotation tool" };
         toolbar.Children.Add(tools);
         color = new TextBox { Text = controller.Settings.AnnotationColor, Width = 112, ToolTip = "Color (#RRGGBB or #AARRGGBB)" };
@@ -91,7 +91,7 @@ internal sealed class EditorWindow : Window
         DockPanel.SetDock(properties, Dock.Top); root.Children.Add(properties);
         status = Ui.Text(string.IsNullOrWhiteSpace(record.ExportPath) ? "Apply + copy updates the managed shelf image. Export image writes a separate file. Closing applies edits; Discard leaves pending edits unapplied." : "Last image export: " + record.ExportPath, 12, true);
         status.TextWrapping = TextWrapping.Wrap;
-        var footer = new Grid { Margin = new Thickness(14, 8, 14, 8) }; footer.ColumnDefinitions.Add(new() { Width = new GridLength(1, GridUnitType.Star) }); footer.ColumnDefinitions.Add(new() { Width = GridLength.Auto }); footer.RowDefinitions.Add(new() { Height = GridLength.Auto }); footer.RowDefinitions.Add(new() { Height = GridLength.Auto });
+        var footer = new Grid { Margin = new Thickness(18, 10, 18, 10) }; footer.ColumnDefinitions.Add(new() { Width = new GridLength(1, GridUnitType.Star) }); footer.ColumnDefinitions.Add(new() { Width = GridLength.Auto }); footer.RowDefinitions.Add(new() { Height = GridLength.Auto }); footer.RowDefinitions.Add(new() { Height = GridLength.Auto });
         var zoomActions = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right };
         zoomActions.Children.Add(Ui.Button("−", "Zoom out", () => Zoom(scale.ScaleX / 1.2)));
         zoomActions.Children.Add(Ui.Button("+", "Zoom in", () => Zoom(scale.ScaleX * 1.2)));
@@ -105,13 +105,13 @@ internal sealed class EditorWindow : Window
         viewport = new ScrollViewer { Content = surface, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Background = new SolidColorBrush(Color.FromRgb(12, 15, 19)) };
         viewport.SetResourceReference(BackgroundProperty, "Canvas");
         var canvas = new Grid(); canvas.ColumnDefinitions.Add(new() { Width = GridLength.Auto }); canvas.ColumnDefinitions.Add(new() { Width = new GridLength(1, GridUnitType.Star) });
-        var rail = new StackPanel { Margin = new Thickness(8, 4, 8, 4) };
+        var rail = new StackPanel { Margin = new Thickness(10, 12, 10, 12) };
         var toolButtons = new Dictionary<EditTool, Button>();
         foreach (var tool in new[] { EditTool.Arrow, EditTool.Rectangle, EditTool.Ellipse, EditTool.Line, EditTool.Pen, EditTool.Text, EditTool.Highlight, EditTool.Number, EditTool.Blur, EditTool.Pixelate, EditTool.Redact, EditTool.Spotlight, EditTool.Crop, EditTool.OcrArea, EditTool.ColorPicker, EditTool.Magnify })
         {
             if (tool is EditTool.Blur or EditTool.Crop) { var separator = Ui.Rule(); separator.Margin = new Thickness(0, 4, 0, 4); rail.Children.Add(separator); }
             var button = Ui.IconButton(ToolIcon(tool), ToolLabel(tool), () => tools.SelectedValue = tool);
-            button.Width = 40; button.Height = 32; button.MinHeight = 32; button.Padding = new Thickness(5); button.Margin = new Thickness(0); button.Tag = tool;
+            button.Width = 40; button.Height = 32; button.MinHeight = 32; button.Padding = new Thickness(5); button.Margin = new Thickness(0, 0, 0, 0); button.Tag = tool;
             toolButtons.Add(tool, button); rail.Children.Add(button);
         }
         var railScroll = new ScrollViewer { Content = rail, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
@@ -192,7 +192,7 @@ internal sealed class EditorWindow : Window
     {
         var state = journal.Current;
         var area = new PixelRect(Math.Clamp((int)point.X, 0, state.Base.PixelWidth - 1), Math.Clamp((int)point.Y, 0, state.Base.PixelHeight - 1), 1, 1);
-        var image = await Task.Run(() => RenderRegion(state, area));
+        var image = await ImageWorker.RunAsync(() => RenderRegion(state, area));
         var picked = SampleColor(image, new(0, 0));
         color.Text = $"#{picked.R:X2}{picked.G:X2}{picked.B:X2}";
         status.Text = "Annotation color: " + color.Text + ". Sampled from the edited image; select a drawing tool to use it.";
@@ -246,7 +246,8 @@ internal sealed class EditorWindow : Window
         if (mark.Tool is not (EditTool.Crop or EditTool.Blur or EditTool.Pixelate)) return Task.FromResult(state with { Marks = [.. state.Marks, mark] });
         var area = PixelRect.Between((int)mark.Start.X, (int)mark.Start.Y, (int)mark.End.X, (int)mark.End.Y).Intersect(new(0, 0, state.Base.PixelWidth, state.Base.PixelHeight));
         if (area.Width < 2 || area.Height < 2) return Task.FromResult(state);
-        return Task.Run(() =>
+        ImageLimits.Validate((long)area.Width * area.Height, mark.Tool == EditTool.Crop ? state.Marks.Length == 0 ? 0 : 12 : 24, "Editor operation");
+        return ImageWorker.RunAsync(() =>
         {
             // Create the drawing on this worker; all input bitmaps are frozen and cross-thread safe.
             var crop = RenderRegion(state, area);
@@ -263,8 +264,8 @@ internal sealed class EditorWindow : Window
     private async Task<BitmapSource> ApplyAsync()
     {
         var image = await RenderAsync(journal.Current);
-        var png = await Task.Run(() => ImageService.Png(image));
-        controller.Repository.Replace(record, png, image.PixelWidth, image.PixelHeight, expectedRevision);
+        var png = await ImageWorker.RunAsync(() => ImageService.Png(image));
+        await controller.Repository.ReplaceAsync(record, png, image.PixelWidth, image.PixelHeight, expectedRevision);
         expectedRevision = record.FileName;
         dirty = false; controller.Dock.Refresh(); return image;
     }
@@ -335,14 +336,10 @@ internal sealed class EditorWindow : Window
     private async Task CopyDocumentOcr(PixelRect? area = null)
     {
         var token = ocrLifetime.Token; var state = journal.Current;
-        var image = await Task.Run(() => area is { } crop ? RenderRegion(state, crop) : Render(state));
-        if (!token.IsCancellationRequested) await CopyOcr(image);
-    }
-    private async Task CopyOcr(BitmapSource image)
-    {
+        var bounds = area?.Intersect(new(0, 0, state.Base.PixelWidth, state.Base.PixelHeight)) ?? new PixelRect(0, 0, state.Base.PixelWidth, state.Base.PixelHeight);
+        if ((long)bounds.Width * bounds.Height > ImageLimits.MaxOcrPixels) { status.Text = "OCR supports up to 16 megapixels. Use OCR selected area or crop the image first."; return; }
         status.Text = "Reading text locally…";
-        var token = ocrLifetime.Token;
-        var outcome = await controller.OcrText(image, token);
+        var outcome = await controller.OcrPreparedImage(cancellation => ImageWorker.RunAsync(() => area is { } crop ? RenderRegion(state, crop) : Render(state), cancellation), token);
         if (!token.IsCancellationRequested) status.Text = outcome;
     }
     internal static long RetainedBytes(IReadOnlyList<EditorState> states)
@@ -379,7 +376,7 @@ internal sealed class EditorWindow : Window
         }
         var bitmap = new RenderTargetBitmap(area.Width, area.Height, 96, 96, PixelFormats.Pbgra32); bitmap.Render(drawing); bitmap.Freeze(); return bitmap;
     }
-    internal static Task<BitmapSource> RenderAsync(EditorState state) => Task.Run(() => Render(state));
+    internal static Task<BitmapSource> RenderAsync(EditorState state) => ImageWorker.RunAsync(() => Render(state));
     internal static void Draw(DrawingContext dc, Annotation m, int width, int height)
     {
         var brush = new SolidColorBrush(m.Color); var pen = new Pen(brush, m.Stroke) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round, LineJoin = PenLineJoin.Round };

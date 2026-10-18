@@ -36,6 +36,7 @@ public static class BatchExport
         if (plan.Any(p => p.Capture.FileName != p.Revision)) throw new InvalidOperationException("Captures changed before batch export started. Select them again.");
         int success = 0, skipped = 0, failed = 0, warnings = 0, processed = 0;
         var errors = new List<string>();
+        var exports = new List<(CaptureRecord Capture, string Revision, string Path)>();
         foreach (var item in plan)
         {
             if (cancellation.IsCancellationRequested) break;
@@ -49,7 +50,7 @@ public static class BatchExport
                     cancellation.ThrowIfCancellationRequested();
                     CaptureExport.ValidateDestination(repository.Root, item.Destination, format);
                     if (collision == ExportCollision.Skip && (File.Exists(item.Destination) || Directory.Exists(item.Destination))) return false;
-                    try { AtomicFile.Write(item.Destination, bytes, collision == ExportCollision.Replace); }
+                    try { CaptureExport.WriteDestination(repository.Root, item.Destination, format, bytes, collision == ExportCollision.Replace); }
                     catch (IOException) when (collision == ExportCollision.Skip && (File.Exists(item.Destination) || Directory.Exists(item.Destination))) { return false; }
                     return true;
                 }, cancellation);
@@ -57,7 +58,7 @@ public static class BatchExport
                 else
                 {
                     success++;
-                    if (item.Capture.FileName != item.Revision || !repository.Captures.Contains(item.Capture) || !CaptureExport.Remember(repository, item.Capture, item.Destination).MetadataSaved) warnings++;
+                    exports.Add((item.Capture, item.Revision, item.Destination));
                 }
             }
             catch (OperationCanceledException) { break; }
@@ -65,6 +66,9 @@ public static class BatchExport
             { failed++; var error = $"Item {processed + 1} ({Path.GetFileName(item.Destination)}): {OperationFailure.From(ex).Message}"; errors.Add(error); progress?.Report(error); }
             processed++;
         }
+        // Completed files remain durable on cancellation; commit their history once.
+        try { warnings = await repository.RememberExportsAsync(exports); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or InvalidOperationException) { warnings = exports.Count; }
         return new(success, skipped, failed, plan.Count - processed, warnings) { Errors = errors.ToArray() };
     }
 }

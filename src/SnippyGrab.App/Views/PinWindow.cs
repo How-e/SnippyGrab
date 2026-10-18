@@ -27,14 +27,14 @@ internal sealed class PinWindow : Window
         preview = new Image { Stretch = Stretch.Uniform };
         RenderOptions.SetBitmapScalingMode(preview, BitmapScalingMode.HighQuality);
         var frame = new Grid(); frame.Children.Add(preview);
-        var chrome = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Bottom, Visibility = Visibility.Collapsed };
+        var chrome = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(4), VerticalAlignment = VerticalAlignment.Bottom, Visibility = Visibility.Collapsed };
         chrome.SetResourceReference(Panel.BackgroundProperty, "Raised");
         chrome.Children.Add(Ui.ActionButton("Copy", "copy", "Copy pinned image", () => controller.Run(() => controller.Copy(record)), "QuietButton"));
         chrome.Children.Add(Ui.ActionButton("Edit", "edit", "Edit pinned image", () => controller.Edit(record), "QuietButton"));
         chrome.Children.Add(Ui.IconButton("more", "Pinned image actions", () => { ContextMenu.PlacementTarget = this; ContextMenu.IsOpen = true; }));
         frame.Children.Add(chrome);
         SizeChanged += (_, _) => { foreach (var button in chrome.Children.OfType<Button>().Take(2)) button.Visibility = ActualWidth < 220 * Ui.TextScale ? Visibility.Collapsed : Visibility.Visible; };
-        var border = new Border { Child = frame, CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1) };
+        var border = new Border { Child = frame, CornerRadius = new CornerRadius(12), BorderThickness = new Thickness(1) };
         border.SetResourceReference(Border.BorderBrushProperty, "Border"); border.SetResourceReference(Border.BackgroundProperty, "Surface"); Content = border;
         MouseEnter += (_, _) => chrome.Visibility = Visibility.Visible;
         MouseLeave += (_, _) => { if (!ContextMenu.IsOpen) chrome.Visibility = Visibility.Collapsed; };
@@ -53,7 +53,7 @@ internal sealed class PinWindow : Window
         menu.Items.Add(new MenuItem { Header = opacityRow, StaysOpenOnClick = true });
         var through = Ui.Menu("Click-through", "capture", () => { SetClickThrough(!clickThrough); SaveLayout(); }); through.IsCheckable = true; through.ToolTip = "Restore interaction through tray → Restore pins."; menu.Items.Add(through);
         menu.Items.Add(new Separator());
-        menu.Items.Add(Ui.Menu("Return to shelf", "left", () => { controller.Repository.Restore([record], DateTimeOffset.UtcNow); controller.Dock.Reveal(); Close(); }));
+        menu.Items.Add(Ui.Menu("Return to shelf", "left", () => controller.Run(async () => { await controller.Repository.RestoreAsync([record], DateTimeOffset.UtcNow); if (!controller.Exiting) controller.Dock.Reveal(); if (!closed) Close(); })));
         menu.Items.Add(Ui.Menu("Close pin window", "close", Close));
         menu.Opened += (_, _) => { onTop.IsChecked = Topmost; through.IsChecked = clickThrough; opacity.Value = Opacity; opacityLabel.Text = $"Opacity {Opacity:P0}"; };
         menu.Closed += (_, _) => { if (!IsMouseOver) chrome.Visibility = Visibility.Collapsed; };
@@ -98,7 +98,8 @@ internal sealed class PinWindow : Window
         if (record.PinLayout is { } saved)
         {
             var layout = saved.Normalize(); var monitors = MonitorService.All();
-            var monitor = monitors.FirstOrDefault(m => m.Identity == layout.MonitorIdentity) ?? monitors.FirstOrDefault(m => m.Primary) ?? monitors[0];
+            var monitor = RestoreMonitor(monitors, layout.MonitorIdentity);
+            if (monitor is null) { ready = true; return; }
             var bounds = layout.Place(monitor.Work, monitor.Dpi);
             Width = DpiGeometry.ToDip(bounds.Width, monitor.Dpi); Height = DpiGeometry.ToDip(bounds.Height, monitor.Dpi);
             Topmost = layout.Topmost; Opacity = layout.Opacity;
@@ -113,12 +114,17 @@ internal sealed class PinWindow : Window
         controller.Try(() =>
         {
             if (!Native.GetWindowRect(new WindowInteropHelper(this).Handle, out var rect)) return;
-            var monitor = MonitorService.All().OrderByDescending(m => m.Bounds.Intersect(rect.Pixels).Width * (long)m.Bounds.Intersect(rect.Pixels).Height).First();
+            var monitor = LayoutMonitor(MonitorService.All(), rect.Pixels);
+            if (monitor is null) return;
             var layout = new PinLayout(monitor.Identity, DpiGeometry.ToDip(rect.Left - monitor.Work.X, monitor.Dpi), DpiGeometry.ToDip(rect.Top - monitor.Work.Y, monitor.Dpi),
                 DpiGeometry.ToDip(rect.Pixels.Width, monitor.Dpi), DpiGeometry.ToDip(rect.Pixels.Height, monitor.Dpi), Opacity, Topmost, clickThrough);
-            if (record.PinLayout != layout) controller.Repository.SetPinLayout(record, layout);
+            if (record.PinLayout != layout) controller.Run(() => controller.Repository.SetPinLayoutAsync(record, layout));
         });
     }
+    internal static MonitorInfo? RestoreMonitor(IReadOnlyList<MonitorInfo> monitors, string identity)
+        => monitors.FirstOrDefault(m => m.Identity == identity) ?? monitors.FirstOrDefault(m => m.Primary) ?? monitors.FirstOrDefault();
+    internal static MonitorInfo? LayoutMonitor(IReadOnlyList<MonitorInfo> monitors, PixelRect bounds)
+        => monitors.OrderByDescending(m => m.Bounds.Intersect(bounds).Width * (long)m.Bounds.Intersect(bounds).Height).FirstOrDefault();
     private void RefreshPreview()
     {
         if (closed) return;

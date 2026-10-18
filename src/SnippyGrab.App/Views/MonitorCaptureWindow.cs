@@ -8,10 +8,10 @@ internal sealed class MonitorCaptureWindow : Window
     internal CaptureTarget? Target { get; private set; }
     internal MonitorCaptureWindow()
     {
-        Ui.StyleWindow(this); Title = "SnippyGrab · Capture monitor"; Width = 540; Height = 300; MinWidth = 420; MinHeight = 260;
+        Ui.StyleWindow(this); Title = "SnippyGrab · Capture monitor"; Width = 540; Height = 380; MinWidth = 420; MinHeight = 260;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         var root = new StackPanel { Margin = new Thickness(24) }; Content = Ui.Scroll(root);
-        root.Children.Add(Ui.Heading("Capture monitor")); root.Children.Add(Ui.Text("Choose the complete display, including its taskbar.", 14, true));
+        root.Children.Add(Ui.PageHeading("Capture monitor", "Capture an entire display in one step.", "desktop")); root.Children.Add(Ui.Text("Choose the complete display, including its taskbar.", 14, true));
         var displays = MonitorService.All();
         var picker = new ComboBox { ItemsSource = displays.Select(m => new DisplayChoice(m.Identity, $"Display {m.Index + 1} · {m.Bounds.Width} × {m.Bounds.Height}" + (m.Primary ? " · primary" : ""))).ToArray(), SelectedIndex = displays.Count > 0 ? 0 : -1, Margin = new Thickness(0, 18, 0, 18) };
         AutomationProperties.SetName(picker, "Display to capture"); root.Children.Add(picker);

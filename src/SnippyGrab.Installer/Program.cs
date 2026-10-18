@@ -59,10 +59,10 @@ internal static class Program
         var identity = version.Split('+', 2);
         version = identity[0] + (identity.Length == 2 ? " · " + identity[1][..Math.Min(8, identity[1].Length)] : "");
         var form = new SetupForm { Text = "SnippyGrab Setup", ClientSize = new Size(720, 570), MinimumSize = new Size(600, 510), StartPosition = FormStartPosition.CenterScreen, Font = new Font("Segoe UI", 10.5f), Icon = Icon.ExtractAssociatedIcon(Environment.ProcessPath!) };
-        var root = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(24), ColumnCount = 1, RowCount = 2 };
+        var root = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(30), ColumnCount = 1, RowCount = 2 };
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         var content = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true, Margin = Padding.Empty };
-        var title = new Label { Text = "Install SnippyGrab", Font = new Font("Segoe UI", 25, FontStyle.Bold), AutoSize = true, Margin = new Padding(0, 0, 0, 4) };
+        var title = new Label { Text = "Your screenshot shelf awaits.", Font = new Font("Segoe UI", 23, FontStyle.Bold), AutoSize = true, Margin = new Padding(0, 0, 0, 4) };
         content.Controls.Add(title);
         content.Controls.Add(new Label { Text = version, AutoSize = true, Margin = new Padding(0, 0, 0, 8), Tag = "muted" });
         content.Controls.Add(new Label { Text = "A local screenshot shelf. No accounts or uploads.", AutoSize = true, Margin = new Padding(0, 0, 0, 20), Tag = "muted" });
@@ -124,15 +124,15 @@ internal static class Program
         {
             var dark = Microsoft.Win32.Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "AppsUseLightTheme", 1) is int value && value == 0;
             Color Token(string light, string night) => ColorTranslator.FromHtml(dark ? night : light);
-            var shell = SystemInformation.HighContrast ? SystemColors.Window : Token("#F7F7F8", "#1C1D20");
-            var raised = SystemInformation.HighContrast ? SystemColors.Window : Token("#FFFFFF", "#252629");
-            var ink = SystemInformation.HighContrast ? SystemColors.WindowText : Token("#202124", "#F1F2F4");
-            var muted = SystemInformation.HighContrast ? SystemColors.WindowText : Token("#60646C", "#B2B5BD");
-            var border = SystemInformation.HighContrast ? SystemColors.WindowText : Token("#D4D5D8", "#44464D");
+            var shell = SystemInformation.HighContrast ? SystemColors.Window : Token("#F5F5F5", "#191919");
+            var raised = SystemInformation.HighContrast ? SystemColors.Window : Token("#FFFFFF", "#242424");
+            var ink = SystemInformation.HighContrast ? SystemColors.WindowText : Token("#242424", "#F2F2F2");
+            var muted = SystemInformation.HighContrast ? SystemColors.WindowText : Token("#606060", "#B8B8B8");
+            var border = SystemInformation.HighContrast ? SystemColors.WindowText : Token("#D2D2D2", "#444444");
             void Apply(Control control)
             {
                 var role = control.Tag as string ?? ""; control.BackColor = role == "group" ? raised : control.Parent?.BackColor ?? shell; control.ForeColor = role == "muted" ? muted : ink;
-                if (control is Button button) { button.BackColor = role == "primary" ? SystemInformation.HighContrast ? SystemColors.Highlight : ColorTranslator.FromHtml("#465F84") : raised; button.ForeColor = role == "primary" ? SystemInformation.HighContrast ? SystemColors.HighlightText : Color.White : ink; button.FlatAppearance.BorderColor = border; button.FlatAppearance.MouseOverBackColor = role == "primary" ? button.BackColor : Token("#ECEDEF", "#303238"); }
+                if (control is Button button) { button.BackColor = role == "primary" ? SystemInformation.HighContrast ? SystemColors.Highlight : ColorTranslator.FromHtml("#505050") : raised; button.ForeColor = role == "primary" ? SystemInformation.HighContrast ? SystemColors.HighlightText : Color.White : ink; button.FlatAppearance.BorderColor = border; button.FlatAppearance.MouseOverBackColor = role == "primary" ? button.BackColor : Token("#EBEBEB", "#303030"); }
                 if (role == "group" && roles.TryAdd(control, role)) control.Paint += (_, e) =>
                 {
                     var diameter = Math.Min(16f * control.DeviceDpi / 96, Math.Min(control.Width - 1, control.Height - 1));
@@ -145,7 +145,7 @@ internal static class Program
                     e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
                     e.Graphics.Clear(control.Parent?.BackColor ?? BackColor);
                     using var fill = new SolidBrush(control.BackColor); e.Graphics.FillPath(fill, outline);
-                    using var pen = new Pen(SystemInformation.HighContrast ? SystemColors.WindowText : ColorTranslator.FromHtml(BackColor.GetBrightness() < 0.5 ? "#44464D" : "#D4D5D8")); e.Graphics.DrawPath(pen, outline);
+                    using var pen = new Pen(SystemInformation.HighContrast ? SystemColors.WindowText : ColorTranslator.FromHtml(BackColor.GetBrightness() < 0.5 ? "#444444" : "#D2D2D2")); e.Graphics.DrawPath(pen, outline);
                 };
                 foreach (Control child in control.Controls) Apply(child);
             }
@@ -169,7 +169,7 @@ internal static class Program
             using var process = Process.Start(info) ?? throw new InvalidOperationException("Installer process unavailable.");
             var output = process.StandardOutput.ReadToEndAsync(); var error = process.StandardError.ReadToEndAsync(); process.WaitForExit();
             Task.WaitAll(output, error);
-            if (process.ExitCode != 0) throw new InvalidOperationException("Installation failed: " + error.Result);
+            if (process.ExitCode != 0) throw new InvalidOperationException("Installation failed: " + (string.IsNullOrWhiteSpace(error.Result) ? string.IsNullOrWhiteSpace(output.Result) ? $"Installer exited with code {process.ExitCode}." : output.Result : error.Result));
         }
         finally { Directory.Delete(root, true); }
     }

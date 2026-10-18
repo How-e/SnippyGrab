@@ -67,7 +67,7 @@ internal sealed class OcrService(string? modelDirectory = null, Func<Settings>? 
         await serial.WaitAsync(cancellation);
         try
         {
-            return await Task.Run(() =>
+            return await ImageWorker.RunAsync(() =>
             {
                 cancellation.ThrowIfCancellationRequested();
                 var directory = modelDirectory ?? Path.Combine(AppContext.BaseDirectory, "tessdata");
@@ -93,7 +93,7 @@ internal sealed class OcrService(string? modelDirectory = null, Func<Settings>? 
         await serial.WaitAsync(cancellation);
         try
         {
-            return await Task.Run(() =>
+            return await ImageWorker.RunAsync(() =>
             {
                 cancellation.ThrowIfCancellationRequested();
                 var directory = modelDirectory ?? Path.Combine(AppContext.BaseDirectory, "tessdata");
@@ -101,9 +101,9 @@ internal sealed class OcrService(string? modelDirectory = null, Func<Settings>? 
                 var admitted = InspectPackage(directory, AppContext.BaseDirectory);
                 if (admitted.Status != OcrReadinessStatus.Ready) { ResetEngine(); throw new OcrUnavailableException(admitted); }
                 using (var encoded = new MemoryStream(png, writable: false)) ImageService.ValidateEncoded(encoded);
-                var engine = Engine(directory);
                 // Windows decodes admitted images; native OCR receives raw pixels, never codec input.
                 using var pix = DecodePixels(png, cancellation);
+                var engine = Engine(directory);
                 if ((long)pix.Width * pix.Height > ImageService.MaxPixels) throw new InvalidDataException("OCR image exceeds 80 megapixels.");
                 var mode = layout switch { OcrLayout.SparseText => PageSegMode.SparseText, OcrLayout.SingleBlock => PageSegMode.SingleBlock, _ => PageSegMode.Auto };
                 string text; float confidence; int lineHeight; PixelRect textArea;
@@ -180,6 +180,15 @@ internal sealed class OcrService(string? modelDirectory = null, Func<Settings>? 
     {
         using var stream = new MemoryStream(encoded, writable: false);
         ImageService.ValidateEncoded(stream); stream.Position = 0;
+        Span<byte> dimensions = stackalloc byte[24]; stream.ReadExactly(dimensions); stream.Position = 0;
+        if (dimensions[..8].SequenceEqual(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 }) &&
+            (long)System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(dimensions.Slice(16, 4)) * System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(dimensions.Slice(20, 4)) > ImageLimits.MaxOcrPixels)
+            throw new InvalidDataException("OCR supports up to 16 megapixels per operation. Use OCR selected area or crop the image first.");
+        var header = BitmapDecoder.Create(stream, BitmapCreateOptions.DelayCreation, BitmapCacheOption.None);
+        if (header is not (PngBitmapDecoder or JpegBitmapDecoder or BmpBitmapDecoder)) throw new InvalidDataException("Unsupported OCR image codec.");
+        if ((long)header.Frames[0].PixelWidth * header.Frames[0].PixelHeight > ImageLimits.MaxOcrPixels)
+            throw new InvalidDataException("OCR supports up to 16 megapixels per operation. Use OCR selected area or crop the image first.");
+        stream.Position = 0;
         var decoder = BitmapDecoder.Create(stream, BitmapCreateOptions.PreservePixelFormat, BitmapCacheOption.OnLoad);
         if (decoder is not (PngBitmapDecoder or JpegBitmapDecoder or BmpBitmapDecoder)) throw new InvalidDataException("Unsupported OCR image codec.");
         var image = decoder.Frames[0];
@@ -210,23 +219,34 @@ internal sealed class OcrService(string? modelDirectory = null, Func<Settings>? 
     private delegate nint CreatePix(int width, int height, int depth);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate int SetSamples(nint pix, int samples);
-    private static Pix CreateRgba(int width, int height)
+    private sealed record PixCodec(nint Library, CreatePix Create, SetSamples Samples, SetSamples InputFormat);
+    private static readonly Lazy<PixCodec> NativePixels = new(() =>
     {
         var library = NativeLibrary.Load(Path.Combine(AppContext.BaseDirectory, "x64", "leptonica-1.82.0.dll"));
         try
         {
-            var handle = Marshal.GetDelegateForFunctionPointer<CreatePix>(NativeLibrary.GetExport(library, "pixCreate"))(width, height, 32);
-            var pix = Pix.Create(handle);
-            try
-            {
-                // pixCreate defaults to RGB. Preserve the PNG reader's RGBA semantics for OCR.
-                if (Marshal.GetDelegateForFunctionPointer<SetSamples>(NativeLibrary.GetExport(library, "pixSetSpp"))(handle, 4) != 0) throw new InvalidOperationException("Could not initialize OCR pixels.");
-                if (Marshal.GetDelegateForFunctionPointer<SetSamples>(NativeLibrary.GetExport(library, "pixSetInputFormat"))(handle, 3) != 0) throw new InvalidOperationException("Could not initialize OCR alpha handling."); // IFF_PNG
-                return pix;
-            }
-            catch { pix.Dispose(); throw; }
+            // Keep the module loaded for the process lifetime, including returned Pix objects.
+            return new(library,
+                Marshal.GetDelegateForFunctionPointer<CreatePix>(NativeLibrary.GetExport(library, "pixCreate")),
+                Marshal.GetDelegateForFunctionPointer<SetSamples>(NativeLibrary.GetExport(library, "pixSetSpp")),
+                Marshal.GetDelegateForFunctionPointer<SetSamples>(NativeLibrary.GetExport(library, "pixSetInputFormat")));
         }
-        finally { NativeLibrary.Free(library); }
+        catch { NativeLibrary.Free(library); throw; }
+    });
+    private static Pix CreateRgba(int width, int height)
+    {
+        var codec = NativePixels.Value;
+        var handle = codec.Create(width, height, 32);
+        if (handle == 0) throw new InvalidOperationException("Could not allocate OCR pixels.");
+        var pix = Pix.Create(handle);
+        try
+        {
+            // pixCreate defaults to RGB. Preserve the PNG reader's RGBA semantics for OCR.
+            if (codec.Samples(handle, 4) != 0) throw new InvalidOperationException("Could not initialize OCR pixels.");
+            if (codec.InputFormat(handle, 3) != 0) throw new InvalidOperationException("Could not initialize OCR alpha handling."); // IFF_PNG
+            return pix;
+        }
+        catch { pix.Dispose(); throw; }
     }
     internal static bool HasNativeLoaderFailure(Exception error) => error is DllNotFoundException or BadImageFormatException || error.InnerException is { } inner && HasNativeLoaderFailure(inner);
     internal static void ValidateModel(string path)

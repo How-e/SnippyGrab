@@ -10,15 +10,16 @@ internal sealed class CompositionWindow : Window
     internal CompositionLayout? Layout { get; private set; }
     internal Color BackgroundColor { get; private set; } = Colors.White;
     private readonly List<CompositionInput> inputs;
-    internal CompositionWindow(IReadOnlyList<CompositionInput> selected, Window? owner)
+    internal CompositionWindow(IReadOnlyList<CompositionInput> selected, Window? owner, IReadOnlyDictionary<string, BitmapSource>? preparedPreviews = null)
     {
         if (selected.Count is < 2 or > 20) throw new InvalidDataException("Select between 2 and 20 captures to combine.");
         inputs = selected.ToList(); Ui.StyleWindow(this); Title = "SnippyGrab · Combine selected"; Width = 720; Height = 700; MinWidth = 520; MinHeight = 450;
+        var thumbs = preparedPreviews ?? selected.ToDictionary(i => i.Path, i => ImageService.LoadPreview(i.Path, 160, 160));
         if (owner is not null) Owner = owner;
         var root = new StackPanel { Margin = new Thickness(24, 20, 24, 8) };
         var shell = new DockPanel(); Content = shell;
         var footer = new WrapPanel { Margin = new Thickness(24, 8, 24, 16) }; DockPanel.SetDock(footer, Dock.Bottom); shell.Children.Add(footer); shell.Children.Add(Ui.Scroll(root));
-        root.Children.Add(Ui.Heading("Combine screenshots"));
+        root.Children.Add(Ui.PageHeading("Combine screenshots", "Bring your captures together.", "image"));
         root.Children.Add(Ui.Text($"Arrange {inputs.Count} screenshots into one image. Choose a layout, check the preview, then open the result in the editor.", 14, true));
         root.Children.Add(Ui.Heading("1  Choose a layout", 18));
         var mode = new ComboBox { ItemsSource = new[] { "Vertical strip · top to bottom", "Horizontal strip · side by side", "Grid · rows and columns" }, SelectedIndex = 0 }; AutomationProperties.SetName(mode, "Composition layout"); root.Children.Add(mode);
@@ -29,7 +30,7 @@ internal sealed class CompositionWindow : Window
         void RefreshOrder() => order.ItemsSource = inputs.Select((i, n) =>
         {
             var row = new StackPanel { Orientation = Orientation.Horizontal };
-            row.Children.Add(new Image { Source = ImageService.Load(i.Path, 64, 40), Width = 64, Height = 40, Stretch = Stretch.Uniform, Margin = new Thickness(0, 2, 12, 2) });
+            row.Children.Add(new Image { Source = thumbs[i.Path], Width = 64, Height = 40, Stretch = Stretch.Uniform, Margin = new Thickness(0, 2, 12, 2) });
             row.Children.Add(Ui.Text($"{n + 1} · Screenshot {selected.ToList().IndexOf(i) + 1} · {i.Width} × {i.Height}", 12));
             return row;
         }).ToArray();
@@ -49,7 +50,6 @@ internal sealed class CompositionWindow : Window
         root.Children.Add(Ui.Text("Creates a new PNG at original resolution. Your source screenshots and clipboard stay unchanged. You can annotate or export the result from the editor.", 12, true));
         var confirm = Ui.Button("Create image & edit", "Create a new PNG and open the editor", () => { if (Layout is not null) DialogResult = true; }); confirm.Style = (Style)FindResource("PrimaryButton");
         // Thumbnails are bounded independently of full-resolution input sizes.
-        var thumbs = selected.ToDictionary(i => i.Path, i => ImageService.Load(i.Path, 160, 160));
         void Update()
         {
             try

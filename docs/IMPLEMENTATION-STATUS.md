@@ -1,8 +1,12 @@
-# Implementation status — 2026-10-10
+# Implementation status — 2026-10-17
 
-The project remains **0.1.0-alpha**, unsigned and prerelease; the current release version is `0.1.0-alpha.20261010.1`. The [release-gate manifest](../scripts/release-gates.json) has **41 closed / 10 open** gates after reopening Q1/Q12/Q20/Q24/Q29/Q30/Q32/Q34/Q35/Q41 for the performance changes. Previous owner acceptance is recorded for `0.1.0-alpha.acceptance.20261009.2`, source `80edee6683ef055f073be2f6dc976a15a862f04d`; it does not renew affected acceptance on this release. The owner authorized commit, push and a new unsigned alpha release. Stable promotion requires a separate decision; every release still requires final hosted checks and independent download verification.
+The project remains **0.1.0-alpha**, unsigned and prerelease; the current release version is `0.1.0-alpha.20261017.1`. The [release-gate manifest](../scripts/release-gates.json) has **41 closed / 10 open** gates after reopening Q1/Q12/Q20/Q24/Q29/Q30/Q32/Q34/Q35/Q41 for the performance changes. Previous owner acceptance is recorded for `0.1.0-alpha.acceptance.20261009.2`, source `80edee6683ef055f073be2f6dc976a15a862f04d`; it does not renew affected acceptance on this release. The owner authorized commit, push and a new unsigned alpha release. Stable promotion requires a separate decision; every release still requires final hosted checks and independent download verification.
 
 ## Current implementation
+
+- The October 17 redesign uses neutral Dark/Light/System themes across native windows, dialogs, menus, shelf and installer. Offscreen renders, contrast assertions, keyboard focus and enlarged text layout provide bounded design evidence.
+- The release review fixes late export collision replacement, editor OCR ordering before rendering, checksum path aliases and exact payload inventory, dimensions for every recovered composition input, and empty-monitor pin layout. Targeted regressions cover each case.
+
 
 - Copy reuses stored PNG bytes and prepares a frozen bitmap on a worker with clipboard generation reserved before yielding. Import/editor loading and OCR preparation also run on workers; immutable leases, shutdown and revision guards remain enforced.
 - History seals older 512-record pages, caches unchanged page identities and keeps the changing head in the atomic manifest. Production cleanup yields between slices and rechecks protections; single file operations and durable commits can still pause the UI.

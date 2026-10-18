@@ -7,6 +7,7 @@ public partial class App : Application
 {
     private Mutex? instance;
     private AppController? controller;
+    private InstanceActivation? activation;
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
@@ -92,18 +93,42 @@ public partial class App : Application
             return;
         }
         var user = System.Security.Principal.WindowsIdentity.GetCurrent().User?.Value ?? Environment.UserName;
+        activation = new(@"Local\SnippyGrab-activate-" + user);
         instance = new Mutex(true, @"Local\SnippyGrab-" + user, out var created);
-        if (!created) { Shutdown(); return; }
+        if (!created) { activation.Signal(); Shutdown(); return; }
         DispatcherUnhandledException += OnUnhandled;
-        try { controller = new(e.Args.Contains("--background")); }
+        AppDomain.CurrentDomain.UnhandledException += OnBackgroundUnhandled;
+        TaskScheduler.UnobservedTaskException += OnUnobservedTask;
+        try
+        {
+            controller = new(e.Args.Contains("--background"));
+            activation.Listen(() =>
+            {
+                if (Dispatcher.HasShutdownStarted) return;
+                try
+                {
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        if (controller is not { Exiting: false }) return;
+                        controller.Try(() => { controller.Dock.FocusShelf(); if (!controller.Dock.IsVisible) controller.ShowHistory(); });
+                    }));
+                }
+                catch (InvalidOperationException) when (Dispatcher.HasShutdownStarted) { }
+            });
+        }
         catch (Exception ex) { MessageBox.Show("SnippyGrab could not start. " + OperationFailure.From(ex).Message, "SnippyGrab"); Shutdown(1); }
     }
     private void OnUnhandled(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
         e.Handled = true; controller?.Failure(e.Exception);
     }
+    private void OnBackgroundUnhandled(object sender, UnhandledExceptionEventArgs e) => CrashDiagnostics.Record("Unhandled", e.ExceptionObject as Exception);
+    private void OnUnobservedTask(object? sender, UnobservedTaskExceptionEventArgs e) { CrashDiagnostics.Record("UnobservedTask", e.Exception); e.SetObserved(); }
     protected override void OnExit(ExitEventArgs e)
     {
+        activation?.Dispose();
+        AppDomain.CurrentDomain.UnhandledException -= OnBackgroundUnhandled;
+        TaskScheduler.UnobservedTaskException -= OnUnobservedTask;
         controller?.Dispose(); if (instance is not null) { try { instance.ReleaseMutex(); } catch (ApplicationException) { } instance.Dispose(); }
         base.OnExit(e);
     }

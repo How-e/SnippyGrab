@@ -16,7 +16,8 @@ function Test-SnippyBundle([string]$Source) {
     foreach ($line in Get-Content -LiteralPath $manifest) {
         if ($line -notmatch '^([0-9a-fA-F]{64})  (.+)$') { throw 'Invalid bundle checksum record.' }
         $expected = $Matches[1]; $relative = $Matches[2]; $path = [IO.Path]::GetFullPath((Join-Path $root $relative))
-        if (-not $path.StartsWith($root + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -or $relative.Contains(':') -or -not $names.Add($relative.Replace('\', '/'))) { throw 'Unsafe or duplicate bundle path.' }
+        $normalized = $relative.Replace('\', '/')
+        if ([IO.Path]::IsPathRooted($relative) -or $normalized.Split('/') -contains '..' -or $normalized.Split('/') -contains '.' -or $normalized.Split('/') -contains '' -or $normalized.Split('/').Where({ $_ -match '[. ]$' }).Count -or -not $path.StartsWith($root + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -or $relative.Contains(':') -or -not $names.Add($normalized)) { throw 'Unsafe or duplicate bundle path.' }
         for ($probe = $path; $probe -and $probe.StartsWith($root, [StringComparison]::OrdinalIgnoreCase); $probe = Split-Path -Parent $probe) {
             if ((Get-Item -LiteralPath $probe -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Redirected bundle path.' }
         }
@@ -24,6 +25,9 @@ function Test-SnippyBundle([string]$Source) {
     }
     $files = @(Get-ChildItem -LiteralPath $root -Recurse -File -Force)
     if ($names.Count -ne $files.Count - 1 -or $names.Contains('SHA256SUMS.txt')) { throw 'Incomplete bundle checksum coverage.' }
+    foreach ($file in $files) {
+        if ($file.FullName -ne $manifest -and -not $names.Contains($file.FullName.Substring($root.Length + 1).Replace('\', '/'))) { throw 'Unlisted bundle file.' }
+    }
     foreach ($required in @('SnippyGrab.exe', 'install.ps1', 'install-files.ps1')) { if (-not $names.Contains($required)) { throw 'Incomplete application bundle.' } }
 }
 function Install-SnippyFiles([string]$Source, [string]$Target, [switch]$Portable) {

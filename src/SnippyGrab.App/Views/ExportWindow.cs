@@ -9,11 +9,11 @@ internal sealed class ExportWindow : Window
     internal ExportRequest? Request { get; private set; }
     internal ExportWindow(CaptureRecord record, string directory, string cache, Window? owner, IReadOnlyList<CaptureRecord>? batch = null)
     {
-        Ui.StyleWindow(this); Title = "SnippyGrab · Export image"; Width = 560; Height = 360; MinWidth = 440; MinHeight = 320;
+        Ui.StyleWindow(this); Title = "SnippyGrab · Export image"; Width = 560; Height = 460; MinWidth = 440; MinHeight = 320;
         if (owner is not null) Owner = owner;
         WindowStartupLocation = owner is null ? WindowStartupLocation.CenterScreen : WindowStartupLocation.CenterOwner;
         var root = new StackPanel { Margin = new Thickness(24) }; Content = Ui.Scroll(root);
-        root.Children.Add(Ui.Heading("Export image"));
+        root.Children.Add(Ui.PageHeading("Export image", "Choose a format for your screenshot.", "export"));
         if (batch is not null) root.Children.Add(Ui.Text($"{batch.Count} captures in shelf order:\n" + string.Join("\n", batch.Select((c, i) => $"{i + 1:D3} · {c.Width} × {c.Height}")), 12, true));
         var collision = new ComboBox { ItemsSource = new[] { "Keep both (unique filenames)", "Skip existing files", "Replace existing files" }, SelectedIndex = 0 };
         AutomationProperties.SetName(collision, "Existing file policy"); if (batch is not null) root.Children.Add(collision);
@@ -39,9 +39,10 @@ internal sealed class ExportWindow : Window
             var extension = CaptureExport.Extension(selected);
             var filter = selected switch { ExportFormat.Png => "PNG image|*.png", ExportFormat.Jpeg => "JPEG image|*.jpg;*.jpeg", _ => "WebP image|*.webp" };
             var dialog = new SaveFileDialog { Title = "Export " + selected + " outside the managed cache", Filter = filter, DefaultExt = extension, FileName = SuggestedFileName(record, selected), InitialDirectory = directory, AddExtension = true, OverwritePrompt = true };
-            dialog.FileOk += (_, e) => { try { CaptureExport.ValidateDestination(cache, dialog.FileName, selected); } catch (Exception ex) when (ex is IOException or InvalidDataException or ArgumentException or UnauthorizedAccessException) { e.Cancel = true; note.Text = ex.Message; MessageBox.Show(this, ex.Message, "Choose an export location", MessageBoxButton.OK, MessageBoxImage.Information); } };
+            var replaceApproved = false;
+            dialog.FileOk += (_, e) => { try { CaptureExport.ValidateDestination(cache, dialog.FileName, selected); replaceApproved = File.Exists(dialog.FileName); } catch (Exception ex) when (ex is IOException or InvalidDataException or ArgumentException or UnauthorizedAccessException) { e.Cancel = true; note.Text = ex.Message; MessageBox.Show(this, ex.Message, "Choose an export location", MessageBoxButton.OK, MessageBoxImage.Information); } };
             if (dialog.ShowDialog(this) != true) return;
-            Request = new(dialog.FileName, selected, (int)quality.Value); DialogResult = true;
+            Request = new(dialog.FileName, selected, (int)quality.Value, replaceApproved ? ExportCollision.Replace : ExportCollision.Unique); DialogResult = true;
         }); choose.IsDefault = true; actions.Children.Add(choose); root.Children.Add(actions);
     }
     internal static string SuggestedFileName(CaptureRecord record, ExportFormat format)

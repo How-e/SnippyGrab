@@ -12,7 +12,7 @@ internal sealed class WelcomeWindow : Window
     {
         Ui.StyleWindow(this); Title = "Welcome to SnippyGrab"; Width = 840; Height = 820; MinWidth = 540; MinHeight = 520; WindowStartupLocation = WindowStartupLocation.CenterScreen;
         var root = new DockPanel { Margin = new Thickness(28, 22, 28, 18) }; Content = root;
-        var body = new StackPanel(); body.Children.Add(Ui.Heading("Capture. Paste. Keep moving.")); body.Children.Add(Ui.Text("A small screenshot shelf for your desktop.", 16, true));
+        var body = new StackPanel(); body.Children.Add(Ui.PageHeading("Capture. Paste. Keep moving.", "Your screenshots, close at hand. Private and local to your desktop.", "capture"));
         var steps = new UniformGrid { Columns = 3, Margin = new Thickness(0, 16, 0, 14) };
         foreach (var (title, icon, text) in new[] { ("1  Capture", "capture", "Print Screen, select a region, release."), ("2  Paste", "copy", "Ctrl+V pastes the image immediately."), ("3  Keep", "image", "Drag from the shelf to attach a PNG. Click to edit.") })
         {
@@ -20,7 +20,7 @@ internal sealed class WelcomeWindow : Window
         }
         steps.SizeChanged += (_, _) => steps.Columns = steps.ActualWidth < 480 * Ui.TextScale ? 1 : 3; body.Children.Add(steps);
         var sample = new DockPanel(); var miniature = new StackPanel { Width = 200, Margin = new Thickness(0, 0, 22, 0) };
-        var code = Ui.Text("function captureScreen() {\n  const image = await grab();\n  return image;\n}", 11); code.FontFamily = new FontFamily("Consolas"); miniature.Children.Add(code);
+        miniature.Children.Add(Ui.CaptureSample());
         var icons = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 0) }; foreach (var name in new[] { "edit", "copy", "pin", "trash", "more" }) { var icon = Icons.Make(name, 16); icon.Margin = new Thickness(0, 0, 18, 0); icons.Children.Add(icon); }
         miniature.Children.Add(icons); DockPanel.SetDock(miniature, Dock.Left); sample.Children.Add(miniature);
         var explanation = new StackPanel { VerticalAlignment = VerticalAlignment.Center }; explanation.Children.Add(Ui.Heading("Your captures stay close.", 16)); explanation.Children.Add(Ui.Text("Screens you capture appear in the shelf, ready to paste, attach or edit.", 12, true)); sample.Children.Add(explanation); body.Children.Add(Ui.Group(sample, new Thickness(14)));

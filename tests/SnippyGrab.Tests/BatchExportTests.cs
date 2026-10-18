@@ -33,6 +33,7 @@ public sealed class BatchExportTests : IDisposable
         { calls++; if (calls == 2) throw new IOException("injected disk full"); if (calls == 3) cancel.Cancel(); return [2]; }, cancellation: cancel.Token);
         Assert.Equal(1, result.Successful); Assert.Equal(1, result.Failed); Assert.Equal(2, result.Unprocessed);
         Assert.True(File.Exists(plan[0].Destination)); Assert.False(File.Exists(plan[1].Destination));
+        var reopened = new CaptureRepository(repo.Root); reopened.Load(); Assert.True(reopened.Captures.Single(c => c.Id == plan[0].Capture.Id).Saved);
     }
     [Fact]
     public async Task CollidingFileAppearingAfterPlanIsNeverOverwritten()
@@ -66,5 +67,20 @@ public sealed class BatchExportTests : IDisposable
         try { repo.Replace(later, [3], 1, 1); repo.Cleanup(DateTimeOffset.UtcNow, 24, clear: true); } finally { release.Set(); }
         var result = await export; Assert.Equal(2, result.Successful); Assert.Equal(1, result.MetadataWarnings);
         Assert.Equal(new byte[] { 2 }, File.ReadAllBytes(plan[1].Destination)); Assert.Equal(new byte[] { 2 }, File.ReadAllBytes(plan[1].Source));
+    }
+    [Fact]
+    public async Task BatchExportCommitsHistoryOnceAndReportsAllWarningsOnCommitFailure()
+    {
+        var writes = 0; var fail = false;
+        var repo = new CaptureRepository(Path.Combine(root, "cache"), (path, bytes) => { if (path.EndsWith("history.json")) { writes++; if (fail) throw new IOException("injected history failure"); } AtomicFile.Write(path, bytes); });
+        for (var i = 0; i < 5; i++) await repo.AddAsync([(byte)i], 1, 1);
+        writes = 0; var changes = 0; repo.Changed += () => changes++;
+        var plan = BatchExport.Plan(repo, repo.Captures, root, ExportFormat.Png, ExportCollision.Unique);
+        var result = await BatchExport.RunAsync(repo, plan, ExportFormat.Png, 90, ExportCollision.Unique, (_, _) => []);
+        Assert.Equal(5, result.Successful); Assert.Equal(0, result.MetadataWarnings); Assert.Equal(1, writes); Assert.Equal(1, changes);
+        var reopened = new CaptureRepository(repo.Root); reopened.Load(); Assert.All(reopened.Captures, c => Assert.True(c.Saved));
+        fail = true; plan = BatchExport.Plan(repo, repo.Captures, Path.Combine(root, "repeat"), ExportFormat.Png, ExportCollision.Unique);
+        result = await BatchExport.RunAsync(repo, plan, ExportFormat.Png, 90, ExportCollision.Unique, (_, _) => []);
+        Assert.Equal(5, result.Successful); Assert.Equal(5, result.MetadataWarnings); Assert.Equal(0, result.Failed); Assert.All(plan, item => Assert.True(File.Exists(item.Destination)));
     }
 }

@@ -32,6 +32,7 @@ internal sealed class CaptureOverlay : Window
         };
         Loaded += (_, _) => { if (this.activate) { Activate(); Focus(); } };
         KeyDown += (_, e) => { if (e.Key == Key.Escape) Close(); };
+        MouseRightButtonDown += (_, e) => { selecting = false; ReleaseMouseCapture(); Selection = null; WindowPoint = null; e.Handled = true; Close(); };
         MouseLeftButtonDown += (_, e) =>
         {
             Native.GetCursorPos(out origin); selecting = true; CaptureMouse();
@@ -86,16 +87,16 @@ internal sealed class CaptureOverlay : Window
             if (!Region.IsEmpty)
             {
                 dc.DrawRectangle(null, new Pen(Ui.Brush("Accent"), 2), new Rect(Region.X, Region.Y, Region.Width, Region.Height));
-                var text = new FormattedText($"{Region.Width} × {Region.Height}", CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface("Segoe UI"), 14 * Ui.TextScale, Ui.Brush("Ink"), VisualTreeHelper.GetDpi(this).PixelsPerDip);
+                var text = new FormattedText($"{Region.Width} × {Region.Height}", CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface("Segoe UI Variable, Segoe UI"), 14 * Ui.TextScale, Ui.Brush("Ink"), VisualTreeHelper.GetDpi(this).PixelsPerDip);
                 var x = Math.Clamp(Region.X, 4, width - text.Width - 20);
                 var chipHeight = text.Height + 12; var y = Math.Clamp(Region.Y > chipHeight + 8 ? Region.Y - chipHeight - 6 : Region.Bottom + 8, 4, Math.Max(4, height - chipHeight - 4));
-                dc.DrawRoundedRectangle(Ui.Brush("Raised"), null, new Rect(x, y, text.Width + 18, chipHeight), 5, 5);
+                dc.DrawRoundedRectangle(Ui.Brush("Raised"), null, new Rect(x, y, text.Width + 18, chipHeight), 8, 8);
                 dc.DrawText(text, new Point(x + 9, y + 4));
             }
             else
             {
-                var text = new FormattedText(windowMode ? "Click a window · Esc to cancel" : "Drag to snip · Esc to cancel", CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface("Segoe UI"), 16 * Ui.TextScale, Ui.Brush("Ink"), VisualTreeHelper.GetDpi(this).PixelsPerDip);
-                dc.DrawRoundedRectangle(Ui.Brush("Raised"), null, new Rect((width - text.Width) / 2 - 14, 32, text.Width + 28, text.Height + 24), 8, 8);
+                var text = new FormattedText(windowMode ? "Click a window · Esc to cancel" : "Drag to snip · Esc to cancel", CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface("Segoe UI Variable, Segoe UI"), 16 * Ui.TextScale, Ui.Brush("Ink"), VisualTreeHelper.GetDpi(this).PixelsPerDip);
+                dc.DrawRoundedRectangle(Ui.Brush("Raised"), null, new Rect((width - text.Width) / 2 - 14, 32, text.Width + 28, text.Height + 24), 12, 12);
                 dc.DrawText(text, new Point((width - text.Width) / 2, 44));
             }
         }

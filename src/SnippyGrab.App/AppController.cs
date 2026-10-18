@@ -263,7 +263,7 @@ internal sealed class AppController : IDisposable
             progress.Report(request.Format is ExportFormat.WebpLossless or ExportFormat.WebpLossy ? "Encoding WebP… Cancel stops encoding before the file is committed." : "Exporting image… Cancel prevents the file commit after the current image operation finishes.");
             using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(progress.Cancellation, exportLifetime.Token);
             var result = await CaptureExport.WriteAsync(Repository, record, request.Path, request.Format, request.Quality,
-                (source, quality) => ImageService.EncodeExport(source, request.Format, quality, lifetime.Token), lifetime.Token);
+                (source, quality) => ImageService.EncodeExport(source, request.Format, quality, lifetime.Token), lifetime.Token, overwrite: request.Collision == ExportCollision.Replace);
             var warning = result.MetadataSaved ? null : "Image exported, but capture history could not be updated. The file is safe; retry later to remember its destination.";
             progress.Complete(warning ?? "Image exported."); progress.Close();
             if (!disposed) { Notify(warning ?? request.Format + " exported to: " + result.Path); Try(() => Dock.Refresh()); }

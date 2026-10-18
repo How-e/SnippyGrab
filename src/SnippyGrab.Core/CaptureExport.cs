@@ -15,7 +15,7 @@ public static class CaptureExport
         return Remember(repository, capture, path);
     }
     public static async Task<CaptureExportResult> WriteAsync(CaptureRepository repository, CaptureRecord capture, string destination,
-        ExportFormat format, int quality, Func<string, int, byte[]> encodeJpeg, CancellationToken cancellation = default)
+        ExportFormat format, int quality, Func<string, int, byte[]> encodeJpeg, CancellationToken cancellation = default, bool overwrite = false)
     {
         if (quality is < 1 or > 100) throw new InvalidDataException("Export quality must be between 1 and 100.");
         var path = ValidateDestination(repository.Root, destination, format);
@@ -32,7 +32,7 @@ public static class CaptureExport
         {
             cancellation.ThrowIfCancellationRequested();
             ValidateDestination(cache, path, format); // Recheck policy immediately before the atomic write.
-            WriteDestination(cache, path, format, bytes, true);
+            WriteDestination(cache, path, format, bytes, overwrite);
         }, cancellation);
         // A write is durable even when metadata is stale or persistence fails.
         if (!repository.Captures.Contains(capture) || capture.FileName != revision) return new(path, false);

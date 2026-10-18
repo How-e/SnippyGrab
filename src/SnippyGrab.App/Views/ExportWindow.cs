@@ -41,7 +41,7 @@ internal sealed class ExportWindow : Window
             var dialog = new SaveFileDialog { Title = "Export " + selected + " outside the managed cache", Filter = filter, DefaultExt = extension, FileName = SuggestedFileName(record, selected), InitialDirectory = directory, AddExtension = true, OverwritePrompt = true };
             dialog.FileOk += (_, e) => { try { CaptureExport.ValidateDestination(cache, dialog.FileName, selected); } catch (Exception ex) when (ex is IOException or InvalidDataException or ArgumentException or UnauthorizedAccessException) { e.Cancel = true; note.Text = ex.Message; MessageBox.Show(this, ex.Message, "Choose an export location", MessageBoxButton.OK, MessageBoxImage.Information); } };
             if (dialog.ShowDialog(this) != true) return;
-            Request = new(dialog.FileName, selected, (int)quality.Value); DialogResult = true;
+            Request = new(dialog.FileName, selected, (int)quality.Value, File.Exists(dialog.FileName) ? ExportCollision.Replace : ExportCollision.Unique); DialogResult = true;
         }); choose.IsDefault = true; actions.Children.Add(choose); root.Children.Add(actions);
     }
     internal static string SuggestedFileName(CaptureRecord record, ExportFormat format)

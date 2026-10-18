@@ -137,5 +137,16 @@ public sealed class CaptureExportTests : IDisposable
         }
         finally { if (Directory.Exists(redirect)) Directory.Delete(redirect); if (Directory.Exists(cacheAlias)) Directory.Delete(cacheAlias); }
     }
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task LateDestinationIsPreservedUnlessReplacementWasApproved(bool overwrite)
+    {
+        var capture = repository.Add([1], 1, 1); var path = Path.Combine(root, "late.jpg");
+        var export = CaptureExport.WriteAsync(repository, capture, path, ExportFormat.Jpeg, 90,
+            (_, _) => { File.WriteAllBytes(path, [9]); return [2]; }, overwrite: overwrite);
+        if (overwrite) { await export; Assert.Equal(new byte[] { 2 }, File.ReadAllBytes(path)); }
+        else { await Assert.ThrowsAsync<IOException>(() => export); Assert.Equal(new byte[] { 9 }, File.ReadAllBytes(path)); Assert.False(capture.Saved); }
+    }
     public void Dispose() { if (Directory.Exists(root)) Directory.Delete(root, true); }
 }

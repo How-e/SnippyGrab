@@ -61,7 +61,7 @@ internal sealed class HistoryWindow : Window
     public HistoryWindow(AppController controller)
     {
         Ui.StyleWindow(this); this.controller = controller; thumbnails = new(controller.Repository, 24); Title = "SnippyGrab · Recent captures"; Width = 1100; Height = 760; MinWidth = 560; MinHeight = 460;
-        var root = new DockPanel { Margin = new Thickness(24) }; Content = root;
+        var root = new DockPanel { Margin = new Thickness(28) }; Content = root;
         var header = new DockPanel { Margin = new Thickness(0, 0, 0, 18) };
         var headerActions = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
         headerActions.Children.Add(Ui.ActionButton("Import…", "export", "Import local PNG, JPEG or BMP images", Import));
@@ -99,17 +99,18 @@ internal sealed class HistoryWindow : Window
         split.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(0.42, GridUnitType.Star) }); split.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(0.58, GridUnitType.Star) }); root.Children.Add(split);
         var listPane = new Grid { Margin = new Thickness(0, 0, 18, 0) }; listPane.Children.Add(list); empty.Margin = new Thickness(18, 38, 18, 0); listPane.Children.Add(empty); split.Children.Add(listPane);
         list.ItemTemplate = (DataTemplate)XamlReader.Parse("""
-            <DataTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="130"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Border Background="{DynamicResource Canvas}" CornerRadius="5" Margin="0,0,14,0"><Image Source="{Binding Thumbnail, Mode=OneWay}" Height="82" Stretch="Uniform"/></Border><StackPanel Grid.Column="1" VerticalAlignment="Center"><TextBlock Text="{Binding Title, Mode=OneTime}" FontWeight="SemiBold" Margin="0,0,0,7"/><TextBlock Text="{Binding Details, Mode=OneTime}" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/><TextBlock Text="{Binding State, Mode=OneTime}" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Margin="0,5,0,0"/></StackPanel></Grid></DataTemplate>
+            <DataTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="130"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Border Background="{DynamicResource Canvas}" CornerRadius="8" Margin="0,0,14,0"><Image Source="{Binding Thumbnail, Mode=OneWay}" Height="82" Stretch="Uniform"/></Border><StackPanel Grid.Column="1" VerticalAlignment="Center"><TextBlock Text="{Binding Title, Mode=OneTime}" FontWeight="SemiBold" Margin="0,0,0,7"/><TextBlock Text="{Binding Details, Mode=OneTime}" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/><TextBlock Text="{Binding State, Mode=OneTime}" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Margin="0,5,0,0"/></StackPanel></Grid></DataTemplate>
             """);
         AutomationProperties.SetName(list, "Recent captures. Ctrl-click selects several; Enter edits; Delete dismisses; Alt-drag attaches PNG files.");
         VirtualizingPanel.SetIsVirtualizing(list, true); VirtualizingPanel.SetVirtualizationMode(list, VirtualizationMode.Recycling); ScrollViewer.SetCanContentScroll(list, true);
-        var detail = new DockPanel { Margin = new Thickness(22, 0, 0, 0) };
+        var detail = new DockPanel { Margin = new Thickness(20) };
+        var previewTitle = Ui.Heading("Preview", 18); previewTitle.Margin = new Thickness(0, 0, 0, 14); DockPanel.SetDock(previewTitle, Dock.Top); detail.Children.Add(previewTitle);
         var detailActions = new WrapPanel { Margin = new Thickness(0, 12, 0, 0) };
         void Detail(string label, string icon, Action action) { var b = Ui.ActionButton(label, icon, label + " selected capture", action); selectionActions.Add(b); detailActions.Children.Add(b); }
         Detail("Edit", "edit", () => { if (Selected().FirstOrDefault() is { } c) controller.Edit(c); }); Detail("Copy image", "copy", () => { if (Selected().FirstOrDefault() is { } c) controller.Run(() => controller.Copy(c)); }); Detail("Export image…", "export", () => { if (Selected().FirstOrDefault() is { } c) controller.Run(() => controller.Save(c, this)); });
         DockPanel.SetDock(detailActions, Dock.Bottom); detail.Children.Add(detailActions); metadata.Margin = new Thickness(0, 12, 0, 0); DockPanel.SetDock(metadata, Dock.Bottom); detail.Children.Add(metadata);
         var previewContainer = new Grid(); previewContainer.SetResourceReference(Panel.BackgroundProperty, "Canvas"); previewContainer.Children.Add(preview); previewHint.VerticalAlignment = VerticalAlignment.Center; previewHint.HorizontalAlignment = HorizontalAlignment.Center; previewContainer.Children.Add(previewHint); detail.Children.Add(previewContainer);
-        previewPane = new Border { Child = detail, BorderThickness = new Thickness(1, 0, 0, 0) }; previewPane.SetResourceReference(Border.BorderBrushProperty, "Border"); Grid.SetColumn(previewPane, 1); split.Children.Add(previewPane);
+        previewPane = new Border { Child = detail, CornerRadius = new CornerRadius(12), BorderThickness = new Thickness(1) }; previewPane.SetResourceReference(Border.BackgroundProperty, "Raised"); previewPane.SetResourceReference(Border.BorderBrushProperty, "Border"); Grid.SetColumn(previewPane, 1); split.Children.Add(previewPane);
         SizeChanged += (_, _) => Responsive(); Ui.ThemeChanged += Responsive; Closed += (_, _) => Ui.ThemeChanged -= Responsive;
         list.SelectionChanged += (_, _) => { if (!refreshing) controller.Try(RefreshPreview); };
         list.MouseDoubleClick += (_, _) => { if (Selected().FirstOrDefault() is { } c) controller.Edit(c); };

@@ -63,13 +63,13 @@ internal sealed class EditorWindow : Window
         menu.Items.Add(Ui.Menu("Discard changes", "close", () => { discard = true; Close(); }));
         menu.Opened += (_, _) => openFolderItem.IsEnabled = openExportFolder.IsEnabled;
         more.ContextMenu = menu; menu.PlacementTarget = more; actions.Children.Add(more);
-        var header = new Grid { Margin = new Thickness(18, 12, 14, 12) };
+        var header = new Grid { Margin = new Thickness(22, 16, 18, 16) };
         header.ColumnDefinitions.Add(new() { Width = new GridLength(1, GridUnitType.Star) }); header.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
-        var title = Ui.Heading("Screenshot editor", 20); title.VerticalAlignment = VerticalAlignment.Center; header.Children.Add(title);
+        var title = Ui.Heading("Screenshot editor", 24); title.VerticalAlignment = VerticalAlignment.Center; header.Children.Add(title);
         Grid.SetColumn(actions, 1); header.Children.Add(actions);
         header.SizeChanged += (_, _) => { var compact = header.ActualWidth < 760 * Ui.TextScale; actions.MaxWidth = Math.Max(300, header.ActualWidth); Grid.SetColumn(actions, compact ? 0 : 1); title.Visibility = compact ? Visibility.Collapsed : Visibility.Visible; };
         DockPanel.SetDock(header, Dock.Top); root.Children.Add(header);
-        var toolbar = new WrapPanel { Margin = new Thickness(14, 8, 14, 8) };
+        var toolbar = new WrapPanel { Margin = new Thickness(18, 10, 18, 10) };
         tools = new ComboBox { MinWidth = 138, ItemsSource = Enum.GetValues<EditTool>().Select(t => new ToolChoice(t, ToolLabel(t))), DisplayMemberPath = nameof(ToolChoice.Label), SelectedValuePath = nameof(ToolChoice.Tool), SelectedValue = EditTool.Arrow, ToolTip = "Annotation tool" };
         toolbar.Children.Add(tools);
         color = new TextBox { Text = controller.Settings.AnnotationColor, Width = 112, ToolTip = "Color (#RRGGBB or #AARRGGBB)" };
@@ -91,7 +91,7 @@ internal sealed class EditorWindow : Window
         DockPanel.SetDock(properties, Dock.Top); root.Children.Add(properties);
         status = Ui.Text(string.IsNullOrWhiteSpace(record.ExportPath) ? "Apply + copy updates the managed shelf image. Export image writes a separate file. Closing applies edits; Discard leaves pending edits unapplied." : "Last image export: " + record.ExportPath, 12, true);
         status.TextWrapping = TextWrapping.Wrap;
-        var footer = new Grid { Margin = new Thickness(14, 8, 14, 8) }; footer.ColumnDefinitions.Add(new() { Width = new GridLength(1, GridUnitType.Star) }); footer.ColumnDefinitions.Add(new() { Width = GridLength.Auto }); footer.RowDefinitions.Add(new() { Height = GridLength.Auto }); footer.RowDefinitions.Add(new() { Height = GridLength.Auto });
+        var footer = new Grid { Margin = new Thickness(18, 10, 18, 10) }; footer.ColumnDefinitions.Add(new() { Width = new GridLength(1, GridUnitType.Star) }); footer.ColumnDefinitions.Add(new() { Width = GridLength.Auto }); footer.RowDefinitions.Add(new() { Height = GridLength.Auto }); footer.RowDefinitions.Add(new() { Height = GridLength.Auto });
         var zoomActions = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right };
         zoomActions.Children.Add(Ui.Button("−", "Zoom out", () => Zoom(scale.ScaleX / 1.2)));
         zoomActions.Children.Add(Ui.Button("+", "Zoom in", () => Zoom(scale.ScaleX * 1.2)));
@@ -105,13 +105,13 @@ internal sealed class EditorWindow : Window
         viewport = new ScrollViewer { Content = surface, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Background = new SolidColorBrush(Color.FromRgb(12, 15, 19)) };
         viewport.SetResourceReference(BackgroundProperty, "Canvas");
         var canvas = new Grid(); canvas.ColumnDefinitions.Add(new() { Width = GridLength.Auto }); canvas.ColumnDefinitions.Add(new() { Width = new GridLength(1, GridUnitType.Star) });
-        var rail = new StackPanel { Margin = new Thickness(8, 4, 8, 4) };
+        var rail = new StackPanel { Margin = new Thickness(10, 12, 10, 12) };
         var toolButtons = new Dictionary<EditTool, Button>();
         foreach (var tool in new[] { EditTool.Arrow, EditTool.Rectangle, EditTool.Ellipse, EditTool.Line, EditTool.Pen, EditTool.Text, EditTool.Highlight, EditTool.Number, EditTool.Blur, EditTool.Pixelate, EditTool.Redact, EditTool.Spotlight, EditTool.Crop, EditTool.OcrArea, EditTool.ColorPicker, EditTool.Magnify })
         {
             if (tool is EditTool.Blur or EditTool.Crop) { var separator = Ui.Rule(); separator.Margin = new Thickness(0, 4, 0, 4); rail.Children.Add(separator); }
             var button = Ui.IconButton(ToolIcon(tool), ToolLabel(tool), () => tools.SelectedValue = tool);
-            button.Width = 40; button.Height = 32; button.MinHeight = 32; button.Padding = new Thickness(5); button.Margin = new Thickness(0); button.Tag = tool;
+            button.Width = 40; button.Height = 32; button.MinHeight = 32; button.Padding = new Thickness(5); button.Margin = new Thickness(0, 0, 0, 0); button.Tag = tool;
             toolButtons.Add(tool, button); rail.Children.Add(button);
         }
         var railScroll = new ScrollViewer { Content = rail, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };

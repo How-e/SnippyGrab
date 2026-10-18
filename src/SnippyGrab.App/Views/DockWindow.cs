@@ -167,7 +167,7 @@ internal sealed class DockWindow : Window
         {
             // Two understated offset edges communicate a stack without creating a gallery.
             for (var i = 0; i < Math.Min(2, visible.Count - 1); i++)
-                children.Add(new Border { Width = horizontal ? 4 : controller.Settings.ThumbnailSize - (i + 1) * 12, Height = horizontal ? 64 : 4, CornerRadius = new CornerRadius(2), Background = new SolidColorBrush(Color.FromArgb((byte)(150 - i * 40), 81, 99, 124)), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center });
+                children.Add(new Border { Width = horizontal ? 4 : controller.Settings.ThumbnailSize - (i + 1) * 12, Height = horizontal ? 64 : 4, CornerRadius = new CornerRadius(2), Background = new SolidColorBrush(Color.FromArgb((byte)(150 - i * 40), 112, 112, 112)), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center });
         }
         if (DockLayout.Reverse(LayoutOrientation, controller.Settings.Corner)) children.Reverse();
         if (!shelf.Children.Cast<UIElement>().SequenceEqual(children))
@@ -200,15 +200,15 @@ internal sealed class DockWindow : Window
         var size = controller.Settings.ThumbnailSize;
         var grid = new Grid { Width = size, ClipToBounds = true };
         var imageArea = new Grid { Height = Math.Clamp(size * (double)capture.Height / Math.Max(1, capture.Width), 72, size * 0.65), ClipToBounds = true };
-        imageArea.SizeChanged += (_, _) => imageArea.Clip = new RectangleGeometry(new Rect(0, 0, size, imageArea.ActualHeight), 7, 7); grid.Children.Add(imageArea);
+        imageArea.SizeChanged += (_, _) => imageArea.Clip = new RectangleGeometry(new Rect(0, 0, size, imageArea.ActualHeight), 11, 11); grid.Children.Add(imageArea);
         var pixels = PreviewPixels();
         var image = new Image { Stretch = Stretch.Uniform };
         RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.HighQuality); imageArea.Children.Add(image);
         if (thumbnails.TryGet(capture.FileName, pixels, pixels, out var thumb)) image.Source = thumb;
         else _ = FillThumbnailAsync(capture, pixels, image, imageArea);
-        var border = new Border { Child = grid, CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1), BorderBrush = Brushes.Transparent, Background = Brushes.Transparent, Margin = new Thickness(3), Focusable = true, Tag = capture.Id };
+        var border = new Border { Child = grid, CornerRadius = new CornerRadius(12), BorderThickness = new Thickness(1), BorderBrush = Brushes.Transparent, Background = Brushes.Transparent, Margin = new Thickness(3), Focusable = true, Tag = capture.Id };
         var overlayColor = ((SolidColorBrush)Ui.Brush("Surface")).Color;
-        var overlayBrush = SystemParameters.HighContrast ? Ui.Brush("Surface") : new SolidColorBrush(Color.FromArgb(205, overlayColor.R, overlayColor.G, overlayColor.B));
+        var overlayBrush = SystemParameters.HighContrast ? Ui.Brush("Surface") : new SolidColorBrush(Color.FromArgb(230, overlayColor.R, overlayColor.G, overlayColor.B));
         AutomationProperties.SetName(border, $"Screenshot {capture.Width} by {capture.Height}{(capture.Pinned ? ", pinned" : "")}. Click to edit; drag to attach.");
         var badge = Ui.Button($"{visible.IndexOf(capture) + 1}/{visible.Count}{(capture.Pinned ? " · pin" : "")}", $"Focus screenshot {visible.IndexOf(capture) + 1} of {visible.Count} without opening the editor. Selected file transfers use ascending shelf numbers.", () => FocusCapture(capture.Id));
         badge.Background = overlayBrush; badge.BorderThickness = new Thickness(0);
@@ -230,7 +230,7 @@ internal sealed class DockWindow : Window
         { var b = Ui.IconButton(icon, hint, action); b.Padding = new Thickness(3); b.MinWidth = 28; b.MinHeight = 34; b.Margin = new Thickness(1); controls.Children.Add(b); }
         var more = Ui.IconButton("more", "All screenshot actions", () => { border.ContextMenu.PlacementTarget = border; border.ContextMenu.IsOpen = true; });
         more.Padding = new Thickness(3); more.MinWidth = 28; more.Margin = new Thickness(1); controls.Children.Add(more);
-        var strip = new Border { Background = overlayBrush, CornerRadius = new CornerRadius(0, 0, 7, 7), VerticalAlignment = VerticalAlignment.Bottom, Height = 40, IsHitTestVisible = false };
+        var strip = new Border { Background = overlayBrush, CornerRadius = new CornerRadius(0, 0, 11, 11), VerticalAlignment = VerticalAlignment.Bottom, Height = 40, IsHitTestVisible = false };
         strip.SetBinding(VisibilityProperty, new System.Windows.Data.Binding("Visibility") { Source = controls }); imageArea.Children.Add(strip);
         imageArea.Children.Add(controls);
         border.ContextMenu = Menu(capture);

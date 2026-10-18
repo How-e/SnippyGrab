@@ -18,7 +18,12 @@ internal sealed class TrayRenderer : ToolStripProfessionalRenderer
     protected override void OnRenderMenuItemBackground(ToolStripItemRenderEventArgs e)
     {
         if (!e.Item.Selected || !e.Item.Enabled) return;
-        using var brush = new SolidBrush(Color("Selected")); e.Graphics.FillRectangle(brush, new System.Drawing.Rectangle(4, 1, e.Item.Width - 8, e.Item.Height - 2));
+        using var brush = new SolidBrush(Color("Selected"));
+        using var outline = new System.Drawing.Drawing2D.GraphicsPath();
+        var bounds = new System.Drawing.Rectangle(4, 2, e.Item.Width - 8, e.Item.Height - 4);
+        outline.AddRoundedRectangle(bounds, new System.Drawing.Size(6, 6));
+        var smoothing = e.Graphics.SmoothingMode; e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+        e.Graphics.FillPath(brush, outline); e.Graphics.SmoothingMode = smoothing;
     }
     protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
     {

@@ -27,14 +27,14 @@ internal sealed class PinWindow : Window
         preview = new Image { Stretch = Stretch.Uniform };
         RenderOptions.SetBitmapScalingMode(preview, BitmapScalingMode.HighQuality);
         var frame = new Grid(); frame.Children.Add(preview);
-        var chrome = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Bottom, Visibility = Visibility.Collapsed };
+        var chrome = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(4), VerticalAlignment = VerticalAlignment.Bottom, Visibility = Visibility.Collapsed };
         chrome.SetResourceReference(Panel.BackgroundProperty, "Raised");
         chrome.Children.Add(Ui.ActionButton("Copy", "copy", "Copy pinned image", () => controller.Run(() => controller.Copy(record)), "QuietButton"));
         chrome.Children.Add(Ui.ActionButton("Edit", "edit", "Edit pinned image", () => controller.Edit(record), "QuietButton"));
         chrome.Children.Add(Ui.IconButton("more", "Pinned image actions", () => { ContextMenu.PlacementTarget = this; ContextMenu.IsOpen = true; }));
         frame.Children.Add(chrome);
         SizeChanged += (_, _) => { foreach (var button in chrome.Children.OfType<Button>().Take(2)) button.Visibility = ActualWidth < 220 * Ui.TextScale ? Visibility.Collapsed : Visibility.Visible; };
-        var border = new Border { Child = frame, CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1) };
+        var border = new Border { Child = frame, CornerRadius = new CornerRadius(12), BorderThickness = new Thickness(1) };
         border.SetResourceReference(Border.BorderBrushProperty, "Border"); border.SetResourceReference(Border.BackgroundProperty, "Surface"); Content = border;
         MouseEnter += (_, _) => chrome.Visibility = Visibility.Visible;
         MouseLeave += (_, _) => { if (!ContextMenu.IsOpen) chrome.Visibility = Visibility.Collapsed; };

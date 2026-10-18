@@ -23,7 +23,7 @@ internal sealed class ScrollCaptureWindow : Window
         var root = new StackPanel { Margin = new Thickness(24, 20, 24, 8) };
         var shell = new DockPanel(); Content = shell;
         var actions = new WrapPanel { Margin = new Thickness(24, 8, 24, 16) }; DockPanel.SetDock(actions, Dock.Bottom); shell.Children.Add(actions); shell.Children.Add(Ui.Scroll(root));
-        root.Children.Add(Ui.Heading("Build a scrolling screenshot"));
+        root.Children.Add(Ui.PageHeading("Build a scrolling screenshot", "Capture a longer page, one section at a time.", "capture"));
         root.Children.Add(Ui.Text("Your first frame is ready. You scroll the page; SnippyGrab joins the overlapping frames into one image.", 14, true));
         var step = Ui.Heading("1  Scroll the page down", 20); root.Children.Add(step);
         var guidance = Ui.Text("Return to the selected application and scroll about half a screen. Leave some of the previous content visible, then return here and click Capture next frame."); root.Children.Add(guidance);

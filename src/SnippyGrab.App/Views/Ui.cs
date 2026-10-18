@@ -18,7 +18,7 @@ internal static class Ui
         if (Application.Current?.TryFindResource(key) is Brush brush) return brush;
         // Standalone overlay diagnostics have no Application resource owner.
         if (SystemParameters.HighContrast) return key is "Ink" or "Accent" ? SystemColors.WindowTextBrush : SystemColors.WindowBrush;
-        var fallback = new SolidColorBrush((Color)ColorConverter.ConvertFromString(key switch { "Ink" => "#F1F2F4", "Accent" => "#90A8CE", "Raised" => "#252629", _ => "#1C1D20" }));
+        var fallback = new SolidColorBrush((Color)ColorConverter.ConvertFromString(key switch { "Ink" => "#F2F2F2", "Accent" => "#CCCCCC", "Raised" => "#242424", _ => "#191919" }));
         fallback.Freeze(); return fallback;
     }
     public static Button Button(string label, string hint, Action action)
@@ -65,14 +65,40 @@ internal static class Ui
         block.SetResourceReference(TextBlock.FontSizeProperty, key);
         block.SetResourceReference(TextBlock.ForegroundProperty, muted ? "Muted" : "Ink"); return block;
     }
-    public static TextBlock Heading(string title, double size = 28)
+    public static TextBlock Heading(string title, double size = 30)
     {
         var text = Text(title, size); text.FontWeight = FontWeights.SemiBold; return text;
     }
     public static Border Group(UIElement child, Thickness? padding = null)
     {
-        var group = new Border { Child = child, CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1), Padding = padding ?? new Thickness(18), Margin = new Thickness(0, 0, 0, 16) };
+        var group = new Border { Child = child, CornerRadius = new CornerRadius(12), BorderThickness = new Thickness(1), Padding = padding ?? new Thickness(20), Margin = new Thickness(0, 0, 0, 16) };
         group.SetResourceReference(Border.BackgroundProperty, "Raised"); group.SetResourceReference(Border.BorderBrushProperty, "Border"); return group;
+    }
+    public static Border CaptureSample()
+    {
+        var page = new StackPanel { Margin = new Thickness(14) };
+        var label = Text("Project notes", 13); label.FontWeight = FontWeights.SemiBold; page.Children.Add(label);
+        var caption = Text("An idea worth keeping.", 11, true); caption.Margin = new Thickness(0, 3, 0, 12); page.Children.Add(caption);
+        foreach (var width in new[] { 1d, 0.8, 0.6 })
+        {
+            var line = new Border { Height = 4, CornerRadius = new CornerRadius(2), Margin = new Thickness(0, 0, 0, 6), HorizontalAlignment = HorizontalAlignment.Left };
+            line.SetResourceReference(Border.BackgroundProperty, "Border");
+            page.SizeChanged += (_, _) => line.Width = Math.Max(0, page.ActualWidth * width);
+            page.Children.Add(line);
+        }
+        var sample = new Border { Child = page, CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1), IsHitTestVisible = false };
+        sample.SetResourceReference(Border.BackgroundProperty, "Surface"); sample.SetResourceReference(Border.BorderBrushProperty, "Border");
+        AutomationProperties.SetName(sample, "Example screenshot of project notes"); return sample;
+    }
+    public static StackPanel PageHeading(string title, string description, string icon)
+    {
+        var header = new StackPanel { Margin = new Thickness(0, 0, 0, 20) };
+        var titleRow = new DockPanel();
+        var glyph = Icons.Make(icon, 24); glyph.Margin = new Thickness(0, 0, 12, 0); glyph.VerticalAlignment = VerticalAlignment.Center;
+        DockPanel.SetDock(glyph, Dock.Left); titleRow.Children.Add(glyph); titleRow.Children.Add(Heading(title));
+        header.Children.Add(titleRow);
+        var detail = Text(description, 14, true); detail.Margin = new Thickness(0, 6, 0, 0);
+        header.Children.Add(detail); return header;
     }
     public static Border Rule() { var rule = new Border { Height = 1, Margin = new Thickness(0, 12, 0, 12) }; rule.SetResourceReference(Border.BackgroundProperty, "Border"); return rule; }
     public static MenuItem Menu(string label, string icon, Action action, string shortcut = "")
@@ -96,8 +122,8 @@ internal static class Ui
         }
         var keys = new[] { "Surface", "Raised", "Hover", "Pressed", "Border", "Ink", "Muted", "DisabledInk", "Accent", "Selected", "Primary", "PrimaryInk", "Canvas", "Danger", "ScrollThumb" };
         var colors = light
-            ? new[] { "#F7F7F8", "#FFFFFF", "#ECEDEF", "#E1E3E8", "#D4D5D8", "#202124", "#60646C", "#70747B", "#465F84", "#E7ECF3", "#465F84", "#FFFFFF", "#ECEDEF", "#A43C43", "#888D97" }
-            : new[] { "#1C1D20", "#252629", "#303238", "#383B42", "#44464D", "#F1F2F4", "#B2B5BD", "#92969F", "#90A8CE", "#303B4D", "#465F84", "#FFFFFF", "#161719", "#B34B50", "#747880" };
+            ? new[] { "#F5F5F5", "#FFFFFF", "#EBEBEB", "#DEDEDE", "#D2D2D2", "#242424", "#606060", "#707070", "#505050", "#E5E5E5", "#505050", "#FFFFFF", "#EBEBEB", "#A23F46", "#909090" }
+            : new[] { "#191919", "#242424", "#303030", "#3B3B3B", "#444444", "#F2F2F2", "#B8B8B8", "#969696", "#CCCCCC", "#383838", "#505050", "#FFFFFF", "#121212", "#BA525B", "#858585" };
         for (var i = 0; i < keys.Length; i++) Application.Current.Resources[keys[i]] = new SolidColorBrush((Color)ColorConverter.ConvertFromString(colors[i]));
         if (highContrastOverride ?? SystemParameters.HighContrast)
         {

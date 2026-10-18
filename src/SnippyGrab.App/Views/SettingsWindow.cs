@@ -43,7 +43,9 @@ internal sealed class SettingsWindow : Window
         Content = layout;
         layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(220) });
         layout.ColumnDefinitions.Add(new ColumnDefinition());
-        var nav = new StackPanel { Margin = new Thickness(12, 18, 12, 18) };
+        var nav = new StackPanel { Margin = new Thickness(12, 24, 12, 18) };
+        var brand = Ui.Heading("SnippyGrab", 22); brand.Margin = new Thickness(14, 0, 0, 2); nav.Children.Add(brand);
+        var section = Ui.Text("Preferences", 12, true); section.Margin = new Thickness(14, 0, 0, 24); nav.Children.Add(section);
         for (var i = 0; i < Categories.Length; i++)
         {
             var index = i; var button = Ui.ActionButton(Categories[i].Title, Categories[i].Icon, Categories[i].Title, () => SelectCategory(index), "NavigationButton");
@@ -99,9 +101,8 @@ internal sealed class SettingsWindow : Window
         for (var i = 0; i < Categories.Length; i++)
         {
             buildingCategory = i;
-            var page = new StackPanel { Margin = new Thickness(28, 22, 20, 12) }; pages.Add(page);
-            page.Children.Add(Ui.Heading(Categories[i].Title));
-            var description = Ui.Text(Categories[i].Description, 14, true); description.Margin = new Thickness(0, 4, 0, 20); page.Children.Add(description);
+            var page = new StackPanel { Margin = new Thickness(30, 28, 24, 16) }; pages.Add(page);
+            page.Children.Add(Ui.PageHeading(Categories[i].Title, Categories[i].Description, Categories[i].Icon));
             switch (i)
             {
                 case 0: Appearance(); break;
@@ -141,7 +142,7 @@ internal sealed class SettingsWindow : Window
     private void Note(string text) { var note = Ui.Text(text, 12, true); note.Margin = new Thickness(0, 10, 0, 6); group.Children.Add(note); }
     private void Row(string name, string label, FrameworkElement input, string? hint = null)
     {
-        var row = new Grid { Margin = new Thickness(0, 10, 0, 0) };
+        var row = new Grid { Margin = new Thickness(0, 16, 0, 0) };
         row.ColumnDefinitions.Add(new ColumnDefinition()); row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(0.95, GridUnitType.Star) });
         row.RowDefinitions.Add(new RowDefinition()); row.RowDefinitions.Add(new RowDefinition()); row.RowDefinitions.Add(new RowDefinition());
         var labels = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 16, 0) }; labels.Children.Add(Ui.Text(label)); if (hint is not null) labels.Children.Add(Ui.Text(hint, 12, true)); row.Children.Add(labels);
@@ -241,7 +242,7 @@ internal sealed class SettingsWindow : Window
         choices.SizeChanged += (_, _) => choices.Columns = choices.ActualWidth < 350 * Ui.TextScale ? 1 : 3;
         Group("Interface preview"); Note("A preview of the screenshot shelf using the selected theme.");
         var preview = new Grid(); preview.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(268) }); preview.ColumnDefinitions.Add(new ColumnDefinition());
-        var sample = new StackPanel(); var code = Ui.Text("function captureScreen() {\n    const image = grab();\n    return image;\n}\n\nconsole.log('SnippyGrab');", 12); code.FontFamily = new FontFamily("Consolas"); code.Margin = new Thickness(10); sample.Children.Add(code);
+        var sample = new StackPanel(); sample.Children.Add(Ui.CaptureSample());
         var strip = new StackPanel { Orientation = Orientation.Horizontal }; foreach (var icon in new[] { "edit", "copy", "pin", "export", "trash", "more" }) { var b = Ui.IconButton(icon, icon + " preview", () => { }); b.Focusable = false; b.IsHitTestVisible = false; strip.Children.Add(b); }
         sample.Children.Add(strip);
         var previewFrame = Ui.Group(sample, new Thickness(0)); preview.Children.Add(previewFrame); var guidance = Ui.Text("System follows your Windows app theme.", 14, true); guidance.Margin = new Thickness(18, 18, 0, 0); Grid.SetColumn(guidance, 1); preview.Children.Add(guidance); group.Children.Add(preview);
@@ -250,14 +251,14 @@ internal sealed class SettingsWindow : Window
         {
             var light = theme == AppTheme.Light || theme == AppTheme.System && Microsoft.Win32.Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "AppsUseLightTheme", 0) is int value && value == 1;
             guidance.Text = theme == AppTheme.System ? "System follows your Windows app theme." : theme + " is used throughout SnippyGrab.";
-            var keys = new[] { "Raised", "Ink", "Border", "Muted", "Hover" }; var palette = light ? new[] { "#FFFFFF", "#202124", "#D4D5D8", "#60646C", "#ECEDEF" } : new[] { "#252629", "#F1F2F4", "#44464D", "#B2B5BD", "#303238" };
+            var keys = new[] { "Raised", "Ink", "Border", "Muted", "Hover", "Surface" }; var palette = light ? new[] { "#FFFFFF", "#242424", "#D2D2D2", "#606060", "#EBEBEB", "#F5F5F5" } : new[] { "#242424", "#F2F2F2", "#444444", "#B8B8B8", "#303030", "#191919" };
             for (var i = 0; i < keys.Length; i++) previewFrame.Resources[keys[i]] = SystemParameters.HighContrast ? Ui.Brush(keys[i]) : new SolidColorBrush((Color)ColorConverter.ConvertFromString(palette[i]));
         }; updatePreview();
         Group("Accessibility"); Note("Uses Windows text size, high contrast and reduced motion.");
     }
     private static Border ThemeSample(AppTheme theme)
     {
-        var light = theme == AppTheme.Light || theme == AppTheme.System && Microsoft.Win32.Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "AppsUseLightTheme", 0) is int value && value == 1; var bg = new SolidColorBrush((Color)ColorConverter.ConvertFromString(light ? "#F7F7F8" : "#1C1D20")); var fg = new SolidColorBrush((Color)ColorConverter.ConvertFromString(light ? "#D4D5D8" : "#44464D"));
+        var light = theme == AppTheme.Light || theme == AppTheme.System && Microsoft.Win32.Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "AppsUseLightTheme", 0) is int value && value == 1; var bg = new SolidColorBrush((Color)ColorConverter.ConvertFromString(light ? "#F5F5F5" : "#191919")); var fg = new SolidColorBrush((Color)ColorConverter.ConvertFromString(light ? "#D2D2D2" : "#444444"));
         var view = new Grid { Height = 92 }; view.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(0.3, GridUnitType.Star) }); view.ColumnDefinitions.Add(new ColumnDefinition());
         var rail = new StackPanel { Margin = new Thickness(7, 18, 5, 5) }; for (var i = 0; i < 3; i++) rail.Children.Add(new Border { Height = 6, Background = fg, CornerRadius = new CornerRadius(2), Margin = new Thickness(0, 0, 0, 9) }); view.Children.Add(rail);
         var page = new StackPanel { Margin = new Thickness(6, 18, 7, 6) }; page.Children.Add(new Border { Height = 5, Background = fg, Margin = new Thickness(0, 0, 12, 10) }); page.Children.Add(new Border { Height = 35, Background = fg, CornerRadius = new CornerRadius(3) }); Grid.SetColumn(page, 1); view.Children.Add(page);

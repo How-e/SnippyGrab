@@ -125,6 +125,7 @@ public sealed class UiRedesignTests
             {
                 using var controller = new AppController(true, root, diagnostic: true);
                 VerifyUpdatesView(controller);
+                VerifyRedesignPreviews(controller);
                 var original = JsonSerializer.Serialize(controller.Settings);
                 var settings = new SettingsWindow(controller);
                 try
@@ -205,6 +206,7 @@ public sealed class UiRedesignTests
                 try
                 {
                     LayoutWindow(combine);
+                    RenderReview(combine, "combine-Dark");
                     Children<Expander>(combine).Single().IsExpanded = true; combine.UpdateLayout();
                     var layout = Children<ComboBox>(combine).Single(c => System.Windows.Automation.AutomationProperties.GetName(c) == "Composition layout");
                     var spacing = Children<TextBox>(combine).Single(c => System.Windows.Automation.AutomationProperties.GetName(c) == "Spacing in pixels");
@@ -225,6 +227,7 @@ public sealed class UiRedesignTests
                     try
                     {
                         LayoutWindow(scroll);
+                        RenderReview(scroll, "scroll-Dark");
                         var buttons = Children<Button>(scroll).Where(b => b.Content is string).ToDictionary(b => (string)b.Content);
                         Assert.True(buttons["Capture next frame"].IsEnabled);
                         Assert.False(buttons["Keep this frame"].IsEnabled);
@@ -241,6 +244,7 @@ public sealed class UiRedesignTests
                     try
                     {
                         LayoutWindow(scroll);
+                        RenderReview(scroll, "scroll-Dark");
                         var buttons = Children<Button>(scroll).Where(b => b.Content is string).ToDictionary(b => (string)b.Content);
                         Assert.False(buttons["Capture next frame"].IsEnabled); Assert.False(buttons["Create screenshot"].IsEnabled);
                         Assert.True(buttons["Keep this frame"].IsEnabled); Assert.True(buttons["Discard this frame"].IsEnabled);
@@ -299,6 +303,8 @@ public sealed class UiRedesignTests
                     Assert.Equal("Export cancelled before file commit.", form.Children.OfType<TextBlock>().Last().Text);
                 }
                 finally { operation.Complete("Completed"); operation.Close(); }
+                RenderReview(editor, "editor-Dark");
+                Ui.Theme(AppTheme.Light, 1); RenderReview(editor, "editor-Light"); Ui.Theme(AppTheme.Dark, 1);
                 foreach (var tool in Enum.GetValues<EditTool>()) { editor.ToolPicker.SelectedValue = tool; Assert.Equal(tool, editor.ToolPicker.SelectedValue); }
                 var closed = false; editor.Closed += (_, _) => closed = true;
                 editor.Close();
@@ -343,6 +349,60 @@ public sealed class UiRedesignTests
             }
             return true;
         });
+    }
+    // Opt-in rendered fixtures keep review artifacts outside the repository.
+    private static void VerifyRedesignPreviews(AppController controller)
+    {
+        var output = Environment.GetEnvironmentVariable("SNIPPYGRAB_REDESIGN_PREVIEWS");
+        foreach (var theme in new[] { AppTheme.Dark, AppTheme.Light })
+        {
+            Ui.Theme(theme, 1);
+            foreach (var key in new[] { "Surface", "Raised", "Canvas", "Hover", "Pressed", "Border", "Selected", "Primary", "Accent" })
+            {
+                var neutral = ((SolidColorBrush)Ui.Brush(key)).Color;
+                Assert.Equal(neutral.R, neutral.G); Assert.Equal(neutral.G, neutral.B);
+            }
+            static double Luminance(Brush brush)
+            {
+                var c = ((SolidColorBrush)brush).Color;
+                static double Linear(byte value) { var v = value / 255d; return v <= 0.04045 ? v / 12.92 : Math.Pow((v + 0.055) / 1.055, 2.4); }
+                return 0.2126 * Linear(c.R) + 0.7152 * Linear(c.G) + 0.0722 * Linear(c.B);
+            }
+            foreach (var (foreground, background) in new[] { ("Ink", "Surface"), ("Muted", "Surface"), ("Muted", "Raised"), ("PrimaryInk", "Primary") })
+            {
+                var a = Luminance(Ui.Brush(foreground)); var b = Luminance(Ui.Brush(background));
+                Assert.True((Math.Max(a, b) + 0.05) / (Math.Min(a, b) + 0.05) >= 4.5, $"{theme}: {foreground}/{background} text contrast");
+            }
+            if (string.IsNullOrWhiteSpace(output)) continue;
+            Directory.CreateDirectory(output);
+            var settings = new SettingsWindow(controller);
+            try { for (var i = 0; i < SettingsWindow.Categories.Length; i++) { settings.SelectCategory(i); RenderReview(settings, "settings-" + i + "-" + theme); } }
+            finally { settings.Close(); }
+            var welcome = new WelcomeWindow(controller); try { RenderReview(welcome, "welcome-" + theme); } finally { welcome.Close(); }
+            var history = new HistoryWindow(controller); try { RenderReview(history, "history-empty-" + theme); } finally { history.Close(); }
+            var export = new ExportWindow(new CaptureRecord(), "", "", null); try { RenderReview(export, "export-" + theme); } finally { export.Close(); }
+            var dialog = new DialogWindow("Keep this capture?", "Your screenshot stays on this device. Export it to keep a copy outside the temporary shelf."); try { RenderReview(dialog, "dialog-" + theme); } finally { dialog.Close(); }
+        }
+        Ui.Theme(AppTheme.Dark, 1);
+    }
+    private static void RenderReview(Window window, string name)
+    {
+        var output = Environment.GetEnvironmentVariable("SNIPPYGRAB_REDESIGN_PREVIEWS");
+        if (string.IsNullOrWhiteSpace(output)) return;
+        Directory.CreateDirectory(output);
+        window.ShowActivated = false; window.WindowStartupLocation = WindowStartupLocation.Manual; window.Left = -30000; window.Top = -30000;
+        window.Show(); window.UpdateLayout();
+        var content = (FrameworkElement)window.Content;
+        var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap((int)Math.Ceiling(content.ActualWidth), (int)Math.Ceiling(content.ActualHeight), 96, 96, PixelFormats.Pbgra32);
+        var visual = new DrawingVisual();
+        using (var drawing = visual.RenderOpen())
+        {
+            var bounds = new Rect(0, 0, bitmap.PixelWidth, bitmap.PixelHeight);
+            drawing.DrawRectangle(Ui.Brush("Surface"), null, bounds); drawing.DrawRectangle(new VisualBrush(content), null, bounds);
+        }
+        bitmap.Render(visual);
+        var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder(); encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
+        using var stream = File.Create(Path.Combine(output, $"{name}.png")); encoder.Save(stream);
     }
     private static T RunUiTask<T>(Func<Task<T>> action)
     {

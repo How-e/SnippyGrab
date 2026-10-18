@@ -19,7 +19,7 @@ internal sealed class CompositionWindow : Window
         var root = new StackPanel { Margin = new Thickness(24, 20, 24, 8) };
         var shell = new DockPanel(); Content = shell;
         var footer = new WrapPanel { Margin = new Thickness(24, 8, 24, 16) }; DockPanel.SetDock(footer, Dock.Bottom); shell.Children.Add(footer); shell.Children.Add(Ui.Scroll(root));
-        root.Children.Add(Ui.Heading("Combine screenshots"));
+        root.Children.Add(Ui.PageHeading("Combine screenshots", "Bring your captures together.", "image"));
         root.Children.Add(Ui.Text($"Arrange {inputs.Count} screenshots into one image. Choose a layout, check the preview, then open the result in the editor.", 14, true));
         root.Children.Add(Ui.Heading("1  Choose a layout", 18));
         var mode = new ComboBox { ItemsSource = new[] { "Vertical strip · top to bottom", "Horizontal strip · side by side", "Grid · rows and columns" }, SelectedIndex = 0 }; AutomationProperties.SetName(mode, "Composition layout"); root.Children.Add(mode);

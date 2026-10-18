@@ -9,11 +9,11 @@ internal sealed class ExportWindow : Window
     internal ExportRequest? Request { get; private set; }
     internal ExportWindow(CaptureRecord record, string directory, string cache, Window? owner, IReadOnlyList<CaptureRecord>? batch = null)
     {
-        Ui.StyleWindow(this); Title = "SnippyGrab · Export image"; Width = 560; Height = 360; MinWidth = 440; MinHeight = 320;
+        Ui.StyleWindow(this); Title = "SnippyGrab · Export image"; Width = 560; Height = 460; MinWidth = 440; MinHeight = 320;
         if (owner is not null) Owner = owner;
         WindowStartupLocation = owner is null ? WindowStartupLocation.CenterScreen : WindowStartupLocation.CenterOwner;
         var root = new StackPanel { Margin = new Thickness(24) }; Content = Ui.Scroll(root);
-        root.Children.Add(Ui.Heading("Export image"));
+        root.Children.Add(Ui.PageHeading("Export image", "Choose a format for your screenshot.", "export"));
         if (batch is not null) root.Children.Add(Ui.Text($"{batch.Count} captures in shelf order:\n" + string.Join("\n", batch.Select((c, i) => $"{i + 1:D3} · {c.Width} × {c.Height}")), 12, true));
         var collision = new ComboBox { ItemsSource = new[] { "Keep both (unique filenames)", "Skip existing files", "Replace existing files" }, SelectedIndex = 0 };
         AutomationProperties.SetName(collision, "Existing file policy"); if (batch is not null) root.Children.Add(collision);

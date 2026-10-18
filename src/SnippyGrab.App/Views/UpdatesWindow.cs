@@ -20,7 +20,7 @@ internal sealed class UpdatesWindow : Window
         Ui.StyleWindow(this); Title = "SnippyGrab · Updates"; Width = 680; Height = 570; MinWidth = 500; MinHeight = 380; WindowStartupLocation = WindowStartupLocation.CenterScreen;
         var root = new DockPanel { Margin = new Thickness(24) }; Content = root;
         var header = new StackPanel { Margin = new Thickness(0, 0, 0, 18) };
-        header.Children.Add(Ui.Heading("Updates", 24)); header.Children.Add(Ui.Text("Installed: " + BuildVersion.Display, 13));
+        header.Children.Add(Ui.Heading("Updates", 30)); header.Children.Add(Ui.Text("Installed: " + BuildVersion.Display, 13));
         status.TextWrapping = TextWrapping.Wrap; status.Margin = new Thickness(0, 12, 0, 8); header.Children.Add(status);
         header.Children.Add(Ui.Text("Quiet checks every 6 hours. Updates install only when you choose.\nPrerelease builds follow prereleases; stable builds follow stable releases.", 13));
         DockPanel.SetDock(header, Dock.Top); root.Children.Add(header);

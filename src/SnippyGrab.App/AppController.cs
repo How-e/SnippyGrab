@@ -372,7 +372,7 @@ internal sealed class AppController : IDisposable
             var previewPaths = ordered.Select(Repository.PathFor).ToArray();
             var thumbs = await ImageWorker.RunAsync(() => previewPaths.ToDictionary(path => path, path => ImageService.LoadPreview(path, 160, 160)), exportLifetime.Token);
             if (disposed) return;
-            var dialog = new CompositionWindow(ordered.Select(c => new CompositionInput(Repository.PathFor(c), c.Width, c.Height)).ToArray(), owner, thumbs);
+            var dialog = new CompositionWindow(PrepareCompositionInputs(ordered), owner, thumbs);
             if (dialog.ShowDialog() != true || dialog.Layout is not { } layout) return;
             progress = new OperationWindow("Combining captures", owner); progress.Show();
             using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(progress.Cancellation, exportLifetime.Token);
@@ -385,6 +385,12 @@ internal sealed class AppController : IDisposable
         catch (OperationCanceledException) { progress?.Complete("Combination cancelled. Original captures are unchanged."); }
         catch (Exception ex) { progress?.Complete(OperationFailure.From(ex).Message); if (!disposed) Failure(ex); }
         finally { exporting = false; }
+    }
+    internal CompositionInput[] PrepareCompositionInputs(IReadOnlyList<CaptureRecord> ordered)
+    {
+        using var lease = Repository.Lease(ordered);
+        foreach (var record in ordered) Repository.ResolveDimensions(record);
+        return ordered.Select(c => new CompositionInput(Repository.PathFor(c), c.Width, c.Height)).ToArray();
     }
     public void Pin(CaptureRecord record) => Run(async () => { await Repository.SetPinnedAsync(record, !record.Pinned); if (!disposed) Dock.Refresh(); });
     public void Pin(IEnumerable<CaptureRecord> records)

@@ -193,6 +193,11 @@ public sealed class UiRedesignTests
                 VerifyIconTextAlignment();
                 var png = ImageService.Png(EditorDocumentTests.Fixture());
                 for (var index = 0; index < 70; index++) controller.Repository.Add(png, 160, 100);
+                var recovered = controller.Repository.Captures.Take(2).ToArray();
+                foreach (var capture in recovered) { capture.Width = 1; capture.Height = 1; capture.DimensionsPending = true; }
+                var recoveredInputs = controller.PrepareCompositionInputs(recovered);
+                Assert.All(recoveredInputs, input => { Assert.Equal(160, input.Width); Assert.Equal(100, input.Height); });
+                Assert.All(recovered, capture => Assert.False(capture.DimensionsPending));
                 RunUiTask(async () => { await VerifyStorageAndHistoryCollection(controller, root); return true; });
                 var previousSessionOnly = controller.Settings.SessionOnly;
                 controller.Settings.SessionOnly = true;

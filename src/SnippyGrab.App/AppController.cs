@@ -364,6 +364,7 @@ internal sealed class AppController : IDisposable
     public async Task CombineSelected(IReadOnlyList<CaptureRecord> selected, Window? owner = null)
     {
         if (exporting || exitRequested || Exiting) return;
+        if (selected.Count is < 2 or > 20) { Notify("Select between 2 and 20 captures to combine."); return; }
         exporting = true; OperationWindow? progress = null;
         try
         {

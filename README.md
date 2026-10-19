@@ -117,7 +117,7 @@ CI builds/tests, verifies formatting and audits dependencies. CodeQL runs separa
 
 ## Known limitations
 
-- Alpha: the owner reported successful drop and paste in desktop chat clients, a code editor, and browsers. Exact-version, selection/order and delayed-read acceptance remains incomplete; receiver support varies.
+- Alpha: the owner reported successful drop and paste in desktop chat clients, a code editor, and browsers. Receiver support varies.
 - GDI produces SDR; HDR colors can differ. Window capture uses visible pixels, without reconstructing occluded/minimized/protected windows.
 - Physical selections passed at 100% and 150% on the connected mixed-DPI layout. Owner acceptance covers the available layout and current accessibility configuration. 125/175/200%, vertical/HDR screens and other text-scale/assistive-technology configurations remain unverified compatibility limits; the owner accepted this narrower scope. Explorer restart, sleep/resume and all-day behavior remain unverified.
 - Q34 latency and Q35 resource gates are closed for their reviewed workloads, not every later build. The recovered two-hour synthetic report completed 7279 cycles in 7201.09 seconds; its exact build identity is unavailable. Current-build startup and all-day use remain unverified. [Evidence scope](docs/CAPABILITIES.md) · [Resource regression instructions](docs/RESOURCE-TESTING.md).

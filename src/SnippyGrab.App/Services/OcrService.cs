@@ -67,7 +67,7 @@ internal sealed class OcrService(string? modelDirectory = null, Func<Settings>? 
         await serial.WaitAsync(cancellation);
         try
         {
-            return await ImageWorker.RunAsync(() =>
+            return await ImageWorker.RunOcrAsync(() =>
             {
                 cancellation.ThrowIfCancellationRequested();
                 var directory = modelDirectory ?? Path.Combine(AppContext.BaseDirectory, "tessdata");
@@ -93,7 +93,7 @@ internal sealed class OcrService(string? modelDirectory = null, Func<Settings>? 
         await serial.WaitAsync(cancellation);
         try
         {
-            return await ImageWorker.RunAsync(() =>
+            return await ImageWorker.RunOcrAsync(() =>
             {
                 cancellation.ThrowIfCancellationRequested();
                 var directory = modelDirectory ?? Path.Combine(AppContext.BaseDirectory, "tessdata");

@@ -66,6 +66,34 @@ public sealed class ImageSchedulingTests
         Assert.NotEqual(captureThread, await background);
     }
     [Fact]
+    public async Task LongOcrWorkDoesNotBlockCopiesPreviewsOrCaptureEncodingAndReusesItsSta()
+    {
+        using var entered = new ManualResetEventSlim(); using var release = new ManualResetEventSlim();
+        var recognition = ImageWorker.RunOcrAsync(() =>
+        {
+            Assert.Equal(ApartmentState.STA, Thread.CurrentThread.GetApartmentState());
+            entered.Set(); if (!release.Wait(TimeSpan.FromSeconds(10))) throw new TimeoutException();
+            return Thread.CurrentThread.ManagedThreadId;
+        });
+        Assert.True(entered.Wait(TimeSpan.FromSeconds(10)));
+        int imageThread;
+        try
+        {
+            imageThread = await ImageWorker.RunAsync(() =>
+            {
+                var image = BitmapSource.Create(2, 2, 96, 96, PixelFormats.Bgra32, null, new byte[16], 8); image.Freeze();
+                Assert.NotEmpty(ImageService.Png(image)); return Thread.CurrentThread.ManagedThreadId;
+            }).WaitAsync(TimeSpan.FromSeconds(3));
+            Assert.False(recognition.IsCompleted);
+            using var cancelled = new CancellationTokenSource();
+            var obsolete = ImageWorker.RunOcrAsync<int>(() => throw new InvalidOperationException("Cancelled OCR must not run."), cancelled.Token);
+            cancelled.Cancel(); await Assert.ThrowsAnyAsync<OperationCanceledException>(() => obsolete);
+        }
+        finally { release.Set(); }
+        var ocrThread = await recognition; Assert.NotEqual(imageThread, ocrThread);
+        for (var i = 0; i < 20; i++) Assert.Equal(ocrThread, await ImageWorker.RunOcrAsync(() => Thread.CurrentThread.ManagedThreadId));
+    }
+    [Fact]
     public void OcrRejectsOversizedPngHeaderBeforeDecodingOrNativeAllocation()
     {
         var bytes = ImageIntegrationTests.Sta(() => ImageService.Png(BitmapSource.Create(2, 2, 96, 96, PixelFormats.Bgra32, null, new byte[16], 8)));

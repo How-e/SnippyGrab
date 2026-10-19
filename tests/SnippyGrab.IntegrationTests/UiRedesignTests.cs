@@ -277,10 +277,12 @@ public sealed class UiRedesignTests
                 var history = new HistoryWindow(controller);
                 try
                 {
+                    Assert.False(System.Windows.Input.ApplicationCommands.Save.CanExecute(null, history));
                     var view = (FrameworkElement)history.Content; view.Measure(new Size(1080, 720)); view.Arrange(new Rect(0, 0, 1080, 720)); view.UpdateLayout();
                     RunUiTask(async () => { await history.DrainPreviewAsync(); return true; });
                     Assert.True(VirtualizingPanel.GetIsVirtualizing(history.CaptureList)); Assert.InRange(history.CachedThumbnailCount, 1, 24);
                     history.CaptureList.SelectedIndex = 0; var id = controller.Repository.Captures[0].Id;
+                    Assert.True(System.Windows.Input.ApplicationCommands.Save.CanExecute(null, history));
                     controller.Repository.Replace(controller.Repository.Captures[0], png, 160, 100);
                     var previewTask = history.PreviewWork;
                     var previewFrame = new System.Windows.Threading.DispatcherFrame();

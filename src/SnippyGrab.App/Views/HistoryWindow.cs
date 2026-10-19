@@ -115,6 +115,11 @@ internal sealed class HistoryWindow : Window
         list.SelectionChanged += (_, _) => { if (!refreshing) controller.Try(RefreshPreview); };
         list.MouseDoubleClick += (_, _) => { if (Selected().FirstOrDefault() is { } c) controller.Edit(c); };
         list.PreviewMouseMove += (_, e) => { if (e.LeftButton == MouseButtonState.Pressed && Selected().Count > 0 && (Keyboard.Modifiers & ModifierKeys.Alt) != 0) controller.Run(() => controller.DragDrop.DragAsync(list, Selected())); };
+        // InputGestureText on the context menu only displays the shortcut.
+        // Bind the standard Save command so Ctrl+S actually exports the selection.
+        CommandBindings.Add(new CommandBinding(ApplicationCommands.Save,
+            (_, _) => { if (Selected().FirstOrDefault() is { } capture) controller.Run(() => controller.Save(capture, this)); },
+            (_, e) => { e.CanExecute = Selected().Count > 0; e.Handled = true; }));
         PreviewKeyDown += (_, e) => { if (e.Key == Key.Escape) Close(); if (e.Key == Key.Delete && Keyboard.Modifiers == ModifierKeys.None) { controller.Dismiss(Selected()); Refresh(); e.Handled = true; } if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.None && Selected().FirstOrDefault() is { } c) { controller.Edit(c); e.Handled = true; } };
         controller.Repository.Changed += RepositoryChanged; controller.SettingsChanged += RepositoryChanged;
         DpiChanged += (_, e) => { if (ReferenceEquals(e.Source, this)) Dispatcher.BeginInvoke(new Action(() => { thumbnails.Clear(); if (IsLoaded && !closed) controller.Try(Refresh); })); };

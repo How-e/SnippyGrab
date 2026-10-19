@@ -369,10 +369,13 @@ internal sealed class AppController : IDisposable
         {
             var ordered = TransferPayload.Ordered(Repository, selected);
             using var leases = Repository.Lease(ordered);
-            var previewPaths = ordered.Select(Repository.PathFor).ToArray();
+            // Snapshot dimensions and paths while these exact revisions are leased.
+            // An editor can commit a newer revision while thumbnail decoding yields.
+            var inputs = PrepareCompositionInputs(ordered);
+            var previewPaths = inputs.Select(input => input.Path).ToArray();
             var thumbs = await ImageWorker.RunAsync(() => previewPaths.ToDictionary(path => path, path => ImageService.LoadPreview(path, 160, 160)), exportLifetime.Token);
             if (disposed) return;
-            var dialog = new CompositionWindow(PrepareCompositionInputs(ordered), owner, thumbs);
+            var dialog = new CompositionWindow(inputs, owner, thumbs);
             if (dialog.ShowDialog() != true || dialog.Layout is not { } layout) return;
             progress = new OperationWindow("Combining captures", owner); progress.Show();
             using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(progress.Cancellation, exportLifetime.Token);

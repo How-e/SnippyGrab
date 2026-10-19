@@ -198,6 +198,32 @@ public sealed class UiRedesignTests
                 var recoveredInputs = controller.PrepareCompositionInputs(recovered);
                 Assert.All(recoveredInputs, input => { Assert.Equal(160, input.Width); Assert.Equal(100, input.Height); });
                 Assert.All(recovered, capture => Assert.False(capture.DimensionsPending));
+                RunUiTask(async () =>
+                {
+                    using var entered = new ManualResetEventSlim(); using var release = new ManualResetEventSlim();
+                    var worker = ImageWorker.RunAsync(() => { entered.Set(); if (!release.Wait(TimeSpan.FromSeconds(10))) throw new TimeoutException(); return true; });
+                    Assert.True(entered.Wait(TimeSpan.FromSeconds(10)));
+                    var originalPaths = recovered.Select(controller.Repository.PathFor).ToArray();
+                    CompositionInput[]? displayed = null;
+                    var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(10) };
+                    timer.Tick += (_, _) =>
+                    {
+                        if (app.Windows.OfType<CompositionWindow>().FirstOrDefault() is not { } dialog) return;
+                        dialog.ShowActivated = false; dialog.Left = dialog.Top = -30000;
+                        displayed = dialog.Inputs.ToArray(); dialog.Close();
+                    };
+                    timer.Start();
+                    try
+                    {
+                        var combining = controller.CombineSelected(recovered);
+                        controller.Repository.Replace(recovered[0], png, 160, 100);
+                        release.Set(); await worker; await combining;
+                        Assert.NotNull(displayed);
+                        Assert.Equal(originalPaths, displayed.Select(input => input.Path));
+                    }
+                    finally { release.Set(); timer.Stop(); }
+                    return true;
+                });
                 RunUiTask(async () => { await VerifyStorageAndHistoryCollection(controller, root); return true; });
                 var previousSessionOnly = controller.Settings.SessionOnly;
                 controller.Settings.SessionOnly = true;

@@ -318,6 +318,18 @@ public sealed class UiRedesignTests
                     var selectedCapture = controller.Repository.Captures[0]; selectedCapture.Saved = true; controller.Repository.Persist();
                     Assert.Same(previewTask, history.PreviewWork); Assert.NotNull(history.PreviewImage.Source);
                     Assert.Equal(id, controller.Repository.Captures[0].Id);
+                    var combineAction = Children<Button>((DependencyObject)history.Content).Single(button => button.ToolTip as string == "Combine 2–20 selected captures into a new image");
+                    Assert.False(combineAction.IsEnabled);
+                    history.CaptureList.SelectedItems.Add(history.CaptureList.Items[1]); Assert.True(combineAction.IsEnabled);
+                    for (var index = 2; index < 21; index++) history.CaptureList.SelectedItems.Add(history.CaptureList.Items[index]);
+                    Assert.False(combineAction.IsEnabled);
+                    history.CaptureList.SelectedItems.Clear(); history.CaptureList.SelectedIndex = 0;
+                    RunUiTask(async () =>
+                    {
+                        await controller.CombineSelected(controller.Repository.Captures.Take(21).ToArray());
+                        Assert.Equal("Select between 2 and 20 captures to combine.", controller.LastOperationDetails);
+                        return true;
+                    });
                 }
                 finally { history.Close(); }
                 var editor = new EditorWindow(controller, controller.Repository.Captures[0]);

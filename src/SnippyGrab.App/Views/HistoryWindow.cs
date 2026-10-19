@@ -28,6 +28,7 @@ internal sealed class HistoryWindow : Window
     private readonly TextBlock previewHint = Ui.Text("Select a capture to preview it.", 14, true);
     private readonly List<Button> selectionActions = [];
     private readonly Button copy;
+    private readonly Button combine;
     private readonly Button previous;
     private readonly Button next;
     private readonly Grid split = new();
@@ -85,7 +86,8 @@ internal sealed class HistoryWindow : Window
         copy = Action("Copy image", "copy", "Copy image or selected PNG files", () => controller.Run(async () => { var selected = Selected(); if (selected.Count == 1) await controller.Copy(selected[0]); else if (selected.Count > 1) await controller.CopyFiles(selected); }));
         Action("Pin", "pin", "Toggle pins on selected captures", () => controller.Pin(Selected()));
         Action("Export selected…", "export", "Export selected captures in shelf order", () => controller.Run(() => controller.ExportSelected(Selected(), this)));
-        Action("Combine selected…", "image", "Combine 2–20 selected captures into a new image", () => controller.Run(() => controller.CombineSelected(Selected(), this)));
+        combine = Action("Combine selected…", "image", "Combine 2–20 selected captures into a new image", () => controller.Run(() => controller.CombineSelected(Selected(), this)));
+        ToolTipService.SetShowOnDisabled(combine, true);
         Action("More", "more", "More selected capture actions", () =>
         {
             var menu = new ContextMenu(); menu.Items.Add(Ui.Menu("Edit", "edit", () => { if (Selected().FirstOrDefault() is { } c) controller.Edit(c); }, "Enter")); menu.Items.Add(Ui.Menu("Dismiss", "close", () => { controller.Dismiss(Selected()); Refresh(); }, "Delete")); menu.Items.Add(Ui.Menu("Export image…", "export", () => { if (Selected().FirstOrDefault() is { } c) controller.Run(() => controller.Save(c)); }, "Ctrl+S")); menu.Items.Add(Ui.Menu("Copy OCR text", "ocr", () => { if (Selected().FirstOrDefault() is { } c) controller.Run(() => controller.Ocr(c)); })); menu.PlacementTarget = toolbar; menu.IsOpen = true;
@@ -138,6 +140,7 @@ internal sealed class HistoryWindow : Window
         if (closed) return;
         metadata.Text = "";
         var selected = Selected(); var capture = selected.FirstOrDefault(); foreach (var button in selectionActions) button.IsEnabled = selected.Count > 0;
+        combine.IsEnabled = selected.Count is >= 2 and <= 20;
         copy.Content = Ui.IconLabel("copy", selected.Count > 1 ? "Copy files" : "Copy image"); selectionStatus.Text = selected.Count == 0 ? "Select a capture" : $"{selected.Count} selected"; previewHint.Visibility = capture is null ? Visibility.Visible : Visibility.Collapsed;
         if (capture is not null) controller.Repository.ResolveDimensions(capture);
         metadata.Text = capture is null ? "" : $"{capture.Width} × {capture.Height}   ·   PNG   ·   {capture.CreatedUtc.LocalDateTime:g}"; RenderOptions.SetBitmapScalingMode(preview, BitmapScalingMode.HighQuality);

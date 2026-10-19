@@ -281,6 +281,15 @@ public sealed class UiRedesignTests
                     RunUiTask(async () => { await history.DrainPreviewAsync(); return true; });
                     Assert.True(VirtualizingPanel.GetIsVirtualizing(history.CaptureList)); Assert.InRange(history.CachedThumbnailCount, 1, 24);
                     history.CaptureList.SelectedIndex = 0; var id = controller.Repository.Captures[0].Id;
+                    controller.Repository.Replace(controller.Repository.Captures[0], png, 160, 100);
+                    var previewTask = history.PreviewWork;
+                    var previewFrame = new System.Windows.Threading.DispatcherFrame();
+                    _ = previewTask.ContinueWith(_ => history.Dispatcher.BeginInvoke(new Action(() => previewFrame.Continue = false)));
+                    System.Windows.Threading.Dispatcher.PushFrame(previewFrame); previewTask.GetAwaiter().GetResult();
+                    Assert.Single(history.CaptureList.SelectedItems); Assert.NotNull(history.PreviewImage.Source);
+                    var selectedCapture = controller.Repository.Captures[0]; selectedCapture.Saved = true; controller.Repository.Persist();
+                    Assert.Same(previewTask, history.PreviewWork); Assert.NotNull(history.PreviewImage.Source);
+                    Assert.Equal(id, controller.Repository.Captures[0].Id);
                     var combineAction = Children<Button>((DependencyObject)history.Content).Single(button => button.ToolTip as string == "Combine 2–20 selected captures into a new image");
                     Assert.False(combineAction.IsEnabled);
                     history.CaptureList.SelectedItems.Add(history.CaptureList.Items[1]); Assert.True(combineAction.IsEnabled);
@@ -293,15 +302,6 @@ public sealed class UiRedesignTests
                         Assert.Equal("Select between 2 and 20 captures to combine.", controller.LastOperationDetails);
                         return true;
                     });
-                    controller.Repository.Replace(controller.Repository.Captures[0], png, 160, 100);
-                    var previewTask = history.PreviewWork;
-                    var previewFrame = new System.Windows.Threading.DispatcherFrame();
-                    _ = previewTask.ContinueWith(_ => history.Dispatcher.BeginInvoke(new Action(() => previewFrame.Continue = false)));
-                    System.Windows.Threading.Dispatcher.PushFrame(previewFrame); previewTask.GetAwaiter().GetResult();
-                    Assert.Single(history.CaptureList.SelectedItems); Assert.NotNull(history.PreviewImage.Source);
-                    var selectedCapture = controller.Repository.Captures[0]; selectedCapture.Saved = true; controller.Repository.Persist();
-                    Assert.Same(previewTask, history.PreviewWork); Assert.NotNull(history.PreviewImage.Source);
-                    Assert.Equal(id, controller.Repository.Captures[0].Id);
                 }
                 finally { history.Close(); }
                 var editor = new EditorWindow(controller, controller.Repository.Captures[0]);

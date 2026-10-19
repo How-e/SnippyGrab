@@ -1,0 +1,19 @@
+name: Cache pinned native dependencies
+description: Reuse recipe-matched OCR and WebP outputs; every build still validates their provenance and hashes.
+runs:
+  using: composite
+  steps:
+    - name: Identify the hosted toolchain image
+      id: image
+      shell: pwsh
+      run: |
+        if (!$env:ImageOS -or !$env:ImageVersion) { throw 'Hosted runner image identity is required for native caching.' }
+        "version=$env:ImageOS-$env:ImageVersion" >> $env:GITHUB_OUTPUT
+    - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        # Cache only completed outputs, never mutable source/build trees or managed assemblies.
+        # No prefix fallback: a recipe, policy, or runner toolchain change requires a rebuild.
+        path: |
+          artifacts/native-ocr/current
+          artifacts/native-webp/current
+        key: native-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.image.outputs.version }}-${{ hashFiles('.github/actions/native-cache/action.yml', 'scripts/build-native-ocr.ps1', 'scripts/native-ocr-policy.ps1', 'scripts/ocr-components.json', 'scripts/build-native-webp.ps1', 'scripts/webp-policy.ps1', 'scripts/webp-component.json', 'native/webp/**') }}

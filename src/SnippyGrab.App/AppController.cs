@@ -84,7 +84,6 @@ internal sealed class AppController : IDisposable
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException) { cacheWarning = "Monitor identity could not be saved. Review and retry Settings before changing the display layout."; }
         }
         Ui.FailureHandler = Failure;
-        capture.Timing += Log;
         Ui.Theme(Settings.Theme);
         Settings.LaunchOnStartup = !diagnostic && StartupService.Enabled;
         if (!diagnostic && StartupService.Stale) cacheWarning = "Windows startup points to another or older SnippyGrab path. Enable Launch at Windows login in Settings to register this executable, or disable it to remove the old entry.";
@@ -121,10 +120,13 @@ internal sealed class AppController : IDisposable
     {
         if (deliveringCapture) return;
         deliveringCapture = true;
-        try { await CaptureCore(mode, target); }
-        finally { deliveringCapture = false; }
+        var timing = new CaptureTiming(mode); timing.Start();
+        Log($"event=capture_started; operation={timing.Operation}; mode={mode}");
+        try { await CaptureCore(mode, target, timing); }
+        catch (Exception ex) { timing.Fail(ex); throw; }
+        finally { Log("event=capture_finished; " + System.Text.Json.JsonSerializer.Serialize(timing.Finish())); deliveringCapture = false; }
     }
-    private async Task CaptureCore(CaptureMode mode, CaptureTarget? target)
+    private async Task CaptureCore(CaptureMode mode, CaptureTarget? target, CaptureTiming timing)
     {
         if (capture.Busy || choosingMonitor || exitRequested || Exiting) return;
         if (mode == CaptureMode.Monitor && target is null)
@@ -140,27 +142,46 @@ internal sealed class AppController : IDisposable
         {
             result = await capture.CaptureAsync(mode, Settings.IncludeCursor,
                 () => { dockWasVisible = Dock.IsVisible; Dock.Hide(); foreach (var pin in pins.Values) pin.Hide(); },
-                () => { if (dockWasVisible) Dock.Reveal(); foreach (var pin in pins.Values) pin.Show(); }, target);
+                () => { if (dockWasVisible) Dock.Reveal(); foreach (var pin in pins.Values) pin.Show(); }, target, timing);
         }
         catch (InvalidOperationException) when (mode == CaptureMode.Monitor)
         { Notify("Monitor capture cancelled. The selected display is unavailable or ambiguous; choose a display again."); return; }
         if (result is null || exitRequested || Exiting) return;
-        var ready = Stopwatch.StartNew();
-        var png = await ImageWorker.RunDeliveryAsync(() => ImageService.Png(result.Image), exportLifetime.Token);
-        await PreserveCaptureAsync(result.Image, png, string.Join(",", Forms.Screen.AllScreens.Where(screen => !result.Bounds.Intersect(new PixelRect(screen.Bounds.X, screen.Bounds.Y, screen.Bounds.Width, screen.Bounds.Height)).IsEmpty).Select(screen => screen.DeviceName)), () => Dock.Refresh(newCapture: true));
-        Log($"capture_ready_ms={ready.ElapsedMilliseconds}; capture_total_ms={result.ElapsedMilliseconds + ready.ElapsedMilliseconds}");
+        using var queued = timing.Measure(CapturePhase.EncodingQueue);
+        var png = await ImageWorker.RunDeliveryAsync(() =>
+        {
+            queued.Dispose(); using var encoding = timing.Measure(CapturePhase.Encoding); return ImageService.Png(result.Image);
+        }, exportLifetime.Token);
+        var outcome = await PreserveCaptureAsync(result.Image, png, string.Join(",", Forms.Screen.AllScreens.Where(screen => !result.Bounds.Intersect(new PixelRect(screen.Bounds.X, screen.Bounds.Y, screen.Bounds.Width, screen.Bounds.Height)).IsEmpty).Select(screen => screen.DeviceName)), () => Dock.Refresh(newCapture: true), timing);
+        timing.Complete(outcome);
     }
-    internal async Task PreserveCaptureAsync(BitmapSource image, byte[] png, string monitor, Action refreshDock)
+    internal async Task<CaptureOutcome> PreserveCaptureAsync(BitmapSource image, byte[] png, string monitor, Action refreshDock, CaptureTiming? timing = null)
     {
         ImageLimits.ValidateEncoded(png.Length);
-        try { await Repository.AddAsync(png, image.PixelWidth, image.PixelHeight, monitor); if (!disposed) refreshDock(); }
+        try
+        {
+            using (timing?.Measure(CapturePhase.Storage)) await Repository.AddAsync(png, image.PixelWidth, image.PixelHeight, monitor);
+            timing?.Stored(!Repository.PersistencePending); if (!disposed) refreshDock();
+        }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
         {
-            if (Settings.AutoCopy && await Clipboard.ImageAsync(image, Settings.ClipboardPng, png)) Notify("Capture copied, but cache storage failed. Paste it now; check cache permissions/free space before retrying capture.");
+            var copied = false;
+            if (Settings.AutoCopy)
+            {
+                using (timing?.Measure(CapturePhase.Clipboard)) copied = await Clipboard.ImageAsync(image, Settings.ClipboardPng, png);
+                timing?.ClipboardPublished(copied);
+            }
+            if (copied) Notify("Capture copied, but cache storage failed. Paste it now; check cache permissions/free space before retrying capture.");
             else Notify("Capture storage and clipboard could not preserve this image. Check cache permissions/free space and retry capture.");
-            return;
+            return copied ? CaptureOutcome.ClipboardOnly : CaptureOutcome.PreservationFailed;
         }
-        if (Settings.AutoCopy) await CopyImageCore(image, png);
+        if (Settings.AutoCopy)
+        {
+            bool copied; using (timing?.Measure(CapturePhase.Clipboard)) copied = await CopyImageCore(image, png);
+            timing?.ClipboardPublished(copied);
+            if (!copied) return CaptureOutcome.ClipboardUnavailable;
+        }
+        return CaptureOutcome.Completed;
     }
     public Task<bool> CopyImage(BitmapSource image) => CopyImageCore(image);
     private async Task<bool> CopyImageCore(BitmapSource image, byte[]? encoded = null)

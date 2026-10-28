@@ -15,6 +15,7 @@ internal sealed class CaptureOverlay : Window
     private readonly bool activate;
     public PixelRect? Selection { get; private set; }
     public Native.POINT? WindowPoint { get; private set; }
+    internal event Action? SelectionAccepted;
     public CaptureOverlay(BitmapSource frozen, PixelRect bounds, bool windowMode, bool activate = true)
     {
         desktop = bounds; pickWindow = windowMode; this.activate = activate;
@@ -36,7 +37,7 @@ internal sealed class CaptureOverlay : Window
         MouseLeftButtonDown += (_, e) =>
         {
             Native.GetCursorPos(out origin); selecting = true; CaptureMouse();
-            if (pickWindow) { WindowPoint = origin; Close(); }
+            if (pickWindow) { WindowPoint = origin; SelectionAccepted?.Invoke(); Close(); }
             e.Handled = true;
         };
         MouseMove += (_, _) =>
@@ -51,6 +52,7 @@ internal sealed class CaptureOverlay : Window
             if (!selecting) return;
             Native.GetCursorPos(out var point);
             Selection = CaptureSelection.Region(origin.X, origin.Y, point.X, point.Y, desktop);
+            if (Selection is not null) SelectionAccepted?.Invoke();
             ReleaseMouseCapture(); Close();
         };
     }

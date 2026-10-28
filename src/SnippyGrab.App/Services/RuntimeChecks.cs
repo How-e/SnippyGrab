@@ -190,7 +190,12 @@ internal static class RuntimeChecks
             var copies = 0; var refreshes = 0;
             controller.Clipboard = new ClipboardService(data => { Assert(data.GetDataPresent(DataFormats.Bitmap) && data.GetDataPresent("PNG"), "Fallback retains image and PNG clipboard formats"); copies++; }, _ => Task.CompletedTask);
             fail = true;
-            await controller.PreserveCaptureAsync(image, png, "synthetic", () => refreshes++);
+            var timing = new CaptureTiming(CaptureMode.Region); timing.Start(); timing.SelectionCompleted();
+            var outcome = await controller.PreserveCaptureAsync(image, png, "synthetic", () => refreshes++, timing);
+            timing.Complete(outcome); var measured = timing.Finish();
+            Assert(outcome == (boundary == "png" ? CaptureOutcome.ClipboardOnly : CaptureOutcome.Completed), "Storage fallback has an explicit outcome");
+            Assert(measured.ClipboardCopied == true && measured.SelectionToClipboardMs.HasValue && measured.PhaseMilliseconds.ContainsKey("Storage") && measured.PhaseMilliseconds.ContainsKey("Clipboard"), "Capture timing measures production storage and clipboard fallback");
+            Assert(boundary == "png" ? measured.SelectionToStoredMs is null : measured.HistorySaved == false, "Timing distinguishes missing pixels from pending history");
             Assert(copies == 1, "Capture reaches clipboard despite PNG or metadata storage failure");
             if (boundary == "png") Assert(controller.Repository.Captures.Count == 0 && refreshes == 0, "Failed PNG creates no misleading shelf record");
             else
@@ -202,6 +207,15 @@ internal static class RuntimeChecks
             Assert(!controller.Repository.PersistencePending, "History retry clears persistence warning state");
             await controller.PreserveCaptureAsync(image, png, "synthetic", () => refreshes++);
             Assert(copies == 2 && refreshes > 0, "Capture can be retried after storage recovers");
+            controller.Clipboard = new ClipboardService(_ => throw new ExternalException("synthetic busy clipboard"), _ => Task.CompletedTask);
+            timing = new CaptureTiming(CaptureMode.Region); timing.Start(); timing.SelectionCompleted();
+            outcome = await controller.PreserveCaptureAsync(image, png, "synthetic", () => refreshes++, timing);
+            timing.Complete(outcome); measured = timing.Finish();
+            Assert(outcome == CaptureOutcome.ClipboardUnavailable && measured.ClipboardCopied == false && measured.SelectionToClipboardMs is null, "Busy clipboard never receives a success latency");
+            controller.Settings.AutoCopy = false; timing = new CaptureTiming(CaptureMode.Region); timing.Start();
+            outcome = await controller.PreserveCaptureAsync(image, png, "synthetic", () => refreshes++, timing);
+            timing.Complete(outcome); measured = timing.Finish();
+            Assert(outcome == CaptureOutcome.Completed && measured.ClipboardCopied is null && !measured.PhaseMilliseconds.ContainsKey("Clipboard"), "Disabled automatic copy has no clipboard measurement");
             controller.Dispose(); controller.Dock.Close();
         }
     }

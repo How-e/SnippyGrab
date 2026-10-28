@@ -9,6 +9,7 @@ internal static class ImageWorker
 {
     private static readonly Lazy<Dispatcher> Worker = new(() => Start("SnippyGrab image worker"));
     private static readonly Lazy<Dispatcher> CaptureWorker = new(() => Start("SnippyGrab capture worker"));
+    private static readonly Lazy<Dispatcher> DeliveryWorker = new(() => Start("SnippyGrab delivery worker"));
     // Native recognition cannot be preempted mid-pass. Keep it off the dispatcher
     // used by newer copies, previews, editor work and capture PNG delivery.
     private static readonly Lazy<Dispatcher> OcrWorker = new(() => Start("SnippyGrab OCR worker"));
@@ -23,6 +24,8 @@ internal static class ImageWorker
         => RunAsync(Worker, work, cancellation);
     internal static Task<T> RunCaptureAsync<T>(Func<T> work, CancellationToken cancellation = default)
         => RunAsync(CaptureWorker, work, cancellation);
+    internal static Task<T> RunDeliveryAsync<T>(Func<T> work, CancellationToken cancellation = default)
+        => RunAsync(DeliveryWorker, work, cancellation);
     internal static Task<T> RunOcrAsync<T>(Func<T> work, CancellationToken cancellation = default)
         => RunAsync(OcrWorker, work, cancellation);
     private static Task<T> RunAsync<T>(Lazy<Dispatcher> worker, Func<T> work, CancellationToken cancellation)

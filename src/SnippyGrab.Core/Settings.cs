@@ -118,6 +118,8 @@ public static class AtomicFile
     public static void Write(string path, byte[] data, bool overwrite)
         => WriteChecked(path, data, overwrite, () => ManagedPath.RejectRedirects(path));
     internal static void WriteChecked(string path, byte[] data, bool overwrite, Action validate)
+        => WriteChecked(path, stream => stream.Write(data), overwrite, validate);
+    internal static void WriteChecked(string path, Action<FileStream> write, bool overwrite, Action validate)
     {
         validate();
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
@@ -125,9 +127,35 @@ public static class AtomicFile
         try
         {
             using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
-            { stream.Write(data); stream.Flush(true); }
+            { write(stream); stream.Flush(true); }
             validate();
             File.Move(temporary, path, overwrite);
+        }
+        finally { if (File.Exists(temporary)) File.Delete(temporary); }
+    }
+    internal static async Task WriteCheckedAsync(string path, Func<FileStream, CancellationToken, Task> write,
+        bool overwrite, Action validate, Action beforeCommit, CancellationToken cancellation)
+    {
+        cancellation.ThrowIfCancellationRequested(); validate();
+        var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            await Task.Run(async () =>
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
+                await using var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None,
+                    81920, FileOptions.Asynchronous | FileOptions.SequentialScan);
+                await write(stream, cancellation).ConfigureAwait(false);
+                await stream.FlushAsync(cancellation).ConfigureAwait(false);
+                stream.Flush(true);
+            }, cancellation);
+            // Repository revision decisions must resume on the caller's context.
+            cancellation.ThrowIfCancellationRequested(); beforeCommit();
+            await Task.Run(() =>
+            {
+                cancellation.ThrowIfCancellationRequested(); validate();
+                File.Move(temporary, path, overwrite);
+            }, cancellation);
         }
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }

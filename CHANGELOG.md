@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.0-alpha.20261028.1 — 2026-10-28
+
+- Isolated capture PNG delivery and clipboard image preparation from long exports and editor effects. Native OCR keeps its separate reusable worker; release verification now checks production OCR isolation, real recognition and engine reuse in the packaged build.
+- Streamed unchanged PNG exports through atomic temporary files, preserving cancellation, revision protection and overwrite decisions while avoiding a full-file encoded buffer.
+- Skipped history writes, change notifications and shelf refreshes when cleanup has nothing to change. Expired transfer protection and completed deletions still persist.
+- Added optional local performance diagnostics under Settings → Application. Resource, CPU, GC, handle and dispatcher-delay samples use two bounded 1 MiB files; the option is off by default and omits screenshot content, OCR text, window titles and private paths.
+- Added correlated capture timing records that distinguish human selection time, queue wait, encoding, storage and clipboard delivery, with explicit cancellation and fallback outcomes.
+- Fixed Recent captures Ctrl+S export, captured composition revisions before asynchronous preparation, and validated Combine's 2–20 selection limit before decoding.
+- This remains an unsigned alpha with ten open acceptance gates. Automated, synthetic and packaged checks do not establish all-day leak freedom, universal latency or renewed physical desktop/receiver acceptance. The local dock probe's desktop-preservation guards remain unresolved.
+
 ## 0.1.0-alpha.20261017.1 — 2026-10-17
 
 - Refreshed native windows, dialogs, menus, shelf and installer with neutral Dark/Light/System themes, clearer page headings, quieter controls and screenshot previews. Retained keyboard focus, text scaling and Windows high-contrast support.

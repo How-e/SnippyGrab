@@ -9,9 +9,14 @@ public static class CaptureExport
     public static CaptureExportResult Write(CaptureRepository repository, CaptureRecord capture, string destination)
     {
         var path = ValidateDestination(repository.Root, destination, ExportFormat.Png);
-        EnsureCurrent(repository, capture, capture.FileName);
+        var revision = capture.FileName; EnsureCurrent(repository, capture, revision);
         using var lease = repository.Lease([capture]);
-        WriteDestination(repository.Root, path, ExportFormat.Png, File.ReadAllBytes(repository.PathFor(capture)), true);
+        AtomicFile.WriteChecked(path, output =>
+        {
+            var source = repository.PathFor(capture); ManagedPath.RejectRedirects(source);
+            using var input = File.OpenRead(source); input.CopyTo(output);
+            EnsureCurrent(repository, capture, revision);
+        }, true, () => CheckDestination(repository.Root, path, ExportFormat.Png));
         return Remember(repository, capture, path);
     }
     public static async Task<CaptureExportResult> WriteAsync(CaptureRepository repository, CaptureRecord capture, string destination,
@@ -22,18 +27,27 @@ public static class CaptureExport
         var revision = capture.FileName; EnsureCurrent(repository, capture, revision);
         using var lease = repository.Lease([capture]);
         var source = repository.PathFor(capture); var cache = repository.Root;
-        var bytes = await Task.Run(() =>
+        if (format == ExportFormat.Png)
         {
-            ManagedPath.RejectRedirects(source);
-            return format == ExportFormat.Png ? File.ReadAllBytes(source) : encodeJpeg(source, quality);
-        }, cancellation);
-        cancellation.ThrowIfCancellationRequested(); EnsureCurrent(repository, capture, revision);
-        await Task.Run(() =>
+            await AtomicFile.WriteCheckedAsync(path, async (output, token) =>
+            {
+                ManagedPath.RejectRedirects(source);
+                await using var input = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.Read,
+                    81920, FileOptions.Asynchronous | FileOptions.SequentialScan);
+                await input.CopyToAsync(output, token).ConfigureAwait(false);
+            }, overwrite, () => CheckDestination(cache, path, format),
+                () => EnsureCurrent(repository, capture, revision), cancellation);
+        }
+        else
         {
-            cancellation.ThrowIfCancellationRequested();
-            ValidateDestination(cache, path, format); // Recheck policy immediately before the atomic write.
-            WriteDestination(cache, path, format, bytes, overwrite);
-        }, cancellation);
+            var bytes = await Task.Run(() => { ManagedPath.RejectRedirects(source); return encodeJpeg(source, quality); }, cancellation);
+            cancellation.ThrowIfCancellationRequested(); EnsureCurrent(repository, capture, revision);
+            await Task.Run(() =>
+            {
+                cancellation.ThrowIfCancellationRequested();
+                WriteDestination(cache, path, format, bytes, overwrite);
+            }, cancellation);
+        }
         // A write is durable even when metadata is stale or persistence fails.
         if (!repository.Captures.Contains(capture) || capture.FileName != revision) return new(path, false);
         return await RememberAsync(repository, capture, path, revision);
@@ -73,9 +87,10 @@ public static class CaptureExport
         return resolved;
     }
     internal static void WriteDestination(string cache, string path, ExportFormat format, byte[] bytes, bool overwrite)
-        => AtomicFile.WriteChecked(path, bytes, overwrite, () =>
-        {
-            if (!ValidateDestination(cache, path, format).Equals(path, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidDataException("Export directory changed. Choose the destination again.");
-        });
+        => AtomicFile.WriteChecked(path, bytes, overwrite, () => CheckDestination(cache, path, format));
+    private static void CheckDestination(string cache, string path, ExportFormat format)
+    {
+        if (!ValidateDestination(cache, path, format).Equals(path, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("Export directory changed. Choose the destination again.");
+    }
 }

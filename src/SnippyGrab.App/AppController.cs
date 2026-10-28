@@ -142,7 +142,7 @@ internal sealed class AppController : IDisposable
         { Notify("Monitor capture cancelled. The selected display is unavailable or ambiguous; choose a display again."); return; }
         if (result is null || exitRequested || Exiting) return;
         var ready = Stopwatch.StartNew();
-        var png = await ImageWorker.RunAsync(() => ImageService.Png(result.Image));
+        var png = await ImageWorker.RunDeliveryAsync(() => ImageService.Png(result.Image), exportLifetime.Token);
         await PreserveCaptureAsync(result.Image, png, string.Join(",", Forms.Screen.AllScreens.Where(screen => !result.Bounds.Intersect(new PixelRect(screen.Bounds.X, screen.Bounds.Y, screen.Bounds.Width, screen.Bounds.Height)).IsEmpty).Select(screen => screen.DeviceName)), () => Dock.Refresh(newCapture: true));
         Log($"capture_ready_ms={ready.ElapsedMilliseconds}; capture_total_ms={result.ElapsedMilliseconds + ready.ElapsedMilliseconds}");
     }

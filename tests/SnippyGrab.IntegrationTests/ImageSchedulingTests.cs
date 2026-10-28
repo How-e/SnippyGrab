@@ -94,6 +94,47 @@ public sealed class ImageSchedulingTests
         for (var i = 0; i < 20; i++) Assert.Equal(ocrThread, await ImageWorker.RunOcrAsync(() => Thread.CurrentThread.ManagedThreadId));
     }
     [Fact]
+    public async Task LongImageWorkDoesNotBlockCaptureDeliveryOrStoredCopy()
+    {
+        var image = ImageIntegrationTests.Sta(() => { var bitmap = BitmapSource.Create(2, 2, 96, 96, PixelFormats.Bgra32, null, new byte[16], 8); bitmap.Freeze(); return bitmap; });
+        using var entered = new ManualResetEventSlim(); using var release = new ManualResetEventSlim();
+        var background = ImageWorker.RunAsync(() => { entered.Set(); if (!release.Wait(TimeSpan.FromSeconds(10))) throw new TimeoutException(); return Thread.CurrentThread.ManagedThreadId; });
+        Assert.True(entered.Wait(TimeSpan.FromSeconds(10)));
+        int deliveryThread;
+        try
+        {
+            deliveryThread = await ImageWorker.RunDeliveryAsync(() =>
+            {
+                Assert.Equal(ApartmentState.STA, Thread.CurrentThread.GetApartmentState());
+                Assert.NotEmpty(ImageService.Png(image)); return Thread.CurrentThread.ManagedThreadId;
+            }).WaitAsync(TimeSpan.FromSeconds(3));
+            var writes = 0;
+            var clipboard = new ClipboardService(_ => writes++, prepareStored: (_, _, _) => (image, null));
+            Assert.True(await clipboard.StoredImageAsync("synthetic", false).WaitAsync(TimeSpan.FromSeconds(3)));
+            Assert.Equal(1, writes); Assert.False(background.IsCompleted);
+            for (var i = 0; i < 20; i++) Assert.Equal(deliveryThread, await ImageWorker.RunDeliveryAsync(() => Thread.CurrentThread.ManagedThreadId));
+        }
+        finally { release.Set(); }
+        Assert.NotEqual(deliveryThread, await background);
+    }
+    [Fact]
+    public async Task BlockedDeliveryDoesNotBlockAcquisitionAndCancelledDeliveryDoesNotRun()
+    {
+        using var entered = new ManualResetEventSlim(); using var release = new ManualResetEventSlim();
+        var delivery = ImageWorker.RunDeliveryAsync(() => { entered.Set(); if (!release.Wait(TimeSpan.FromSeconds(10))) throw new TimeoutException(); return 0; });
+        Assert.True(entered.Wait(TimeSpan.FromSeconds(10)));
+        try
+        {
+            await ImageWorker.RunCaptureAsync(() => 0).WaitAsync(TimeSpan.FromSeconds(3));
+            using var cancelled = new CancellationTokenSource();
+            var obsolete = ImageWorker.RunDeliveryAsync<int>(() => throw new InvalidOperationException("Cancelled delivery must not allocate."), cancelled.Token);
+            cancelled.Cancel(); await Assert.ThrowsAnyAsync<OperationCanceledException>(() => obsolete);
+            Assert.False(delivery.IsCompleted);
+        }
+        finally { release.Set(); }
+        await delivery;
+    }
+    [Fact]
     public void OcrRejectsOversizedPngHeaderBeforeDecodingOrNativeAllocation()
     {
         var bytes = ImageIntegrationTests.Sta(() => ImageService.Png(BitmapSource.Create(2, 2, 96, 96, PixelFormats.Bgra32, null, new byte[16], 8)));

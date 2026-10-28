@@ -21,7 +21,7 @@ internal sealed class ClipboardService(Action<DataObject>? write = null, Func<in
             {
                 if (png && encoded is null)
                 {
-                    encoded = await ImageWorker.RunAsync(() => ImageService.Png(image), token);
+                    encoded = await ImageWorker.RunDeliveryAsync(() => ImageService.Png(image), token);
                 }
                 token.ThrowIfCancellationRequested();
                 if (png && encoded is not null) ImageLimits.ValidateEncoded(encoded.Length);
@@ -41,7 +41,7 @@ internal sealed class ClipboardService(Action<DataObject>? write = null, Func<in
             await serial.WaitAsync(token);
             try
             {
-                var prepared = await ImageWorker.RunAsync(() =>
+                var prepared = await ImageWorker.RunDeliveryAsync(() =>
                 {
                     token.ThrowIfCancellationRequested();
                     if (prepareStored is not null) return prepareStored(path, png, token);

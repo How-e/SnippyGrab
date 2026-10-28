@@ -130,6 +130,7 @@ internal sealed class SettingsWindow : Window
                     Group("Text recognition"); Add(nameof(Settings.OcrEnhanceSmallText), "Enhance small text", "Improves smaller inputs without changing the saved image."); Add(nameof(Settings.OcrLayout), "Text layout"); Note("Recognition is local and English only. Auto retries scattered text when confidence is low. Use OCR selected area in the editor for best accuracy."); AddReadiness(); break;
                 case 6:
                     Group("Startup"); Add(nameof(Settings.LaunchOnStartup), "Launch at Windows login"); Add(nameof(Settings.StartMinimized), "Start silently in tray", "After first-run setup.");
+                    Group("Troubleshooting"); Add(nameof(Settings.PerformanceDiagnostics), "Record local performance diagnostics", "Resource statistics once a minute and after windows close. Stored locally in two bounded log files; no screenshot content or OCR text.");
                     Group("About SnippyGrab"); Note("A native, local screenshot shelf. No uploads, accounts or analytics."); Note("SnippyGrab " + BuildVersion.Display + " · MIT"); Note("Quiet GitHub release checks every six hours. Tray → Help & about → Updates for changelogs and updating."); page.Children.Add(Ui.ActionButton("Hotkey help", "keyboard", "Review hotkeys and conflicts", controller.ShowHotkeyHelp)); break;
             }
         }

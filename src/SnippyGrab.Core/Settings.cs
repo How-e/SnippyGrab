@@ -54,6 +54,7 @@ public sealed class Settings
     public bool HistoryEnabled { get; set; } = true;
     public bool LaunchOnStartup { get; set; }
     public bool StartMinimized { get; set; } = true;
+    public bool PerformanceDiagnostics { get; set; }
     public AppTheme Theme { get; set; } = AppTheme.System;
     // Update checks are quiet; installation requires an explicit user action.
     public void Validate()

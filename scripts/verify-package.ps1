@@ -27,5 +27,6 @@ $ocrReport = Join-Path (Split-Path -Parent ([IO.Path]::GetFullPath($Installer)))
 & (Join-Path $PSScriptRoot 'test-native-probe.ps1') -Check ocr-scheduling -Executable (Join-Path $Bundle 'SnippyGrab.exe') -Report $ocrReport
 $ocr = Get-Content -LiteralPath $ocrReport -Raw | ConvertFrom-Json
 $provenance = Get-Content -LiteralPath (Join-Path $Bundle 'BUILD-PROVENANCE.json') -Raw | ConvertFrom-Json
-if ($ocr.Build -ne $provenance.Version -or !$ocr.OcrIsolation -or !$ocr.NativeRecognition -or $ocr.CopiesDuringBlockedOcr -ne 1 -or $ocr.EngineCreations -ne 1) { throw 'Packaged OCR isolation/build verification failed.' }
+. (Join-Path $PSScriptRoot 'package-identity.ps1')
+Assert-SnippyPackagedOcrIdentity $ocr $provenance
 Write-Output 'PASS: complete bundle inventory, ZIP/setup digests, independently embedded setup payload and packaged OCR isolation.'

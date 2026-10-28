@@ -36,6 +36,7 @@ jobs:
           ./scripts/test-installer.ps1
           ./scripts/test-install-files.ps1
           ./scripts/test-update-helper.ps1
+          ./scripts/test-package-identity.ps1
           ./scripts/test-artifact-retention.ps1
           ./scripts/test-milestone-map.ps1 -SelfTest
           ./scripts/test-native-probe.ps1 -Check reliability

@@ -443,7 +443,7 @@ internal sealed class AppController : IDisposable
         var work = Repository.CleanupAsync(DateTimeOffset.UtcNow, sessionOnly ? -1 : Settings.RetentionHours, clear, sessionOnly,
             async () => { await Dispatcher.Yield(DispatcherPriority.Background); }, exportLifetime.Token);
         cleanupWork = work;
-        try { var removed = await work; if (!disposed) Dock.Refresh(); return removed; }
+        try { var removed = await work; if (!disposed && removed > 0) Dock.Refresh(); return removed; }
         catch (OperationCanceledException) when (exportLifetime.IsCancellationRequested) { return 0; }
         finally { if (ReferenceEquals(cleanupWork, work)) cleanupWork = null; }
     }

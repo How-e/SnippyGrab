@@ -361,18 +361,19 @@ public sealed partial class CaptureRepository
     public int CleanupSession(DateTimeOffset now) => Cleanup(now, -1, clear: true, sessionOnly: true);
     public int Cleanup(DateTimeOffset now, int retentionHours, bool clear = false, bool sessionOnly = false)
         => CleanupSteps(now, retentionHours, clear, sessionOnly).Sum();
+    private sealed class CleanupProgress { public bool MetadataChanged; }
     public async Task<int> CleanupAsync(DateTimeOffset now, int retentionHours, bool clear = false, bool sessionOnly = false,
         Func<Task>? yield = null, CancellationToken cancellation = default, int batchSize = 16)
     {
         if (batchSize is < 1 or > 256) throw new ArgumentOutOfRangeException(nameof(batchSize));
         await cleanupSerial.WaitAsync(cancellation);
-        var removed = 0; var finished = false;
+        var removed = 0; var finished = false; var progress = new CleanupProgress();
         try
         {
             // State/lease decisions remain on the caller's context. Yield between bounded
             // slices and recheck protections, rather than deleting from a stale worker snapshot.
             var slice = Stopwatch.StartNew(); var count = 0;
-            foreach (var item in CleanupSteps(now, retentionHours, clear, sessionOnly, deferPersist: true))
+            foreach (var item in CleanupSteps(now, retentionHours, clear, sessionOnly, deferPersist: true, progress))
             {
                 removed += item;
                 cancellation.ThrowIfCancellationRequested();
@@ -382,18 +383,18 @@ public sealed partial class CaptureRepository
                 cancellation.ThrowIfCancellationRequested();
                 count = 0; slice.Restart();
             }
-            if (!CleanupBlocked && !PersistencePending) await PersistAsync();
+            if (progress.MetadataChanged && !CleanupBlocked && !PersistencePending) await PersistAsync();
             finished = true; return removed;
         }
         finally
         {
-            try { if (!finished && removed > 0 && !CleanupBlocked && !PersistencePending) await PersistAsync(); }
+            try { if (!finished && progress.MetadataChanged && !CleanupBlocked && !PersistencePending) await PersistAsync(); }
             finally { cleanupSerial.Release(); }
         }
     }
-    private IEnumerable<int> CleanupSteps(DateTimeOffset now, int retentionHours, bool clear, bool sessionOnly, bool deferPersist = false)
+    private IEnumerable<int> CleanupSteps(DateTimeOffset now, int retentionHours, bool clear, bool sessionOnly, bool deferPersist = false, CleanupProgress? progress = null)
     {
-        using var steps = CleanupStepsCore(now, retentionHours, clear, sessionOnly, deferPersist).GetEnumerator();
+        using var steps = CleanupStepsCore(now, retentionHours, clear, sessionOnly, deferPersist, progress ?? new()).GetEnumerator();
         while (true)
         {
             // Acquire only for a slice; never hold the mutation gate across a yield.
@@ -405,7 +406,7 @@ public sealed partial class CaptureRepository
             yield return removed;
         }
     }
-    private IEnumerable<int> CleanupStepsCore(DateTimeOffset now, int retentionHours, bool clear, bool sessionOnly, bool deferPersist)
+    private IEnumerable<int> CleanupStepsCore(DateTimeOffset now, int retentionHours, bool clear, bool sessionOnly, bool deferPersist, CleanupProgress progress)
     {
         ManagedPath.RejectRedirects(root);
         // An async mutation may temporarily expose a state that still needs to
@@ -423,13 +424,19 @@ public sealed partial class CaptureRepository
             var created = record is null ? new DateTimeOffset(File.GetLastWriteTimeUtc(path)) : record.RestoredUtc ?? record.CreatedUtc;
             if (!clear && (retentionHours < 0 || created.AddHours(retentionHours) > now)) continue;
             var deleted = false;
-            try { File.Delete(path); sessionFiles.Remove(name); state.Superseded.Remove(name); if (record is not null) state.Captures.Remove(record); deleted = true; }
+            try
+            {
+                File.Delete(path); sessionFiles.Remove(name);
+                if (state.Superseded.Remove(name)) progress.MetadataChanged = true;
+                if (record is not null && state.Captures.Remove(record)) progress.MetadataChanged = true;
+                deleted = true;
+            }
             catch (IOException) { }
             catch (UnauthorizedAccessException) { }
             if (deleted) yield return 1;
         }
         foreach (var key in state.ProtectedUntil.Where(p => p.Value <= now).Select(p => p.Key).ToArray())
-            if (state.ProtectedUntil.GetValueOrDefault(key) <= now) state.ProtectedUntil.Remove(key);
+            if (state.ProtectedUntil.GetValueOrDefault(key) <= now && state.ProtectedUntil.Remove(key)) progress.MetadataChanged = true;
         // Remove only old, owned incomplete atomic writes, never unknown files.
         foreach (var path in Directory.EnumerateFiles(root, "*.tmp"))
         {
@@ -439,7 +446,7 @@ public sealed partial class CaptureRepository
                 TemporaryPattern().IsMatch(Path.GetFileName(path)))
                 try { File.Delete(path); } catch (IOException) { } catch (UnauthorizedAccessException) { }
         }
-        if (!deferPersist) Persist();
+        if (!deferPersist && progress.MetadataChanged) Persist();
         if (sessionFiles.Count == 0) sessionFiles.TrimExcess();
         // Only owned pages unreferenced by the durable manifest and older than the crash grace are removable.
         var hasArchivedHistory = Directory.EnumerateFiles(root, "history.invalid-*.json").Any();

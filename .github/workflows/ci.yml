@@ -39,6 +39,7 @@ jobs:
           ./scripts/test-artifact-retention.ps1
           ./scripts/test-milestone-map.ps1 -SelfTest
           ./scripts/test-native-probe.ps1 -Check reliability
+          ./scripts/test-native-probe.ps1 -Check ocr-scheduling
           ./scripts/measure-startup.ps1 -Samples 2
           ./scripts/audit-dependencies.ps1 -SelfTest
       - run: ./scripts/audit-dependencies.ps1

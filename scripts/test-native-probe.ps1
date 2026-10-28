@@ -1,4 +1,4 @@
-param([Parameter(Mandatory)][ValidateSet('reliability', 'overlay-layout', 'editor-layout', 'ocr-corpus', 'dock-layout', 'pipeline-latency', 'editor-performance')][string]$Check, [string]$Executable = (Join-Path $PSScriptRoot '../src/SnippyGrab.App/bin/Release/net10.0-windows/SnippyGrab.exe'), [string]$Report)
+param([Parameter(Mandatory)][ValidateSet('reliability', 'overlay-layout', 'editor-layout', 'ocr-corpus', 'ocr-scheduling', 'dock-layout', 'pipeline-latency', 'editor-performance')][string]$Check, [string]$Executable = (Join-Path $PSScriptRoot '../src/SnippyGrab.App/bin/Release/net10.0-windows/SnippyGrab.exe'), [string]$Report)
 $ErrorActionPreference = 'Stop'
 $executablePath = (Resolve-Path -LiteralPath $Executable).Path
 if (!$Report) { $Report = Join-Path $PSScriptRoot ("../artifacts/native-checks/$Check-" + (Get-Date -Format 'yyyyMMdd-HHmmss-fff') + '.json') }

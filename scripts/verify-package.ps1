@@ -23,4 +23,9 @@ if ($SigningThumbprint) {
     }
     Write-Output 'PASS: owned app/setup Authenticode chain, publisher identity and timestamp. Browser/clean-profile acceptance remains separate.'
 }
-Write-Output 'PASS: complete bundle inventory, ZIP/setup digests and independently embedded setup payload.'
+$ocrReport = Join-Path (Split-Path -Parent ([IO.Path]::GetFullPath($Installer))) ('ocr-scheduling-' + [Guid]::NewGuid().ToString('N') + '.json')
+& (Join-Path $PSScriptRoot 'test-native-probe.ps1') -Check ocr-scheduling -Executable (Join-Path $Bundle 'SnippyGrab.exe') -Report $ocrReport
+$ocr = Get-Content -LiteralPath $ocrReport -Raw | ConvertFrom-Json
+$provenance = Get-Content -LiteralPath (Join-Path $Bundle 'BUILD-PROVENANCE.json') -Raw | ConvertFrom-Json
+if ($ocr.Build -ne $provenance.Version -or !$ocr.OcrIsolation -or !$ocr.NativeRecognition -or $ocr.CopiesDuringBlockedOcr -ne 1 -or $ocr.EngineCreations -ne 1) { throw 'Packaged OCR isolation/build verification failed.' }
+Write-Output 'PASS: complete bundle inventory, ZIP/setup digests, independently embedded setup payload and packaged OCR isolation.'

@@ -7,6 +7,8 @@ A native Windows screenshot shelf with annotation, local OCR, and clipboard or d
 
 .NET 10, WPF and Win32. No account, telemetry or cloud dependency.
 
+Optional [local performance diagnostics](docs/LOCAL-DIAGNOSTICS.md) record bounded resource and responsiveness statistics for long-session reviews. Enable them in Settings → Application; they are off by default and contain no screenshot content or OCR text.
+
 **0.1.0 alpha:** runnable implementation with unit, integration and interactive synthetic checks. Current acceptance has open gates in the manifest; older owner acceptance applies to its recorded build and available scope. [Capabilities and evidence](docs/CAPABILITIES.md) · [Architecture](docs/ARCHITECTURE.md) · [Desktop acceptance](docs/ACCEPTANCE.md)
 
 

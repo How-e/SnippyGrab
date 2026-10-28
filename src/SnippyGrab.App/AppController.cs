@@ -22,6 +22,7 @@ internal sealed class AppController : IDisposable
     public DockWindow Dock { get; }
     public bool Exiting { get; private set; }
     internal bool Diagnostic { get; }
+    internal LocalSessionDiagnostics Diagnostics { get; }
     internal IReadOnlyCollection<EditorWindow> AcceptanceEditors => editors.Values.ToArray();
     internal void ShowAcceptanceTray()
     {
@@ -71,6 +72,9 @@ internal sealed class AppController : IDisposable
         ManagedPath.RejectRedirects(dataDirectory);
         Directory.CreateDirectory(dataDirectory);
         settingsService = new(Path.Combine(dataDirectory, "settings.json")); Settings = settingsService.Load();
+        Diagnostics = new(dataDirectory, action => Application.Current.Dispatcher.InvokeAsync(action, DispatcherPriority.Background).Task);
+        Diagnostics.SetEnabled(Settings.PerformanceDiagnostics);
+        Log("event=session_start");
         if (diagnostic) Settings.CachePath = "";
         OcrService = new OcrService(settingsProvider: () => Settings);
         if (Settings.DockMonitor >= 0 && Settings.DockMonitorIdentity.Length == 0)
@@ -244,7 +248,7 @@ internal sealed class AppController : IDisposable
                 if (exitRequested || Exiting || !Repository.Captures.Contains(record)) return null;
                 if (revision != record.FileName) continue;
                 var editor = new EditorWindow(this, record, image); editors[record.Id] = editor;
-                editor.Closed += (_, _) => editors.Remove(record.Id); if (show) editor.Show(); return editor;
+                editor.Closed += (_, _) => { editors.Remove(record.Id); Diagnostics.WindowClosed(); }; if (show) editor.Show(); return editor;
             }
             return null;
         }
@@ -406,7 +410,7 @@ internal sealed class AppController : IDisposable
     {
         await Repository.SetPinnedAsync(record, true); if (disposed) return;
         if (pins.TryGetValue(record.Id, out var existing)) { existing.RestoreInteraction(); return; }
-        var pin = new PinWindow(this, record); pins[record.Id] = pin; pin.Closed += (_, _) => pins.Remove(record.Id); pin.Show();
+        var pin = new PinWindow(this, record); pins[record.Id] = pin; pin.Closed += (_, _) => { pins.Remove(record.Id); Diagnostics.WindowClosed(); }; pin.Show();
     });
     public void Dismiss(IEnumerable<CaptureRecord> records) => Run(async () => { await Repository.DismissAsync(records); if (!disposed) Dock.Refresh(); });
     public void Reorder(Guid from, Guid target) => Run(async () =>
@@ -469,7 +473,7 @@ internal sealed class AppController : IDisposable
     public void ShowHistory()
     {
         if (historyWindow is not null) { historyWindow.Activate(); return; }
-        historyWindow = new(this); historyWindow.Closed += (_, _) => historyWindow = null; historyWindow.Show();
+        historyWindow = new(this); historyWindow.Closed += (_, _) => { historyWindow = null; Diagnostics.WindowClosed(); }; historyWindow.Show();
     }
     public void ApplySettings(Settings settings)
     {
@@ -480,6 +484,7 @@ internal sealed class AppController : IDisposable
         if (Diagnostic) { settings.LaunchOnStartup = false; settingsService.Save(settings); }
         else StartupService.Apply(settings, settingsService.Save);
         Settings = settings;
+        Diagnostics.SetEnabled(settings.PerformanceDiagnostics);
         Repository.HistoryEnabled = settings.HistoryEnabled; Run(Repository.PersistAsync);
         Ui.Theme(settings.Theme); ConfigureHotkeys(Hotkeys.Paused); cleanup.Interval = TimeSpan.FromMinutes(settings.CleanupMinutes); Dock.Refresh(); BuildTray();
         SettingsChanged?.Invoke();
@@ -567,7 +572,7 @@ internal sealed class AppController : IDisposable
     }
     private void Log(string text)
     {
-        try { var path = Path.Combine(dataDirectory, "diagnostics.log"); if (File.Exists(path) && new FileInfo(path).Length > 512 * 1024) File.Delete(path); File.AppendAllText(path, $"{DateTimeOffset.UtcNow:O} {text}\n"); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+        try { var path = Path.Combine(dataDirectory, "diagnostics.log"); if (File.Exists(path) && new FileInfo(path).Length > 512 * 1024) File.Delete(path); File.AppendAllText(path, $"{DateTimeOffset.UtcNow:O} session={Diagnostics.Session}; build={Diagnostics.Build}; {text}\n"); } catch (IOException) { } catch (UnauthorizedAccessException) { }
     }
     public void Notify(string message)
     {
@@ -599,6 +604,7 @@ internal sealed class AppController : IDisposable
             if (Settings.SessionOnly && launch is null) { await CleanupRepositoryAsync(clear: true, sessionOnly: true); }
             else await Repository.PersistAsync();
             launch?.Invoke();
+            Log("event=session_stop"); await Diagnostics.StopAsync();
             Exiting = true;
             Application.Current.Shutdown();
         }
@@ -615,5 +621,6 @@ internal sealed class AppController : IDisposable
         SystemEvents.DisplaySettingsChanged -= DisplayChanged; SystemEvents.PowerModeChanged -= PowerChanged; SystemEvents.UserPreferenceChanged -= PreferencesChanged;
         scrollWindow?.CancelSession(); exportLifetime.Cancel(); Ui.FailureHandler = null; ocr.Dispose(); Clipboard.Invalidate(); Hotkeys.Dispose(); tray.Visible = false; tray.ContextMenuStrip?.Dispose(); tray.Icon?.Dispose(); tray.Dispose();
         (OcrService as IDisposable)?.Dispose();
+        Diagnostics.Dispose();
     }
 }

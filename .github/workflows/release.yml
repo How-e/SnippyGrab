@@ -29,6 +29,7 @@ jobs:
           ./scripts/test-install-files.ps1
           ./scripts/test-update-helper.ps1
           ./scripts/test-package-identity.ps1
+          ./scripts/test-native-probe.ps1 -Check window-layout
           ./scripts/test-artifact-retention.ps1
           ./scripts/audit-dependencies.ps1 -SelfTest
       - run: ./scripts/audit-dependencies.ps1

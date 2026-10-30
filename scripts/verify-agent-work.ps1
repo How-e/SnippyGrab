@@ -44,7 +44,7 @@ try {
     Invoke-Step 'whitespace' { git diff --check; if ($LASTEXITCODE -ne 0) { throw 'Git whitespace verification failed.' } }
     if ($NativeChecks) {
         $executable = Join-Path $repoRoot 'src/SnippyGrab.App/bin/Release/net10.0-windows/SnippyGrab.exe'
-        foreach ($check in @('reliability', 'overlay-layout', 'editor-layout', 'ocr-corpus', 'ocr-scheduling', 'dock-layout', 'pipeline-latency', 'editor-performance')) {
+        foreach ($check in @('reliability', 'overlay-layout', 'editor-layout', 'ocr-corpus', 'ocr-scheduling', 'dock-layout', 'pipeline-latency', 'editor-performance', 'window-layout', 'ui-design')) {
             Invoke-Step $check {
                 $report = Join-Path $runDirectory ($check + '.json')
                 & (Join-Path $PSScriptRoot 'test-native-probe.ps1') -Check $check -Executable $executable -Report $report

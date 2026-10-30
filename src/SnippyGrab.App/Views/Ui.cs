@@ -54,6 +54,8 @@ internal static class Ui
     public static void StyleWindow(Window window)
     {
         window.Style = (Style)Application.Current.FindResource(typeof(Window));
+        window.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        WindowPlacement.Attach(window);
         window.SourceInitialized += (_, _) => Chrome(window);
     }
     public static TextBlock Text(string text, double size = 14, bool muted = false)

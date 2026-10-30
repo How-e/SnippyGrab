@@ -14,7 +14,7 @@ internal static class DesignBrowserBridge
     internal static string Inbox(string root) => Path.Combine(root, "design-inbox");
     internal static void ShowSetup(Window owner)
     {
-        var window = new Window { Title = "SnippyGrab · Browser extension", Width = 650, Height = 430, Owner = owner, WindowStartupLocation = WindowStartupLocation.CenterOwner }; Views.Ui.StyleWindow(window);
+        var window = new Window { Title = "SnippyGrab · Browser extension", Width = 650, Height = 430, Owner = owner, ShowInTaskbar = false, WindowStartupLocation = WindowStartupLocation.CenterOwner }; Views.Ui.StyleWindow(window);
         var panel = new StackPanel { Margin = new Thickness(22) }; window.Content = Views.Ui.Scroll(panel);
         panel.Children.Add(Views.Ui.Heading("Import an existing browser tab", 23));
         panel.Children.Add(Views.Ui.Text("1. Open chrome://extensions or edge://extensions. Enable Developer mode and choose Load unpacked.\n2. Select the Design folder beside SnippyGrab.exe. Reload it after an update and accept its page-capture permission.\n3. Paste that extension's ID below and register this installation.\n4. Sign in to your page and choose Import full page in the extension. Visible area and picked-element capture are also available. Close DevTools on the tab before capturing.", 14));

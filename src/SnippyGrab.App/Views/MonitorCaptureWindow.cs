@@ -9,6 +9,7 @@ internal sealed class MonitorCaptureWindow : Window
     internal MonitorCaptureWindow()
     {
         Ui.StyleWindow(this); Title = "SnippyGrab · Capture monitor"; Width = 540; Height = 380; MinWidth = 420; MinHeight = 260;
+        ShowInTaskbar = false;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         var root = new StackPanel { Margin = new Thickness(24) }; Content = Ui.Scroll(root);
         root.Children.Add(Ui.PageHeading("Capture monitor", "Capture an entire display in one step.", "desktop")); root.Children.Add(Ui.Text("Choose the complete display, including its taskbar.", 14, true));

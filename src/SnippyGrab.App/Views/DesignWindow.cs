@@ -38,11 +38,12 @@ internal sealed class DesignWindow : Window
             try
             {
                 await DesignBrowser.Initialize(editor, Path.Combine(dataDirectory, "design-editor-profile"), true);
+                if (lifetime.IsCancellationRequested) return;
                 editor.CoreWebView2.WebMessageReceived += Message;
                 editor.CoreWebView2.ProcessFailed += (_, _) => Status("The editor browser stopped. Close and reopen UI Design; saved designs remain on disk.", true);
                 editor.CoreWebView2.Navigate(DesignBrowser.EditorUrl);
             }
-            catch (Exception ex) { Content = Ui.Scroll(Ui.Text(OperationFailure.From(ex).Message)); }
+            catch (Exception ex) { if (!lifetime.IsCancellationRequested) Content = Ui.Scroll(Ui.Text(OperationFailure.From(ex).Message)); }
         };
         Closing += ClosingWindow;
         Closed += (_, _) => { lifetime.Cancel(); Ui.ThemeChanged -= Theme; editor.Dispose(); lifetime.Dispose(); };

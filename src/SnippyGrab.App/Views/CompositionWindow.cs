@@ -14,6 +14,7 @@ internal sealed class CompositionWindow : Window
     {
         if (selected.Count is < 2 or > 20) throw new InvalidDataException("Select between 2 and 20 captures to combine.");
         inputs = selected.ToList(); Ui.StyleWindow(this); Title = "SnippyGrab · Combine selected"; Width = 720; Height = 700; MinWidth = 520; MinHeight = 450;
+        ShowInTaskbar = false;
         var thumbs = preparedPreviews ?? selected.ToDictionary(i => i.Path, i => ImageService.LoadPreview(i.Path, 160, 160));
         if (owner is not null) Owner = owner;
         var root = new StackPanel { Margin = new Thickness(24, 20, 24, 8) };

@@ -10,6 +10,7 @@ internal sealed class ExportWindow : Window
     internal ExportWindow(CaptureRecord record, string directory, string cache, Window? owner, IReadOnlyList<CaptureRecord>? batch = null)
     {
         Ui.StyleWindow(this); Title = "SnippyGrab · Export image"; Width = 560; Height = 460; MinWidth = 440; MinHeight = 320;
+        ShowInTaskbar = false;
         if (owner is not null) Owner = owner;
         WindowStartupLocation = owner is null ? WindowStartupLocation.CenterScreen : WindowStartupLocation.CenterOwner;
         var root = new StackPanel { Margin = new Thickness(24) }; Content = Ui.Scroll(root);

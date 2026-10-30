@@ -126,7 +126,7 @@ public partial class App : Application
         TaskScheduler.UnobservedTaskException += OnUnobservedTask;
         try
         {
-            controller = new(e.Args.Contains("--background"));
+            controller = new(e.Args.Contains("--background") || e.Args.Contains("--design-inbox"));
             activation.Listen(() =>
             {
                 if (Dispatcher.HasShutdownStarted) return;

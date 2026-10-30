@@ -7,6 +7,7 @@ internal sealed class DialogWindow : Window
     internal DialogWindow(string title, string message, string action = "Close", bool confirmation = false, bool danger = false, AppController? controller = null, Window? owner = null)
     {
         Ui.StyleWindow(this); Title = "SnippyGrab · " + title; Width = 550; Height = confirmation ? 330 : 440; MinWidth = 420; MinHeight = 280;
+        ShowInTaskbar = false;
         WindowStartupLocation = owner is null ? WindowStartupLocation.CenterScreen : WindowStartupLocation.CenterOwner; if (owner is not null) Owner = owner;
         var root = new DockPanel { Margin = new Thickness(28) }; Content = root;
         var heading = Ui.IconLabel(danger ? "trash" : "info", title); heading.Children.RemoveAt(1); var titleText = Ui.Heading(title, 24); titleText.Margin = new Thickness(10, 0, 0, 0); titleText.VerticalAlignment = VerticalAlignment.Center; heading.Children.Add(titleText); heading.Margin = new Thickness(0, 0, 0, 18); DockPanel.SetDock(heading, Dock.Top); root.Children.Add(heading);

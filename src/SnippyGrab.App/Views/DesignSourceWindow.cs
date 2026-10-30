@@ -29,6 +29,7 @@ internal sealed class DesignSourceWindow : Window
     internal DesignSourceWindow(string profile, DesignDocument? previous = null)
     {
         Ui.StyleWindow(this); Title = "SnippyGrab · Select source page"; Width = 1150; Height = 850; MinWidth = 700; MinHeight = 500; WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        ShowInTaskbar = false;
         var root = new DockPanel(); Content = root; var top = new WrapPanel { Margin = new Thickness(12) };
         load = Ui.Button("Load", "Load source page", () => Run(Load)); load.IsEnabled = false;
         address.KeyDown += (_, e) => { if (e.Key == System.Windows.Input.Key.Enter && load.IsEnabled) { e.Handled = true; Run(Load); } };
@@ -48,7 +49,7 @@ internal sealed class DesignSourceWindow : Window
         if (previous is not null) { address.Text = previous.Source.Url; width.Text = Math.Round(previous.Source.ViewportWidth > 0 ? previous.Source.ViewportWidth : previous.Width).ToString(System.Globalization.CultureInfo.InvariantCulture); height.Text = Math.Round(previous.Source.ViewportHeight > 0 ? previous.Source.ViewportHeight : previous.Height).ToString(System.Globalization.CultureInfo.InvariantCulture); project.Text = previous.Source.Project; revision.Text = previous.Source.Revision; mode.SelectedIndex = previous.Source.CaptureMode == "visible" ? 0 : previous.Source.CaptureMode == "element" ? 2 : 1; }
         Loaded += (_, _) => Run(async () =>
         {
-            await DesignBrowser.Initialize(browser, profile, false, Authenticate); ready = true;
+            await DesignBrowser.Initialize(browser, profile, false, Authenticate); if (lifetime.IsCancellationRequested) return; ready = true;
             browser.CoreWebView2.NavigationStarting += (_, e) => { navigation = e.NavigationId; pageReady = false; capture.IsEnabled = false; status.Text = "Loading source page…"; };
             browser.CoreWebView2.NavigationCompleted += async (_, e) =>
             {
@@ -75,8 +76,8 @@ internal sealed class DesignSourceWindow : Window
     private Task<(string UserName, string Password)?> Authenticate(string uri, string challenge)
     {
         if (lifetime.IsCancellationRequested) return Task.FromResult<(string, string)?>(null);
-        var dialog = new Window { Title = "SnippyGrab · Sign in to source page", Width = 480, SizeToContent = SizeToContent.Height, ResizeMode = ResizeMode.NoResize, Owner = this, WindowStartupLocation = WindowStartupLocation.CenterOwner }; Ui.StyleWindow(dialog);
-        var panel = new StackPanel { Margin = new Thickness(22) }; dialog.Content = panel;
+        var dialog = new Window { Title = "SnippyGrab · Sign in to source page", Width = 480, Height = 500, MinHeight = 260, ResizeMode = ResizeMode.NoResize, Owner = this, ShowInTaskbar = false, WindowStartupLocation = WindowStartupLocation.CenterOwner }; Ui.StyleWindow(dialog);
+        var panel = new StackPanel { Margin = new Thickness(22) }; dialog.Content = Ui.Scroll(panel);
         panel.Children.Add(Ui.Heading("Sign in", 23));
         panel.Children.Add(Ui.Text(new Uri(uri).GetLeftPart(UriPartial.Authority), 14)); panel.Children.Add(Ui.Text(challenge, 12, true));
         var user = new TextBox(); var password = new PasswordBox();

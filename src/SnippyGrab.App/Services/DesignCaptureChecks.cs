@@ -122,6 +122,7 @@ internal static class DesignCaptureChecks
             });
             await command.WaitAsync(TimeSpan.FromSeconds(10));
             Require(source!.LoadButton.IsEnabled, "Load stayed disabled after source initialization.");
+            Require(!source.ShowInTaskbar && source.Owner == workspace, "Source import lost modal ownership or created a separate taskbar entry.");
             source.Address.Text = "javascript:invalid"; source.LoadButton.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
             await Wait(() => Task.FromResult(!source.Busy));
             Require(source.LoadButton.IsEnabled, "Invalid-address failure prevented retry.");

@@ -4,7 +4,9 @@ internal sealed record DesignComparison(string Summary, string SourceUrl, string
 {
     internal static DesignComparison Create(DesignDocument expected, DesignDocument actual, byte[] rendered)
     {
-        var sameViewport = expected.Width == actual.Width && expected.Height == actual.Height;
+        var sameViewport = expected.Width == actual.Width && expected.Height == actual.Height
+            && (expected.Source.ViewportWidth == 0 || actual.Source.ViewportWidth == 0 || expected.Source.ViewportWidth == actual.Source.ViewportWidth)
+            && (expected.Source.ViewportHeight == 0 || actual.Source.ViewportHeight == 0 || expected.Source.ViewportHeight == actual.Source.ViewportHeight);
         var sameRoute = expected.Source.Url == actual.Source.Url && (expected.Source.Url.Length > 0 || ReferenceEquals(expected, actual)); var sameTheme = expected.Source.Theme == actual.Source.Theme;
         double? mean = null; long? changed = null;
         if (sameViewport && sameRoute && sameTheme)

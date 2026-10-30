@@ -87,6 +87,17 @@ public sealed class DesignIntegrationTests
         });
     }
     [Fact]
+    public void FullPageComparisonRejectsDifferentSourceViewportsEvenWhenArtboardsMatch()
+    {
+        ImageIntegrationTests.Sta(() =>
+        {
+            var expected = Fixture(); expected.Source.ViewportWidth = 160; expected.Source.ViewportHeight = 100;
+            var actual = DesignDocument.Copy(expected); actual.Source.ViewportHeight = 200;
+            var comparison = DesignComparison.Create(expected, actual, expected.Assets[expected.Original].Bytes());
+            Assert.False(comparison.SameViewport); Assert.Null(comparison.MeanChannelDifference); return true;
+        });
+    }
+    [Fact]
     public async Task NativeProtocolRejectsOversizeAndTruncatedPayloads()
     {
         await Assert.ThrowsAsync<InvalidDataException>(() => DesignBrowserBridge.ReadMessage(new MemoryStream(new byte[] { 0xff, 0xff, 0xff, 0x7f })));

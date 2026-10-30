@@ -39,7 +39,34 @@ internal static class WindowLayoutChecks
             finally { window.Close(); owner.Close(); }
         }
         Require(results.Count > 0, "No monitors available for native layout verification.");
-        await File.WriteAllTextAsync(report, JsonSerializer.Serialize(new { Result = "PASS", Monitors = results, Scope = "Native WPF owner-monitor placement, work-area bounds, maximize visible frame, restore and minimized-window activation on every attached monitor. Synthetic geometry tests cover negative origins and taskbar offsets; unavailable display arrangements and physical gestures remain separate." }, new JsonSerializerOptions { WriteIndented = true }));
+        await CheckWorkspaceReuse();
+        await File.WriteAllTextAsync(report, JsonSerializer.Serialize(new { Result = "PASS", Monitors = results, WorkspaceReuse = true, Scope = "Native WPF owner-monitor placement, work-area bounds, maximize visible frame, restore and minimized-window activation on every attached monitor; repeated workspace launch, saved-design identity, empty-workspace reuse, distinct-document preservation and singleton restoration. Synthetic geometry tests cover negative origins and taskbar offsets; unavailable display arrangements and physical gestures remain separate." }, new JsonSerializerOptions { WriteIndented = true }));
+    }
+    private static async Task CheckWorkspaceReuse()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "SnippyGrab-window-check-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(root);
+        await File.WriteAllTextAsync(Path.Combine(root, "settings.json"), JsonSerializer.Serialize(new Settings { FirstRunComplete = true, StartMinimized = true }));
+        using var controller = new AppController(true, root, diagnostic: true);
+        DesignWindow[] Workspaces() => Application.Current.Windows.OfType<DesignWindow>().ToArray();
+        try
+        {
+            controller.ShowDesign(); controller.ShowDesign();
+            Require(Workspaces().Length == 1, "Repeated UI Design launch created duplicate workspaces.");
+            var first = Workspaces().Single(); first.WindowState = WindowState.Minimized; controller.ShowDesign();
+            Require(first.WindowState == WindowState.Normal, "Existing workspace was left minimized.");
+            var doc = new DesignDocument { Width = 160, Height = 100 }; doc.SealBaseline();
+            var path = Path.Combine(root, "fixture.snippy"); DesignStore.Save(path, doc);
+            controller.ShowDesign(doc, path); controller.ShowDesign(DesignStore.Load(path), path);
+            Require(Workspaces().Length == 1 && first.Session?.Document.Id == doc.Id, "Opening a saved design duplicated its existing or empty workspace.");
+            var second = new DesignDocument { Width = 200, Height = 120 }; second.SealBaseline(); controller.ShowDesign(second);
+            Require(Workspaces().Length == 2 && first.Session?.Document.Id == doc.Id, "Another design replaced an existing document.");
+            controller.ShowSettings(); var settings = Application.Current.Windows.OfType<SettingsWindow>().Single(); settings.WindowState = WindowState.Minimized; controller.ShowSettings();
+            Require(settings.WindowState == WindowState.Normal, "Settings remained minimized after reopening."); settings.Close();
+            controller.ShowHistory(); var history = Application.Current.Windows.OfType<HistoryWindow>().Single(); history.WindowState = WindowState.Minimized; controller.ShowHistory();
+            Require(history.WindowState == WindowState.Normal, "Recent captures remained minimized after reopening."); history.Close();
+            await Task.Delay(100);
+        }
+        finally { foreach (var workspace in Workspaces()) workspace.CloseForDiagnostics(); controller.Dock.Close(); }
     }
     private static void Require(bool condition, string message) { if (!condition) throw new InvalidDataException(message); }
 }

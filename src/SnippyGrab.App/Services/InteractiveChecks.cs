@@ -43,6 +43,7 @@ internal static class InteractiveChecks
         Button("Edit first", () => controller.Edit(controller.Repository.Captures[0]));
         Button("Edit second", () => controller.Edit(controller.Repository.Captures[1]));
         Button("History", controller.ShowHistory);
+        Button("UI Design", () => controller.ShowDesign());
         Button("Detached pin", () => controller.Detach(controller.Repository.Captures[0]));
         Button("Settings", controller.ShowSettings);
         Button("First-run setup", () => new WelcomeWindow(controller).Show());

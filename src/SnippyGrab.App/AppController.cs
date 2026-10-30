@@ -47,6 +47,7 @@ internal sealed class AppController : IDisposable
     private HistoryWindow? historyWindow;
     private WelcomeWindow? welcomeWindow;
     private readonly HashSet<DesignWindow> designWindows = [];
+    private bool openingDesignInbox;
     private readonly string dataDirectory;
     private bool dockWasVisible;
     private bool disposed;
@@ -256,13 +257,26 @@ internal sealed class AppController : IDisposable
     });
     public void ShowDesign(DesignDocument? document = null, string? savedPath = null)
     {
+        if (disposed || exitRequested || Exiting) return;
+        var existing = document is null ? designWindows.LastOrDefault() : designWindows.FirstOrDefault(w => w.Matches(document, savedPath));
+        if (existing is not null) { WindowPlacement.Activate(existing); return; }
+        var empty = designWindows.FirstOrDefault(w => w.Session is null && !w.Busy && w.IsEnabled);
+        if (empty is not null && document is not null) { empty.SetDocument(document, savedPath); WindowPlacement.Activate(empty); return; }
         var window = new DesignWindow(dataDirectory, async (png, width, height, path) =>
         {
             var record = await Repository.AddAsync(png, width, height); record.DesignPath = path; await Repository.PersistAsync(); if (!disposed) Dock.Refresh(newCapture: true);
-        }, text => Clipboard.TextAsync(text), document, savedPath);
+        }, text => Clipboard.TextAsync(text), document, savedPath, diagnostic: Diagnostic);
         designWindows.Add(window); window.Closed += (_, _) => designWindows.Remove(window); window.Show();
     }
     internal async Task<bool> OpenDesignInbox()
+    {
+        if (openingDesignInbox) return true;
+        if (disposed || exitRequested || Exiting) return false;
+        openingDesignInbox = true;
+        try { return await OpenDesignInboxCore(); }
+        finally { openingDesignInbox = false; }
+    }
+    private async Task<bool> OpenDesignInboxCore()
     {
         var inbox = DesignBrowserBridge.Inbox(dataDirectory); if (!Directory.Exists(inbox)) return false; ManagedPath.RejectRedirects(inbox); var opened = false;
         foreach (var file in Directory.EnumerateFiles(inbox, "*.json").Take(10))
@@ -273,7 +287,9 @@ internal sealed class AppController : IDisposable
             {
                 using var json = System.Text.Json.JsonDocument.Parse(await File.ReadAllBytesAsync(file)); var capture = json.RootElement.GetProperty("capture").GetRawText(); var screenshot = json.RootElement.GetProperty("screenshot").GetString()!;
                 if (!screenshot.StartsWith("data:image/png;base64,", StringComparison.Ordinal)) throw new InvalidDataException("Invalid browser reference image.");
-                var png = Convert.FromBase64String(screenshot[22..]); var document = await ImageWorker.RunAsync(() => DesignBrowser.FromCapture(capture, png), exportLifetime.Token); ShowDesign(document); File.Delete(file); opened = true;
+                var png = Convert.FromBase64String(screenshot[22..]); var document = await ImageWorker.RunAsync(() => DesignBrowser.FromCapture(capture, png), exportLifetime.Token);
+                if (disposed || exitRequested || Exiting) return opened;
+                ShowDesign(document); File.Delete(file); opened = true;
             }
             catch (Exception ex) { Notify("Browser import could not be opened: " + OperationFailure.From(ex).Message); }
         }
@@ -282,7 +298,7 @@ internal sealed class AppController : IDisposable
     internal async Task<EditorWindow?> OpenEditorAsync(CaptureRecord record, bool show = true)
     {
         if (exitRequested || Exiting) return null;
-        if (editors.TryGetValue(record.Id, out var existing)) { existing.Activate(); return existing; }
+        if (editors.TryGetValue(record.Id, out var existing)) { WindowPlacement.Activate(existing); return existing; }
         if (!openingEditors.Add(record.Id)) return null;
         try
         {
@@ -463,13 +479,13 @@ internal sealed class AppController : IDisposable
     public void ShowSettings() => ShowSettings(false);
     private void ShowSettings(bool welcome)
     {
-        if (settingsWindow is not null) { settingsWindow.Activate(); return; }
+        if (settingsWindow is not null) { WindowPlacement.Activate(settingsWindow); return; }
         ConfigureHotkeys(hotkeyPause.Enter(Hotkeys.Paused));
         settingsWindow = new(this, welcome); settingsWindow.Closed += (_, _) => { settingsWindow = null; ConfigureHotkeys(hotkeyPause.Exit()); BuildTray(); }; settingsWindow.Show();
     }
     public void ShowHistory()
     {
-        if (historyWindow is not null) { historyWindow.Activate(); return; }
+        if (historyWindow is not null) { WindowPlacement.Activate(historyWindow); return; }
         historyWindow = new(this); historyWindow.Closed += (_, _) => { historyWindow = null; Diagnostics.WindowClosed(); }; historyWindow.Show();
     }
     public void ApplySettings(Settings settings)
@@ -552,7 +568,7 @@ internal sealed class AppController : IDisposable
     private void DisplayChanged(object? sender, EventArgs e) => lifecycle.Post(() => Try(Dock.TopologyChanged));
     private void ShowUpdates()
     {
-        if (updatesWindow is not null) { updatesWindow.Activate(); return; }
+        if (updatesWindow is not null) { WindowPlacement.Activate(updatesWindow); return; }
         updatesWindow = new(this, updates); updatesWindow.Closed += (_, _) => updatesWindow = null; updatesWindow.Show();
         if (updates.State is UpdateState.Unknown or UpdateState.Failed) _ = updates.CheckAsync();
     }

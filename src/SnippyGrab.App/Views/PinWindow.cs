@@ -20,7 +20,7 @@ internal sealed class PinWindow : Window
     private readonly System.Windows.Threading.DispatcherTimer resizeTimer = new() { Interval = TimeSpan.FromMilliseconds(150) };
     public PinWindow(AppController controller, CaptureRecord record)
     {
-        Ui.StyleWindow(this);
+        Ui.StyleWindow(this, place: false);
         this.controller = controller; this.record = record;
         Title = "SnippyGrab pin"; WindowStyle = WindowStyle.None; AllowsTransparency = true; Background = Brushes.Transparent;
         ShowInTaskbar = false; ShowActivated = false; Topmost = true; Width = 320; Height = 220; MinWidth = 80; MinHeight = 60; ResizeMode = ResizeMode.CanResizeWithGrip;

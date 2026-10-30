@@ -50,7 +50,7 @@ internal sealed class DockWindow : Window
     }
     public DockWindow(AppController controller)
     {
-        Ui.StyleWindow(this);
+        Ui.StyleWindow(this, place: false);
         this.controller = controller;
         thumbnails = new(controller.Repository, 12);
         Title = "SnippyGrab shelf"; WindowStyle = WindowStyle.None; AllowsTransparency = true;

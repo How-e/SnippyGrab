@@ -51,11 +51,10 @@ internal static class Ui
         text.SetBinding(TextBlock.ForegroundProperty, new Binding("Foreground") { RelativeSource = new RelativeSource(RelativeSourceMode.FindAncestor, typeof(Control), 1) });
         row.Children.Add(text); return row;
     }
-    public static void StyleWindow(Window window)
+    public static void StyleWindow(Window window, bool place = true)
     {
         window.Style = (Style)Application.Current.FindResource(typeof(Window));
-        window.WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        WindowPlacement.Attach(window);
+        if (place) { window.WindowStartupLocation = WindowStartupLocation.CenterOwner; WindowPlacement.Attach(window); }
         window.SourceInitialized += (_, _) => Chrome(window);
     }
     public static TextBlock Text(string text, double size = 14, bool muted = false)

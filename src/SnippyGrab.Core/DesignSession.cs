@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 
 namespace SnippyGrab.Core;
 
@@ -6,6 +7,12 @@ public sealed record DesignChange(string Id, string LayerId, string Name, string
 
 public sealed class DesignSession
 {
+    private static readonly JsonSerializerOptions ComparisonJson = new(DesignDocument.Json)
+    {
+        // Optional typography fields stay absent from old baseline hashes, but defaults must
+        // participate in diffs in both directions (including resetting a field).
+        TypeInfoResolver = new DefaultJsonTypeInfoResolver { Modifiers = { info => { foreach (var property in info.Properties) property.ShouldSerialize = (_, _) => true; } } }
+    };
     public DesignDocument Document { get; }
     public bool CanUndo => Document.Head > 0;
     public bool CanRedo => Document.Head < Document.History.Count;
@@ -99,7 +106,7 @@ public sealed class DesignSession
             if (privateAll.Contains(target.Id)) continue;
             if (c.After is null && c.Before?.Parent is { } p && baseline.ContainsKey(p) && !edited.ContainsKey(p)) continue;
             if (c.Before is null && c.After?.Parent is { } added && !baseline.ContainsKey(added)) continue;
-            var before = JsonSerializer.SerializeToElement(c.Before, DesignDocument.Json); var after = JsonSerializer.SerializeToElement(c.After, DesignDocument.Json);
+            var before = JsonSerializer.SerializeToElement(c.Before, ComparisonJson); var after = JsonSerializer.SerializeToElement(c.After, ComparisonJson);
             if (c.Before is null || c.After is null)
             {
                 var subtree = c.After is null ? Document.Baseline : current; var ids = Descendants(subtree, [target.Id]);

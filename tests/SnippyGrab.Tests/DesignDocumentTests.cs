@@ -5,6 +5,18 @@ namespace SnippyGrab.Tests;
 
 public sealed class DesignDocumentTests
 {
+    [Fact]
+    public void ImportedTextStylesRoundTripWithoutChangingLegacyBaselineSerialization()
+    {
+        var d = Fixture(); var original = JsonSerializer.Serialize(d.Baseline, DesignDocument.Json);
+        Assert.DoesNotContain("noWrap", original); Assert.DoesNotContain("fontStyle", original); Assert.DoesNotContain("letterSpacing", original); Assert.DoesNotContain("textDecoration", original);
+        var legacy = JsonSerializer.Deserialize<DesignDocument>(JsonSerializer.Serialize(d, DesignDocument.Json), DesignDocument.Json)!; legacy.Validate();
+        var session = new DesignSession(d); session.Apply("Typography", layers => { layers[1].NoWrap = true; layers[1].LetterSpacing = 1.5; layers[1].FontStyle = "italic"; layers[1].TextDecoration = "underline"; });
+        var copy = DesignDocument.Copy(d); copy.Validate(); Assert.True(copy.Layers[1].NoWrap); Assert.Equal(1.5, copy.Layers[1].LetterSpacing); Assert.Equal("italic", copy.Layers[1].FontStyle);
+        Assert.Equal(4, session.NetChanges().Count);
+        session.Undo(); Assert.Equal(original, JsonSerializer.Serialize(d.Layers, DesignDocument.Json));
+        Assert.Throws<InvalidDataException>(() => session.Apply("Invalid style", layers => layers[1].FontStyle = "url(secret)"));
+    }
     public static DesignDocument Fixture()
     {
         var document = new DesignDocument { Layers = [new() { Id = "frame", Width = 400, Height = 300 }, new() { Id = "title", Kind = "text", Parent = "frame", Text = "Before" }, new() { Id = "body", Parent = "frame", Y = 60 }] }; document.SealBaseline(); return document;

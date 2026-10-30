@@ -24,7 +24,7 @@ globalThis.SGScene = (() => {
                 (a) =>
                     "@font-face{font-family:" +
                     JSON.stringify(a.family) +
-                    ";src:url(data:" +
+                    ";font-weight:" + (a.weight || "normal") + ";font-style:" + (a.style || "normal") + ";src:url(data:" +
                     a.mediaType +
                     ";base64," +
                     a.data +
@@ -176,6 +176,7 @@ globalThis.SGScene = (() => {
                 measure.font = `${n.fontWeight} ${n.fontSize}px ${n.fontFamily}`;
                 const lines = [];
                 for (const paragraph of n.text.split("\n")) {
+                    if (n.noWrap) { lines.push(paragraph); continue; }
                     let line = "";
                     for (const word of paragraph.split(/(\s+)/)) {
                         const next = line + word;
@@ -196,6 +197,10 @@ globalThis.SGScene = (() => {
                     "font-family": n.fontFamily,
                     "font-size": n.fontSize,
                     "font-weight": n.fontWeight,
+                    "font-style": n.fontStyle || "normal",
+                    "letter-spacing": n.letterSpacing || 0,
+                    "text-decoration": n.textDecoration || "none",
+                    "xml:space": "preserve",
                     "dominant-baseline": "text-before-edge",
                     "text-anchor":
                         n.align === "center"

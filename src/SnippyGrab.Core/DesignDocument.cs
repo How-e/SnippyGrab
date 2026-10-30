@@ -13,6 +13,9 @@ public sealed record DesignSource
     public string Locale { get; set; } = "";
     public string Project { get; set; } = "";
     public string Revision { get; set; } = "";
+    public double ViewportWidth { get; set; }
+    public double ViewportHeight { get; set; }
+    public string CaptureMode { get; set; } = "";
     public DateTimeOffset CapturedUtc { get; set; } = DateTimeOffset.UtcNow;
 }
 public sealed record DesignEvidence
@@ -55,6 +58,12 @@ public sealed record DesignLayer
     public string FontFamily { get; set; } = "Segoe UI";
     public double FontSize { get; set; } = 14;
     public int FontWeight { get; set; } = 400;
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? FontStyle { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public double LetterSpacing { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? TextDecoration { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool NoWrap { get; set; }
     public double LineHeight { get; set; } = 20;
     public string Align { get; set; } = "left";
     public string Asset { get; set; } = "";
@@ -73,6 +82,8 @@ public sealed record DesignAsset
     public string MediaType { get; set; } = "image/png";
     public string Data { get; set; } = "";
     public string Family { get; set; } = "";
+    public string Weight { get; set; } = "normal";
+    public string Style { get; set; } = "normal";
     public byte[] Bytes() => Convert.FromBase64String(Data);
 }
 public sealed class DesignDocument
@@ -97,9 +108,9 @@ public sealed class DesignDocument
     public static JsonSerializerOptions Json { get; } = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, PropertyNameCaseInsensitive = true, MaxDepth = 160, WriteIndented = false, NumberHandling = JsonNumberHandling.Strict };
     public static T Copy<T>(T value) => JsonSerializer.Deserialize<T>(JsonSerializer.SerializeToUtf8Bytes(value, Json), Json)!;
     public static string Hash(byte[] bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
-    public string AddAsset(byte[] bytes, string mediaType = "image/png", string family = "")
+    public string AddAsset(byte[] bytes, string mediaType = "image/png", string family = "", string weight = "normal", string style = "normal")
     {
-        var id = Hash(bytes); if (Assets.Count >= 20000 && !Assets.ContainsKey(id)) throw new InvalidDataException("Design asset inventory exceeds 20000 entries."); Assets.TryAdd(id, new() { Data = Convert.ToBase64String(bytes), MediaType = mediaType, Family = family }); return id;
+        var id = Hash(bytes); if (Assets.Count >= 20000 && !Assets.ContainsKey(id)) throw new InvalidDataException("Design asset inventory exceeds 20000 entries."); Assets.TryAdd(id, new() { Data = Convert.ToBase64String(bytes), MediaType = mediaType, Family = family, Weight = weight, Style = style }); return id;
     }
     public void SealBaseline()
     {
@@ -119,11 +130,12 @@ public sealed class DesignDocument
     {
         if (SchemaVersion != 1 || Id == Guid.Empty || !Finite(Width, 1, 16384) || !Finite(Height, 1, 16384) || Width * Height > 64_000_000 || !Finite(DevicePixelRatio, .1, 8)) throw new InvalidDataException("Unsupported design version or artboard size (64 MP / 16384 per axis).");
         if (Source is null || Source.Url != SafeUrl(Source.Url) || Source.Title.Length > 500 || Source.Project.Length > 2000 || Source.Revision.Length > 200 || Limitations.Count > 1000 || Limitations.Any(s => s.Length > 2000)) throw new InvalidDataException("Invalid design source metadata.");
+        if (!Finite(Source.ViewportWidth, 0, 16384) || !Finite(Source.ViewportHeight, 0, 16384) || Source.CaptureMode is not ("" or "full" or "visible" or "element")) throw new InvalidDataException("Invalid source viewport.");
         if (Assets.Count > 20000) throw new InvalidDataException("Too many design assets.");
         long total = 0;
         foreach (var (key, asset) in Assets)
         {
-            if (asset is null || !Regex.IsMatch(key, "^[a-f0-9]{64}$") || asset.Data.Length > 140_000_000 || asset.Family.Length > 300) throw new InvalidDataException("Invalid design asset.");
+            if (asset is null || !Regex.IsMatch(key, "^[a-f0-9]{64}$") || asset.Data.Length > 140_000_000 || asset.Family.Length > 300 || !Regex.IsMatch(asset.Weight, "^(normal|bold|[1-9][0-9]{0,2}|1000)( (?:[1-9][0-9]{0,2}|1000))?$") || asset.Style is not ("normal" or "italic" or "oblique")) throw new InvalidDataException("Invalid design asset.");
             var bytes = asset.Bytes(); total += bytes.Length;
             if (total > 256L * 1024 * 1024 || Hash(bytes) != key || !ValidAsset(bytes, asset.MediaType)) throw new InvalidDataException("Design asset type, hash or size is invalid.");
         }
@@ -149,6 +161,7 @@ public sealed class DesignDocument
             if (!Finite(n.X, -65536, 65536) || !Finite(n.Y, -65536, 65536) || !Finite(n.Width, .01, 32768) || !Finite(n.Height, .01, 32768) || !Finite(n.Rotation, -36000, 36000) || !Finite(n.Opacity, 0, 1) || !Finite(n.Radius, 0, 16384) || !Finite(n.StrokeWidth, 0, 1000) || !Finite(n.FontSize, 1, 1000) || !Finite(n.LineHeight, 1, 2000) || !Finite(n.Gap, 0, 1000)) throw new InvalidDataException("Invalid layer geometry.");
             if (!Color(n.ShadowColor) || !Finite(n.ShadowX, -1000, 1000) || !Finite(n.ShadowY, -1000, 1000) || !Finite(n.ShadowBlur, 0, 1000) || !Finite(n.GradientAngle, -36000, 36000) || n.GradientStops.Count > 20 || n.GradientStops.Any(s => !Color(s.Color) || !Finite(s.Offset, 0, 1))) throw new InvalidDataException("Invalid gradient or shadow.");
             if (!Color(n.Fill) || !Color(n.Stroke) || n.Text.Length > 100000 || n.Name.Length > 500 || n.Intent.Length > 4000 || n.FontFamily.Length > 300 || n.Path.Length > 100000 || !Regex.IsMatch(n.Path, "^[MmZzLlHhVvCcSsQqTtAa0-9eE.,+\\- \\r\\n]*$") || !Regex.IsMatch(n.ViewBox, "^[-+0-9.eE ]{1,100}$") || n.Align is not ("left" or "center" or "right") || n.Layout is not ("free" or "vertical" or "horizontal") || n.Scope is not ("instance" or "matching" or "component" or "token")) throw new InvalidDataException("Invalid layer content or style.");
+            if (n.FontStyle is not (null or "normal" or "italic") || n.TextDecoration is not (null or "none" or "underline" or "line-through") || !Finite(n.LetterSpacing, -1000, 1000)) throw new InvalidDataException("Invalid text style.");
             if (n.Asset.Length != 0 && (!Assets.ContainsKey(n.Asset) || !Assets[n.Asset].MediaType.StartsWith("image/", StringComparison.Ordinal))) throw new InvalidDataException("Layer image is missing.");
             if (n.Source is null || n.Source.Status is not ("observed" or "user-linked" or "suggested" or "unmapped") || n.Source.Selector.Length > 2000 || n.Source.Key.Length > 200 || n.Source.Name.Length > 1000 || n.Source.Component.Length > 500 || n.Source.File.Length > 2000 || n.Source.File.Length > 0 && (System.IO.Path.IsPathRooted(n.Source.File) || n.Source.File.Contains(':') || n.Source.File.Split('/', '\\').Contains(".."))) throw new InvalidDataException("Invalid source evidence.");
         }

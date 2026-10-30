@@ -13,7 +13,7 @@ const output = path.resolve(process.argv[3]);
 const extension = path.resolve(__dirname, "../src/SnippyGrab.App/Design");
 const fontPath = process.argv[4] ? path.resolve(process.argv[4]) : null;
 const fixture = `<!doctype html><html><meta charset="utf-8"><style>
-${fontPath ? '@font-face{font-family:FixtureUI;src:url(/font.woff);font-weight:100 900;font-style:normal}body{font-family:FixtureUI!important}' : ''}
+${fontPath ? '@import url("/fixture-fonts.css");body{font-family:FixtureUI!important}' : ''}
 html,body{margin:0;background:#101214;color:#eee;font-family:Arial,sans-serif}main{padding:24px;height:6800px;box-sizing:border-box}
 header{position:fixed;top:0;left:0;width:100%;height:24px;background:#304050}h1{margin-top:24px}
 #stat{font-size:30px;font-weight:700}#bottom{position:absolute;top:6500px;left:0;width:100%;height:200px;background:#14283c}
@@ -29,6 +29,7 @@ const server = http.createServer(async (request, response) => {
         response.writeHead(401, { "WWW-Authenticate": 'Basic realm="Extension fixture"' }); response.end("Sign in"); return;
     }
     if (request.url === "/font.woff" && fontPath) { response.writeHead(200, { "Content-Type": "font/woff" }); response.end(await fs.readFile(fontPath)); return; }
+    if (request.url === "/fixture-fonts.css" && fontPath) { response.writeHead(200, { "Content-Type": "text/css" }); response.end('@media screen{@font-face{font-family:FixtureUI;src:url(/font.woff);font-weight:100 900;font-style:normal}}'); return; }
     if (request.url === "/lazy-image.svg") { response.writeHead(200, { "Content-Type": "image/svg+xml" }); response.end('<svg xmlns="http://www.w3.org/2000/svg" width="80" height="40"><rect width="80" height="40" fill="#ff00aa"/></svg>'); return; }
     response.writeHead(200, { "Content-Type": "text/html", "Set-Cookie": "fixture-session=yes; HttpOnly; SameSite=Lax; Path=/" });
     response.end(fixture);
@@ -127,7 +128,7 @@ async function main() {
         assert.equal((await worker.evaluate(() => globalThis.fixtureFirst)).ok, true);
         const originRejected = await worker.evaluate(() => globalThis.fixtureListener({ command: "full" }, { id: "different-extension" }, () => {})); assert.equal(originRejected, undefined);
         const tabRejected = await worker.evaluate(() => globalThis.fixtureListener({ command: "full" }, { id: chrome.runtime.id, tab: { id: 1 } }, () => {})); assert.equal(tabRejected, undefined);
-        const report = { Result: "PASS", Browser: context.browser().version(), FullPage: { Width: full.capture.width, Height: full.capture.height, DevicePixelRatio: 2, ReferenceWidth: png.readUInt32BE(16), ReferenceHeight: png.readUInt32BE(20) }, FontBundle: fontPath ? "PASS" : "not exercised", Checks: ["real manifest/service worker and activeTab grant", "signed-in HTTP Basic page and cookie session", "full-page bottom content", "high-DPI reference dimensions", "inline text", "nested loaded scroller", "visible area", "offscreen picked element", "scroll/style restoration", "attach/screenshot/native/inbox errors and retry", "concurrent import rejection", "sender restrictions", "credential/query exclusion"], Scope: "Production background code and real Chrome scripting/debugger/screenshot APIs in an isolated Chromium profile. Native receiver substituted to inspect payload; native admission is checked separately. Does not establish owner Chrome/Edge profile, policy or extension-upgrade acceptance." };
+        const report = { Result: "PASS", Browser: context.browser().version(), FullPage: { Width: full.capture.width, Height: full.capture.height, DevicePixelRatio: 2, ReferenceWidth: png.readUInt32BE(16), ReferenceHeight: png.readUInt32BE(20) }, FontBundle: fontPath ? "PASS: same-origin import and media-wrapped font face" : "not exercised", Checks: ["real manifest/service worker and activeTab grant", "signed-in HTTP Basic page and cookie session", "full-page bottom content", "high-DPI reference dimensions", "inline text", "direct display-contents text", "initially unloaded lazy image", "deferred content rendering", "nested loaded scroller and reading position", "visible area", "offscreen picked element", "scroll/style restoration", "attach/screenshot/native/inbox errors and retry", "concurrent import rejection", "sender restrictions", "credential/query exclusion"], Scope: "Production background code and real Chrome scripting/debugger/screenshot APIs in an isolated Chromium profile. Native receiver substituted to inspect payload; native admission is checked separately. Does not establish owner Chrome/Edge profile, policy or extension-upgrade acceptance." };
         await fs.writeFile(path.join(output, "summary.json"), JSON.stringify(report, null, 2)); console.log(JSON.stringify(report));
     } finally {
         await context.close(); server.close();

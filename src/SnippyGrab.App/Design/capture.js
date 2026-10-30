@@ -568,28 +568,45 @@ globalThis.snippyExtract = async function (options = {}) {
         add({ kind: "frame", name: "Page canvas", x: 0, y: 0, width: region.width, height: region.height, fill: html !== "#00000000" ? html : body !== "#00000000" ? body : "#ffffff" });
     }
     await walk(root, null, { x: 0, y: 0 }, 0);
-    for (const sheet of document.styleSheets) {
-        try {
-            for (const rule of sheet.cssRules) {
-                if (rule.type !== CSSRule.FONT_FACE_RULE) continue;
+    const visitedSheets = new Set();
+    function collectFontRules(rules, base, depth) {
+        if (depth > 16) { limitations.add("Deeply nested font definitions exceeded the lookup limit."); return; }
+        for (const rule of rules) {
+            if (fonts.length >= 40) return;
+            if (rule.type === CSSRule.FONT_FACE_RULE) {
                 const family = rule.style
                     .getPropertyValue("font-family")
                     .replace(/^['"]|['"]$/g, "");
                 for (const match of rule.style
                     .getPropertyValue("src")
                     .matchAll(/url\(['"]?([^)'"\s]+)['"]?\)/g)) {
-                    const url = new URL(match[1], sheet.href || location.href)
+                    const url = new URL(match[1], base)
                         .href;
                     if (/^https?:/.test(url) && fonts.length < 40)
                         fonts.push({ url, family, weight: rule.style.fontWeight || "normal", style: rule.style.fontStyle?.startsWith("italic") ? "italic" : rule.style.fontStyle?.startsWith("oblique") ? "oblique" : "normal" });
                 }
+            } else if (rule.type === CSSRule.IMPORT_RULE && rule.styleSheet) {
+                collectFontSheet(rule.styleSheet, depth + 1);
+            } else if (rule.cssRules) {
+                if (rule.type === CSSRule.MEDIA_RULE && !matchMedia(rule.conditionText).matches) continue;
+                if (rule.type === CSSRule.SUPPORTS_RULE && !CSS.supports(rule.conditionText)) continue;
+                collectFontRules(rule.cssRules, base, depth + 1);
             }
+        }
+    }
+    function collectFontSheet(sheet, depth = 0) {
+        if (visitedSheets.has(sheet) || sheet.disabled) return;
+        visitedSheets.add(sheet);
+        try {
+            if (sheet.media?.mediaText && !matchMedia(sheet.media.mediaText).matches) return;
+            collectFontRules(sheet.cssRules, sheet.href || location.href, depth);
         } catch {
             limitations.add(
                 "Some cross-origin font definitions could not be inspected.",
             );
         }
     }
+    for (const sheet of document.styleSheets) collectFontSheet(sheet);
     const fontAssets = [], fontDeadline = performance.now() + 10000;
     let fontBytes = 0;
     const uniqueFonts = [...new Map(fonts.map(font => [JSON.stringify(font), font])).values()];

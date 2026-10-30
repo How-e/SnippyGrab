@@ -6,6 +6,7 @@
             changes: [],
             selected: [],
             zoom: 1,
+            autoFit: true,
             original: false,
             excluded: [],
             collapsed: new Set(),
@@ -244,6 +245,9 @@
         art.style.width = state.doc.width + "px";
         art.style.height = state.doc.height + "px";
         art.style.transform = `scale(${state.zoom})`;
+        $("#canvas-space").style.width = state.doc.width * state.zoom + "px";
+        $("#canvas-space").style.height = state.doc.height * state.zoom + "px";
+        $("#dimensions").textContent = `${Math.round(state.doc.width)} × ${Math.round(state.doc.height)} · ${Math.round(state.zoom * 100)}%`;
         selection();
     }
     function selection() {
@@ -277,10 +281,11 @@
     }
     function fit() {
         if (!state.doc) return;
+        state.autoFit = true;
         state.zoom = Math.min(
             1,
             Math.max(
-                0.03,
+                0.001,
                 Math.min(
                     ($("#viewport").clientWidth - 48) / state.doc.width,
                     ($("#viewport").clientHeight - 48) / state.doc.height,
@@ -330,9 +335,20 @@
             return;
         }
         if (m.kind === "state") {
-            const first = !state.doc;
+            const first = state.doc?.id !== m.document.id;
+            if (first) {
+                state.selected = [];
+                state.excluded = [];
+                state.collapsed.clear();
+                state.review = null;
+                state.original = false;
+                state.autoFit = true;
+                $("#compare").textContent = "Original";
+                $("#handoff").hidden = true;
+                $("#viewport").scrollTo(0, 0);
+            }
             state.textScale = m.textScale || 1;
-            const assets = m.document.assets || state.doc?.assets || {};
+            const assets = m.document.assets || (first ? {} : state.doc?.assets) || {};
             state.doc = { ...m.document, assets };
             state.changes = m.changes;
             state.selected = state.selected.filter((id) =>
@@ -418,11 +434,18 @@
         $("#review-visual").hidden = true;
     };
     $("#zoom-fit").onclick = fit;
+    new ResizeObserver(() => {
+        if (state.autoFit) fit();
+        else selection();
+        tree();
+    }).observe($("#viewport"));
     $("#zoom-in").onclick = () => {
+        state.autoFit = false;
         state.zoom = Math.min(8, state.zoom * 1.2);
         renderCanvas();
     };
     $("#zoom-out").onclick = () => {
+        state.autoFit = false;
         state.zoom = Math.max(0.03, state.zoom / 1.2);
         renderCanvas();
     };

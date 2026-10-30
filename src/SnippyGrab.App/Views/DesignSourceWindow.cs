@@ -39,12 +39,14 @@ internal sealed class DesignSourceWindow : Window
         }));
         top.Children.Add(Ui.Text("Viewport", 12)); top.Children.Add(width); top.Children.Add(Ui.Text("×", 12)); top.Children.Add(height);
         top.Children.Add(Ui.Text("Project", 12)); top.Children.Add(project); top.Children.Add(Ui.Text("Revision", 12)); top.Children.Add(revision);
-        DockPanel.SetDock(top, Dock.Top); root.Children.Add(top);
+        var topScroll = Ui.Scroll(top); DockPanel.SetDock(topScroll, Dock.Top); root.Children.Add(topScroll);
         status = Ui.Text("Starting source browser…", 12, true);
         var bottom = new StackPanel { Margin = new Thickness(12) }; var actions = new WrapPanel(); actions.Children.Add(mode);
         actions.Children.Add(Ui.Button("Pick element", "Click an element in the source page to capture", () => Run(async () => { RequireReady(); await browser.CoreWebView2.ExecuteScriptAsync(await File.ReadAllTextAsync(Path.Combine(DesignBrowser.AssetsRoot, "capture.js"))); await browser.CoreWebView2.ExecuteScriptAsync("snippyPick()"); mode.SelectedIndex = 2; status.Text = "Move over the source page and click the element. Then choose Capture layers. Escape cancels the picker."; })));
         capture = Ui.Button("Capture layers", "Capture editable layers from this source", () => Run(Capture)); capture.IsEnabled = false; actions.Children.Add(capture);
-        actions.Children.Add(Ui.Button("Cancel", "Cancel source import", Close)); bottom.Children.Add(actions); bottom.Children.Add(status); DockPanel.SetDock(bottom, Dock.Bottom); root.Children.Add(bottom); root.Children.Add(browser);
+        actions.Children.Add(Ui.Button("Cancel", "Cancel source import", Close)); bottom.Children.Add(actions); bottom.Children.Add(status);
+        var bottomScroll = Ui.Scroll(bottom); DockPanel.SetDock(bottomScroll, Dock.Bottom); root.Children.Add(bottomScroll); root.Children.Add(browser);
+        root.SizeChanged += (_, _) => { topScroll.MaxHeight = Math.Max(60, root.ActualHeight * 0.32); bottomScroll.MaxHeight = Math.Max(60, root.ActualHeight * 0.32); };
         foreach (var (control, label) in new (Control, string)[] { (address, "Source URL"), (width, "Viewport width"), (height, "Viewport height"), (project, "Project context"), (revision, "Source revision"), (mode, "Capture area") }) System.Windows.Automation.AutomationProperties.SetName(control, label);
         if (previous is not null) { address.Text = previous.Source.Url; width.Text = Math.Round(previous.Source.ViewportWidth > 0 ? previous.Source.ViewportWidth : previous.Width).ToString(System.Globalization.CultureInfo.InvariantCulture); height.Text = Math.Round(previous.Source.ViewportHeight > 0 ? previous.Source.ViewportHeight : previous.Height).ToString(System.Globalization.CultureInfo.InvariantCulture); project.Text = previous.Source.Project; revision.Text = previous.Source.Revision; mode.SelectedIndex = previous.Source.CaptureMode == "visible" ? 0 : previous.Source.CaptureMode == "element" ? 2 : 1; }
         Loaded += (_, _) => Run(async () =>

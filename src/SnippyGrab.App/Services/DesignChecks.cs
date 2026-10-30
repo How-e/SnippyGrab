@@ -66,6 +66,7 @@ internal static class DesignChecks
                 Assert(DesignStore.Load(workspacePath).Layers.Single(n => n.Id == target.Id).Text == "Apply preferences", "Production Save did not persist editor changes.");
                 using var screenshot = JsonDocument.Parse(await workspace.Editor.CoreWebView2.CallDevToolsProtocolMethodAsync("Page.captureScreenshot", "{\"format\":\"png\"}")); await File.WriteAllBytesAsync(destination + ".workspace.png", Convert.FromBase64String(screenshot.RootElement.GetProperty("data").GetString()!));
                 await workspace.Editor.CoreWebView2.ExecuteScriptAsync("document.querySelector('[data-command=undo]').click()"); await Wait(() => !workspace.Busy && workspace.Session!.Document.Layers.Single(n => n.Id == target.Id).Text == "Save preferences");
+                await CheckWorkspaceLayout(workspace, document);
             }
             finally { workspace.CloseForDiagnostics(); }
             foreach (var count in new[] { 1000, 10000 })
@@ -75,9 +76,29 @@ internal static class DesignChecks
                 await editor.CoreWebView2.ExecuteScriptAsync("document.getElementById('artboard').replaceChildren(SGScene.svg(" + scene + "))"); timer.Stop();
                 var modelTimer = Stopwatch.StartNew(); var s = new DesignSession(large); s.Apply("Move", nodes => nodes[0].X += 1); _ = s.NetChanges(); modelTimer.Stop(); measurements.Add(new { Layers = count, BrowserRenderMilliseconds = timer.Elapsed.TotalMilliseconds, ModelCommandAndDiffMilliseconds = modelTimer.Elapsed.TotalMilliseconds });
             }
-            await File.WriteAllTextAsync(destination, JsonSerializer.Serialize(new { Result = "PASS", Runtime = source.CoreWebView2.Environment.BrowserVersionString, ImportedLayers = document.Layers.Count, FidelityMeanDifference = fidelity.MeanChannelDifference, FidelityChangedPixels = fidelity.ChangedPixels, ImportRegressions = importRegressions, SourceWindowWorkflow = sourceWindowWorkflow, Measurements = measurements, Scope = "Isolated real WebView2 local HTML import, production editor-to-source-window Import/Load/capture path, full/visible/offscreen-element capture, HTTP Basic/form authentication and cancellation, editable text/vector/fallback, save/reopen, reviewed ZIP and exact package inventory, render/export and bounded scene timings. Does not establish universal page fidelity, external browser extension installation, independent agent implementation, physical gestures or clean-profile runtime installation." }, new JsonSerializerOptions { WriteIndented = true }));
+            await File.WriteAllTextAsync(destination, JsonSerializer.Serialize(new { Result = "PASS", Runtime = source.CoreWebView2.Environment.BrowserVersionString, ImportedLayers = document.Layers.Count, FidelityMeanDifference = fidelity.MeanChannelDifference, FidelityChangedPixels = fidelity.ChangedPixels, ImportRegressions = importRegressions, SourceWindowWorkflow = sourceWindowWorkflow, WorkspaceLayout = "800x550 through 1280x720; 100%, 150%, 225% text; Fit scroll bounds and replacement reset", Measurements = measurements, Scope = "Isolated real WebView2 local HTML import, production editor-to-source-window Import/Load/capture path, full/visible/offscreen-element capture, HTTP Basic/form authentication and cancellation, editable text/vector/fallback, save/reopen, reviewed ZIP and exact package inventory, render/export, responsive workspace and bounded scene timings. Does not establish universal page fidelity, external browser extension installation, independent agent implementation, physical gestures or clean-profile runtime installation." }, new JsonSerializerOptions { WriteIndented = true }));
         }
         finally { source.Dispose(); editor.Dispose(); window.Close(); }
+    }
+    private static async Task CheckWorkspaceLayout(Views.DesignWindow workspace, DesignDocument original)
+    {
+        foreach (var (width, height, scale) in new[] { (800, 550, 1d), (1024, 600, 1.5), (800, 550, 2.25), (1280, 720, 1d) })
+        {
+            await workspace.Editor.CoreWebView2.CallDevToolsProtocolMethodAsync("Emulation.setDeviceMetricsOverride", JsonSerializer.Serialize(new { width, height, deviceScaleFactor = 1, mobile = false }));
+            Views.Ui.Theme(AppTheme.Dark, scale); await Task.Delay(100);
+            await workspace.Editor.CoreWebView2.ExecuteScriptAsync("document.getElementById('zoom-fit').click()"); await Task.Delay(80);
+            using var layout = JsonDocument.Parse(await workspace.Editor.CoreWebView2.ExecuteScriptAsync("(()=>{const v=document.querySelector('#viewport'),h=document.querySelector('header').getBoundingClientRect(),f=document.querySelector('footer').getBoundingClientRect();return {top:h.top,bottom:f.bottom,height:innerHeight,canvasWidth:v.clientWidth,scrollWidth:v.scrollWidth}})()"));
+            var r = layout.RootElement;
+            Assert(r.GetProperty("top").GetDouble() >= 0 && r.GetProperty("bottom").GetDouble() <= r.GetProperty("height").GetDouble() + 1, $"Workspace header/footer clipped at {width} × {height}, text scale {scale}.");
+            Assert(r.GetProperty("scrollWidth").GetDouble() <= r.GetProperty("canvasWidth").GetDouble() + 2, "Fit left a full-size invisible artboard in the scroll area.");
+        }
+        await workspace.Editor.CoreWebView2.ExecuteScriptAsync("document.getElementById('compare').click();document.getElementById('zoom-in').click()");
+        var replacement = DesignDocument.Copy(original); replacement.Id = Guid.NewGuid(); replacement.Width = 2000; replacement.Height = 1200;
+        workspace.SetDocument(replacement); await Task.Delay(120);
+        using var state = JsonDocument.Parse(await workspace.Editor.CoreWebView2.ExecuteScriptAsync("({compare:document.querySelector('#compare').textContent,selection:document.querySelector('#selection').style.display,zoom:document.querySelector('#dimensions').textContent,canvas:document.querySelector('#viewport').clientWidth,art:document.querySelector('#artboard').getBoundingClientRect().width})"));
+        Assert(state.RootElement.GetProperty("compare").GetString() == "Original", "Replacing a design retained its previous original-comparison mode.");
+        Assert(state.RootElement.GetProperty("art").GetDouble() <= state.RootElement.GetProperty("canvas").GetDouble(), "Replacing a design retained the previous zoom instead of fitting the new document.");
+        Views.Ui.Theme(AppTheme.Dark, 1);
     }
     private static async Task Navigate(WebView2 view, string url)
     {

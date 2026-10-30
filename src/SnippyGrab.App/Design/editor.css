@@ -25,7 +25,12 @@ body {
     height: 100vh;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
 }
+header, .document, footer { flex-shrink: 0; }
+header { max-height: 30vh; overflow: auto; }
+.document { max-height: 25vh; overflow: auto; }
+footer { max-height: 15vh; overflow: auto; }
 button,
 input,
 select,
@@ -105,6 +110,8 @@ main {
     grid-template-columns: 190px minmax(250px, 1fr) 260px;
     flex: 1;
     min-height: 0;
+    min-width: 0;
+    overflow: auto;
 }
 .layers,
 .inspector {
@@ -115,6 +122,7 @@ main {
 }
 .layers {
     border-right: 1px solid var(--line);
+    overflow: auto;
 }
 .panel-title {
     padding: 14px 12px;
@@ -127,7 +135,7 @@ main {
     flex: 1;
     overflow: auto;
     position: relative;
-    min-height: 100px;
+    min-height: 64px;
 }
 #tree-space {
     position: relative;
@@ -169,6 +177,9 @@ main {
     display: flex;
     flex-wrap: wrap;
     gap: 2px;
+    max-height: 50%;
+    flex-shrink: 0;
+    overflow: auto;
 }
 .layer-actions button {
     font-size: 12px;
@@ -193,12 +204,17 @@ main {
     position: relative;
     overflow: auto;
     flex: 1;
-    min-height: 100px;
+    min-height: 50px;
     overscroll-behavior: contain;
 }
-#artboard {
+#canvas-space {
     position: relative;
     margin: 22px;
+}
+#artboard {
+    position: absolute;
+    left: 0;
+    top: 0;
     transform-origin: 0 0;
     background: #fff;
     box-shadow: 0 3px 14px #0002;
@@ -332,6 +348,10 @@ footer {
     justify-content: space-between;
     padding: 10px 16px;
     border-bottom: 1px solid var(--line);
+    flex-wrap: wrap;
+    flex-shrink: 0;
+    max-height: 30vh;
+    overflow: auto;
 }
 .review-body {
     display: grid;
@@ -385,7 +405,7 @@ footer {
     }
     nav button {
         padding: 5px;
-        font-size: 12px;
+        font-size: calc(12px * var(--ui-scale));
     }
 }
 @media (forced-colors: active) {

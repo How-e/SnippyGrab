@@ -26,8 +26,8 @@ internal sealed class DesignWindow : Window
     internal bool Busy => busy || queuedMessages > 0;
     internal DesignSession? Session => session;
     internal WebView2 Editor => editor;
-    internal bool Matches(DesignDocument document, string? savedPath) => session?.Document.Id == document.Id ||
-        (path is not null && savedPath is not null && string.Equals(Path.GetFullPath(path), Path.GetFullPath(savedPath), StringComparison.OrdinalIgnoreCase));
+    internal bool Matches(DesignDocument document, string? savedPath) => savedPath is null ? session?.Document.Id == document.Id :
+        path is not null && string.Equals(Path.GetFullPath(path), Path.GetFullPath(savedPath), StringComparison.OrdinalIgnoreCase);
     internal DesignWindow(string dataDirectory, Func<byte[], int, int, string, Task> addToShelf, Func<string, Task<bool>> copyBrief, DesignDocument? initial = null, string? savedPath = null, bool diagnostic = false, MonitorInfo? initialMonitor = null)
     {
         Ui.StyleWindow(this, initialMonitor: initialMonitor); Title = "SnippyGrab · UI Design"; Width = 1320; Height = 900; MinWidth = 800; MinHeight = 550;

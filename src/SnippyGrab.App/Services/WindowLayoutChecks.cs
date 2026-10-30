@@ -75,8 +75,10 @@ internal static class WindowLayoutChecks
             var path = Path.Combine(root, "fixture.snippy"); DesignStore.Save(path, doc);
             controller.ShowDesign(doc, path); controller.ShowDesign(DesignStore.Load(path), path);
             Require(Workspaces().Length == 1 && first.Session?.Document.Id == doc.Id, "Opening a saved design duplicated its existing or empty workspace.");
+            var copyPath = Path.Combine(root, "separate-copy.snippy"); DesignStore.Save(copyPath, doc); controller.ShowDesign(DesignStore.Load(copyPath), copyPath);
+            Require(Workspaces().Length == 2, "A separate saved copy was silently replaced by the workspace for another path.");
             var second = new DesignDocument { Width = 200, Height = 120 }; second.SealBaseline(); controller.ShowDesign(second);
-            Require(Workspaces().Length == 2 && first.Session?.Document.Id == doc.Id, "Another design replaced an existing document.");
+            Require(Workspaces().Length == 3 && first.Session?.Document.Id == doc.Id, "Another design replaced an existing document.");
             controller.ShowSettings(); var settings = Application.Current.Windows.OfType<SettingsWindow>().Single(); settings.WindowState = WindowState.Minimized; controller.ShowSettings();
             Require(settings.WindowState == WindowState.Normal, "Settings remained minimized after reopening."); settings.Close();
             controller.ShowHistory(); var history = Application.Current.Windows.OfType<HistoryWindow>().Single(); history.WindowState = WindowState.Minimized; controller.ShowHistory();

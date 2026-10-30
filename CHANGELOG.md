@@ -1,6 +1,13 @@
 # Changelog
 
-## Unreleased — UI Design import fixes
+## 0.2.0-alpha.20261030.1 — 2026-10-30
+
+- Published UI Design with editable imported layers, portable design files and reviewed implementation-agent handoffs, including the earlier local-only feature and import fixes below.
+- Open normal windows on the initiating app/pointer monitor, fit their initial size and minimum dimensions to its usable work area, and recover placement after display/DPI/work-area changes. Preserve the chosen monitor through asynchronous design and screenshot loading. Native maximize/snap/restore chrome remains in control of frame bounds.
+- Reuse existing UI Design workspaces and saved designs, restore minimized windows, raise owned dialogs, and serialize extension-inbox activation. Separate saved copies retain independent workspaces. Extension import no longer opens Recent captures first, and temporary dialogs no longer create extra taskbar entries.
+- Fix Fit leaving an invisible full-size artboard in the canvas scroll area. Keep fitted canvases responsive to resizing, update the zoom label, and reset comparison/zoom/review state when opening another document. Constrain source controls and editor panels so headers, footers and actions remain reachable at small sizes and large text scales.
+- Added native checks for every attached monitor and the real maximized WebView2 workspace, workspace reuse/minimized restoration, negative-origin/taskbar-offset geometry, and editor layouts from 800×550 through 1280×720 at 100–225% text scale.
+- This remains an unsigned alpha with 13 open acceptance gates. Attached-monitor and synthetic layout checks do not establish every display topology, physical gesture, clean-profile prerequisite, browser-extension deployment or prolonged-session acceptance.
 
 - Fixed the blank source window opened from UI Design: native dialogs now open after the editor's WebView2 message callback returns. Source controls show initialization/loading state, support Enter to load, and enable capture only after navigation succeeds. Regression coverage follows the real Import page → Load → capture route.
 - Full-page capture now gives lazy images a bounded loading opportunity, materializes `content-visibility: auto` regions, and restores nested panel scroll positions. Missing image resources are reported explicitly.

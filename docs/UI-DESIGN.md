@@ -1,10 +1,12 @@
 # UI Design — editable layers to implementation handoff
 
-Design/implementation date: 2026-10-29. Status: implemented in local alpha `0.2.0-alpha.20261029.1`; acceptance limits below remain open. Assisted scrolling is removed. Decision record: [ADR-003](ADR-003-UI-DESIGN-LAYERS.md). Work items: F12–F17 in [TASK_QUEUE.md](../TASK_QUEUE.md).
+Design/implementation date: 2026-10-29; window reliability update: 2026-10-30. Status: implemented in unsigned alpha `0.2.0-alpha.20261030.1`; acceptance limits below remain open. Assisted scrolling is removed. Decision record: [ADR-003](ADR-003-UI-DESIGN-LAYERS.md). Work items: F12–F17 in [TASK_QUEUE.md](../TASK_QUEUE.md).
 
 ## Implemented workflow and limits
 
 Open **Tray → UI Design…**, choose **Import page…**, load a URL/localhost page or local HTML, choose the viewport and capture area, then capture layers. Use the tree or canvas to select layers, drag/resize, double-click text to edit its property, or use the inspector. Add primitives/text, group/ungroup, duplicate, reorder, reparent and align layers. Save/Save as preserves a `.snippy` document and adds a linked PNG shelf preview. The Open dialog also exposes owned `.recovery.snippy` snapshots written after accepted transactions. A stale save is rejected instead of overwriting a newer file.
+
+Repeated **UI Design…** commands focus the existing workspace; opening the same saved file focuses its current window. New imports can use an empty workspace, while different documents and separate saved copies keep independent windows. Source import, sign-in and extension setup are owned dialogs without separate taskbar entries. New windows use the initiating monitor and its work area; **Fit** follows resizing until you choose a manual zoom.
 
 Addresses such as `10.0.1.11:8085` and `localhost:5173` automatically use HTTP. HTTP Basic authentication opens a sign-in dialog showing the requesting server and challenge. Form-based sign-in works in the source page; its isolated browser profile retains its own session. Credentials are not added to design data. Use the extension to reuse a tab already signed in. **Full loaded page** is the default; **Visible area** deliberately captures only the viewport. Source viewport dimensions are stored separately from full-page artboard dimensions for recapture.
 

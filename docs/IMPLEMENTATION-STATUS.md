@@ -1,5 +1,9 @@
 # Implementation status
 
+## 2026-10-30 — UI Design window reliability and published-alpha preparation
+
+Alpha `0.2.0-alpha.20261030.1` includes the earlier local UI Design feature/import work and focused fixes for monitor/work-area placement, asynchronous launch-monitor retention, workspace reuse, minimized restoration, owned dialogs, extension activation, responsive controls and canvas Fit/replacement state. Native layout checks exercise all three attached monitors (including negative origins and 150% DPI) and the actual maximized WebView2 workspace. Browser-layout checks exercise 800×550 through 1280×720 with text scaling up to 225%. The owner authorized individual commits, pushing all work to `origin/main`, and a new release. The existing 38 closed / 13 open acceptance gates remain unchanged; no stable-readiness or universal desktop acceptance claim is added.
+
 ## 2026-10-29 — UI Design implementation and local alpha
 
 Removed assisted scrolling from the tray/controller, window, staging service, Core overlap algorithm, dedicated regressions and runtime diagnostic window inventory. Existing PNG captures and manual composition remain supported. Historical ADR-001 and F08/F09 briefs are explicitly retired. Old private staging/user data is not deleted.

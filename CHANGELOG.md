@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — UI Design import fixes
+
+- Accept scheme-free LAN/localhost addresses and prompt for HTTP Basic authentication. Form sign-in uses the source browser's retained session.
+- Default URL import to the full loaded page and add full-page existing-tab import, including offscreen selected elements, bounded loaded scroll panels, high-DPI references and cleanup after errors. Reload the unpacked extension and accept its page-capture permission after updating.
+- Preserve inline text geometry/spacing, computed typography, side borders, page background and display-contents/positioned children. Use explicit raster fallback for generated icons and complex SVG strokes. Bundle available WOFF/WOFF2 resources and font-face metadata in both adapters.
+- Preserve the source viewport separately from the full-page artboard when comparing implementations. Add native authentication/layout regressions and isolated Chromium extension coverage; broad page fidelity and owner Chrome/Edge acceptance remain separate.
+
 ## 0.2.0-alpha.20261029.1 — 2026-10-29 (local only)
 
 - Replaced assisted scrolling with UI Design: independent editable layers imported from a URL, localhost project, local HTML or optional existing-tab browser extension.

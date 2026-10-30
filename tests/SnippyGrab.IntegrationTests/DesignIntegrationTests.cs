@@ -9,6 +9,21 @@ namespace SnippyGrab.IntegrationTests;
 
 public sealed class DesignIntegrationTests
 {
+    [Theory]
+    [InlineData("10.0.1.11:8085", "http://10.0.1.11:8085/")]
+    [InlineData(" localhost:5173/settings?view=1 ", "http://localhost:5173/settings?view=1")]
+    [InlineData("example.org", "http://example.org/")]
+    [InlineData("https://example.org/page", "https://example.org/page")]
+    [InlineData("[::1]:8085", "http://[::1]:8085/")]
+    [InlineData("file:///C:/fixture.html", "file:///C:/fixture.html")]
+    public void SourceAddressesAcceptLocalHostsAndExplicitUrls(string input, string expected) => Assert.Equal(expected, DesignBrowser.ParseAddress(input).AbsoluteUri);
+    [Theory]
+    [InlineData("javascript:alert(1)")]
+    [InlineData("data:text/html,hello")]
+    [InlineData("ftp://example.org")]
+    [InlineData("10.0.1.11:99999")]
+    [InlineData("")]
+    public void SourceAddressesRejectUnsupportedSchemesAndInvalidPorts(string input) => Assert.Throws<InvalidDataException>(() => DesignBrowser.ParseAddress(input));
     [Fact]
     public void CapturedFontsRejectUnsupportedTypesSignaturesAndStyleInjection()
     {

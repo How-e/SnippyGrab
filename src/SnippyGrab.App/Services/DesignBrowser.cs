@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
 
@@ -8,7 +9,14 @@ internal static class DesignBrowser
 {
     internal const string EditorUrl = "https://snippy-editor.invalid/editor.html";
     internal static string AssetsRoot => Path.Combine(AppContext.BaseDirectory, "Design");
-    internal static async Task Initialize(WebView2 view, string profile, bool editor)
+    internal static Uri ParseAddress(string address)
+    {
+        var value = address.Trim();
+        if (!value.Contains("://", StringComparison.Ordinal) && Regex.IsMatch(value, @"^(?:localhost|[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?|\[[a-f0-9:]+\])(?::\d{1,5})?(?:[/?#].*)?$", RegexOptions.IgnoreCase)) value = "http://" + value;
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https" or "file") || (uri.Scheme != "file" && uri.Host.Length == 0)) throw new InvalidDataException("Enter a project address such as 10.0.1.11:8085, an HTTP(S) URL, or open an HTML file.");
+        return uri;
+    }
+    internal static async Task Initialize(WebView2 view, string profile, bool editor, Func<string, string, Task<(string UserName, string Password)?>>? authenticate = null)
     {
         try { _ = CoreWebView2Environment.GetAvailableBrowserVersionString(); }
         catch (WebView2RuntimeNotFoundException ex) { throw new InvalidOperationException("UI Design needs the Microsoft Edge WebView2 Evergreen Runtime. Install it from Microsoft's WebView2 download page; ordinary screenshot capture remains available.", ex); }
@@ -30,7 +38,23 @@ internal static class DesignBrowser
                 if (!Uri.TryCreate(e.Request.Uri, UriKind.Absolute, out var uri) || uri.Host != "snippy-editor.invalid" || uri.Scheme != "https") e.Response = environment.CreateWebResourceResponse(new MemoryStream(), 403, "Blocked", "Content-Type: text/plain");
             };
         }
-        else core.NavigationStarting += (_, e) => { if (!Uri.TryCreate(e.Uri, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https" or "file" or "about")) e.Cancel = true; };
+        else
+        {
+            core.NavigationStarting += (_, e) => { if (!Uri.TryCreate(e.Uri, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https" or "file" or "about")) e.Cancel = true; };
+            core.BasicAuthenticationRequested += async (_, e) =>
+            {
+                using var deferral = e.GetDeferral();
+                try
+                {
+                    // Leave the WebView callback before opening a modal credential dialog.
+                    await view.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Background);
+                    var credentials = authenticate is null ? null : await authenticate(e.Uri, e.Challenge);
+                    if (credentials is { } value) { e.Response.UserName = value.UserName; e.Response.Password = value.Password; }
+                    else e.Cancel = true;
+                }
+                catch { e.Cancel = true; }
+            };
+        }
     }
     internal static async Task<DesignDocument> Capture(WebView2 browser, string mode, CancellationToken cancellation)
     {

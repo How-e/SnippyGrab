@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "SnippyGrab UI Design",
-  "version": "1.0.0",
-  "description": "Import the visible page or a selected element as editable SnippyGrab design layers.",
-  "permissions": ["activeTab", "scripting", "nativeMessaging"],
+  "version": "1.1.0",
+  "description": "Import a full signed-in page, visible area or selected element as editable SnippyGrab design layers.",
+  "permissions": ["activeTab", "scripting", "nativeMessaging", "debugger"],
   "background": { "service_worker": "extension/background.js" },
   "action": {
     "default_popup": "extension/popup.html",

@@ -14,18 +14,21 @@ const extension = path.resolve(__dirname, "../src/SnippyGrab.App/Design");
 const fontPath = process.argv[4] ? path.resolve(process.argv[4]) : null;
 const fixture = `<!doctype html><html><meta charset="utf-8"><style>
 ${fontPath ? '@font-face{font-family:FixtureUI;src:url(/font.woff);font-weight:100 900;font-style:normal}body{font-family:FixtureUI!important}' : ''}
-html,body{margin:0;background:#101214;color:#eee;font-family:Arial,sans-serif}main{padding:24px;height:2300px;box-sizing:border-box}
+html,body{margin:0;background:#101214;color:#eee;font-family:Arial,sans-serif}main{padding:24px;height:6800px;box-sizing:border-box}
 header{position:fixed;top:0;left:0;width:100%;height:24px;background:#304050}h1{margin-top:24px}
-#stat{font-size:30px;font-weight:700}#bottom{position:absolute;top:2100px;left:0;width:100%;height:200px;background:#14283c}
+#stat{font-size:30px;font-weight:700}#bottom{position:absolute;top:6500px;left:0;width:100%;height:200px;background:#14283c}
 #panel{height:50px;overflow:auto}#panel>div{height:150px}#pseudo:before{content:"";display:inline-block;width:14px;height:14px;background:#678}
+#deferred{position:absolute;top:1700px;width:240px;height:120px;content-visibility:auto}
 </style><header>Fixed header</header><main><h1>Signed-in fixture</h1><span id="stat">1 / 5</span> capture slots
 <p id="pseudo">Generated icon</p><div id="panel"><div>Panel top</div><p>Panel bottom</p></div>
+<div id="deferred"><p>Deferred source content</p></div><img id="lazy-picture" loading="lazy" src="/lazy-image.svg" width="80" height="40" style="position:absolute;top:6520px;left:20px">
 <div id="bottom">Bottom of full signed-in page</div></main></html>`;
 const server = http.createServer(async (request, response) => {
     if (request.headers.authorization !== "Basic " + Buffer.from("fixture:synthetic-password").toString("base64")) {
         response.writeHead(401, { "WWW-Authenticate": 'Basic realm="Extension fixture"' }); response.end("Sign in"); return;
     }
     if (request.url === "/font.woff" && fontPath) { response.writeHead(200, { "Content-Type": "font/woff" }); response.end(await fs.readFile(fontPath)); return; }
+    if (request.url === "/lazy-image.svg") { response.writeHead(200, { "Content-Type": "image/svg+xml" }); response.end('<svg xmlns="http://www.w3.org/2000/svg" width="80" height="40"><rect width="80" height="40" fill="#ff00aa"/></svg>'); return; }
     response.writeHead(200, { "Content-Type": "text/html", "Set-Cookie": "fixture-session=yes; HttpOnly; SameSite=Lax; Path=/" });
     response.end(fixture);
 });
@@ -83,12 +86,17 @@ async function main() {
             assert.equal(result.ok, true, result.error);
             return worker.evaluate(() => globalThis.fixtureCaptures.at(-1));
         }
-        await page.evaluate(() => scrollTo(0, 400));
+        await page.evaluate(() => { scrollTo(0, 400); document.querySelector("#panel").scrollTop = 65; });
+        assert.equal(await page.locator("#lazy-picture").evaluate(image => image.complete), false, "Lazy-image fixture must start unloaded");
         const full = await capture("full");
         assert(full.capture.height >= 2300); assert.equal(full.capture.devicePixelRatio, 2);
         assert(full.capture.layers.some(n => n.kind === "text" && n.text === "Bottom of full signed-in page"));
         assert(full.capture.layers.some(n => n.kind === "text" && n.text === "1 / 5" && n.width > 50 && n.noWrap));
         assert(full.capture.layers.some(n => n.kind === "text" && n.text === "Panel bottom"));
+        assert(full.capture.layers.some(n => n.kind === "text" && n.text === "Deferred source content"));
+        assert(await page.locator("#lazy-picture").evaluate(image => image.complete && image.naturalWidth === 80));
+        assert.equal(await page.locator("#lazy-picture").getAttribute("loading"), "lazy");
+        assert.equal(await page.locator("#deferred").getAttribute("style"), null);
         assert(!JSON.stringify(full.capture).includes("synthetic-password")); assert(!full.capture.source.url.includes("token="));
         if (fontPath) { assert(full.capture.fontAssets.some(font => font.family === "FixtureUI" && font.weight === "100 900" && font.mediaType === "font/woff"), JSON.stringify({ fonts: full.capture.fontAssets.map(({ data, ...font }) => font), limitations: full.capture.limitations, resource: await worker.evaluate(() => ({ result: globalThis.fixtureResource, error: globalThis.fixtureResourceError })) })); }
         const png = Buffer.from(full.screenshot.split(",")[1], "base64");
@@ -97,6 +105,7 @@ async function main() {
         await fs.writeFile(path.join(output, "native-input.json"), JSON.stringify(full));
         const restored = await page.evaluate(() => ({ y: scrollY, style: document.querySelector("#panel").getAttribute("style") }));
         assert.equal(restored.y, 400); assert.equal(restored.style, null);
+        assert.equal(await page.locator("#panel").evaluate(panel => panel.scrollTop), 65);
         const visibleHeight = await page.evaluate(() => innerHeight);
         const visible = await capture("visible"); assert.equal(visible.capture.height, visibleHeight);
         assert(!visible.capture.layers.some(n => n.text === "Bottom of full signed-in page"));

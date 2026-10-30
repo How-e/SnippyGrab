@@ -15,7 +15,7 @@ internal static class DesignCaptureChecks
         var fixture = Path.Combine(root, "import-regressions.html");
         await File.WriteAllTextAsync(fixture, Fixture);
         await Navigate(source, new Uri(fixture).AbsoluteUri);
-        await source.CoreWebView2.ExecuteScriptAsync("scrollTo(0,200)");
+        await source.CoreWebView2.ExecuteScriptAsync("scrollTo(0,200);document.querySelector('#scroll-panel').scrollTop=65");
         var full = await DesignBrowser.Capture(source, "full", CancellationToken.None);
         Require(full.Height >= 1800, "Full-page import cut off content below the viewport.");
         var inline = full.Layers.Single(n => n.Kind == "text" && n.Text == "1 / 5");
@@ -30,10 +30,11 @@ internal static class DesignCaptureChecks
         Require(full.Layers.Any(n => n.Source.Selector == "#modern-color" && n.Fill != "#00000000"), "Modern CSS color became transparent.");
         Require(full.Layers.Any(n => n.Kind == "text" && n.Text == "STYLED TEXT" && n.FontStyle == "italic" && n.LetterSpacing == 2 && n.TextDecoration == "underline"), "Computed text styling was lost.");
         Require(full.Layers.Any(n => n.Kind == "text" && n.Text == "Nested scroller bottom"), "Full import did not expand a loaded nested scroll panel.");
-        using (var restored = JsonDocument.Parse(await source.CoreWebView2.ExecuteScriptAsync("({y:scrollY,style:document.querySelector('#scroll-panel').getAttribute('style')})")))
+        using (var restored = JsonDocument.Parse(await source.CoreWebView2.ExecuteScriptAsync("({y:scrollY,panelScroll:document.querySelector('#scroll-panel').scrollTop,style:document.querySelector('#scroll-panel').getAttribute('style')})")))
         {
             Require(restored.RootElement.GetProperty("y").GetInt32() == 200, "Full capture did not restore page scroll position.");
             Require(restored.RootElement.GetProperty("style").ValueKind == JsonValueKind.Null, "Full capture left source styles changed.");
+            Require(restored.RootElement.GetProperty("panelScroll").GetInt32() == 65, "Full capture changed the nested panel's reading position.");
         }
         var reconstructed = await DesignHandoff.Render(editor.CoreWebView2, full);
         await File.WriteAllBytesAsync(report + ".full-original.png", full.Assets[full.Original].Bytes());

@@ -4,6 +4,7 @@ globalThis.snippyExtract = async function (options = {}) {
     const mode = options.mode || "full";
     const savedScroll = { x: scrollX, y: scrollY };
     const restoredStyles = [];
+    const restoredState = [];
     const restoreStyle = (element) => {
         const style = element.getAttribute("style");
         restoredStyles.push(() => style === null ? element.removeAttribute("style") : element.setAttribute("style", style));
@@ -22,6 +23,8 @@ globalThis.snippyExtract = async function (options = {}) {
     globalThis.snippyFreezeCleanup = () => {
         for (const restore of restoredStyles.reverse()) restore();
         restoredStyles.length = 0;
+        for (const restore of restoredState) restore();
+        restoredState.length = 0;
         scrollTo({ left: savedScroll.x, top: savedScroll.y, behavior: "instant" });
         for (const { animation, running } of animations)
             if (running)
@@ -33,21 +36,38 @@ globalThis.snippyExtract = async function (options = {}) {
         mode === "element" ? globalThis.snippyTarget : document.documentElement;
     if (!root || !root.isConnected)
         throw Error("Select an element on the current page first.");
-    await Promise.race([
-        Promise.all([document.fonts.ready, ...[...document.images].map(image => image.complete ? Promise.resolve() : image.decode().catch(() => {}))]),
-        new Promise((resolve) => setTimeout(resolve, 3000)),
-    ]);
     if (mode === "full") {
         // A full-page reference and its layer geometry must observe the same scroll position.
         scrollTo({ left: 0, top: 0, behavior: "instant" });
         for (const element of document.querySelectorAll("body *")) {
             const style = getComputedStyle(element);
+            if (style.contentVisibility === "auto") {
+                restoreStyle(element);
+                element.style.setProperty("content-visibility", "visible", "important");
+            }
+            if (element.localName === "img" && element.loading === "lazy") {
+                const loading = element.getAttribute("loading");
+                restoredState.push(() => loading === null ? element.removeAttribute("loading") : element.setAttribute("loading", loading));
+                element.loading = "eager";
+            }
+        }
+    }
+    await Promise.race([
+        Promise.all([document.fonts.ready, ...[...document.images].map(image => image.complete ? Promise.resolve() : image.decode().catch(() => {}))]),
+        new Promise((resolve) => setTimeout(resolve, 3000)),
+    ]);
+    if (mode === "full") {
+        for (const element of document.querySelectorAll("body *")) {
+            const style = getComputedStyle(element);
             if (["auto", "scroll"].includes(style.overflowY) && element.clientHeight > 0 && element.scrollHeight > element.clientHeight + 1 && !["fixed", "absolute"].includes(style.position)) {
+                const x = element.scrollLeft, y = element.scrollTop;
+                restoredState.push(() => { element.scrollLeft = x; element.scrollTop = y; });
                 restoreStyle(element);
                 element.style.setProperty("height", element.scrollHeight + (element.offsetHeight - element.clientHeight) + "px", "important");
                 element.style.setProperty("max-height", "none", "important");
                 element.style.setProperty("overflow", "visible", "important");
                 element.style.setProperty("flex-shrink", "0", "important");
+                element.scrollTop = 0;
             }
         }
     }
@@ -88,6 +108,8 @@ globalThis.snippyExtract = async function (options = {}) {
         limitations = new Set(),
         fonts = [],
         started = performance.now();
+    if ([...document.images].some(image => !image.complete || image.naturalWidth === 0))
+        limitations.add("Some images were unavailable or did not finish loading within the capture deadline.");
     const colorCanvas = document.createElement("canvas");
     colorCanvas.width = colorCanvas.height = 1;
     const colorContext = colorCanvas.getContext("2d", { willReadFrequently: true });

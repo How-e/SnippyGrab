@@ -7,9 +7,9 @@ namespace SnippyGrab.App.Views;
 // Keep native chrome: Windows owns maximize, snap, restore and taskbar insets.
 internal static class WindowPlacement
 {
-    internal static void Attach(Window window)
+    internal static void Attach(Window window, MonitorInfo? initialMonitor = null)
     {
-        var anchor = Anchor();
+        var anchor = initialMonitor ?? Anchor();
         var minimumWidth = 0d; var minimumHeight = 0d;
         var explicitPosition = false;
         window.SourceInitialized += (_, _) =>

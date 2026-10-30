@@ -38,9 +38,9 @@ internal sealed class EditorWindow : Window
     private Task? documentWork;
     private readonly EditorCommitCoordinator commits = new();
     private readonly EditorCommitCoordinator closes = new();
-    public EditorWindow(AppController controller, CaptureRecord record, BitmapSource? preparedImage = null)
+    public EditorWindow(AppController controller, CaptureRecord record, BitmapSource? preparedImage = null, MonitorInfo? initialMonitor = null)
     {
-        Ui.StyleWindow(this);
+        Ui.StyleWindow(this, initialMonitor: initialMonitor);
         this.controller = controller; this.record = record;
         expectedRevision = record.FileName;
         journal = new(new EditorState(preparedImage ?? ImageService.Load(controller.Repository.PathFor(record)), []), 20, RetainedBytes, 256L * 1024 * 1024);

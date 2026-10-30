@@ -252,10 +252,11 @@ internal sealed class AppController : IDisposable
     }
     public void Edit(CaptureRecord record) => Run(async () =>
     {
-        if (!string.IsNullOrWhiteSpace(record.DesignPath) && File.Exists(record.DesignPath)) { var document = await Task.Run(() => DesignStore.Load(record.DesignPath)); ShowDesign(document, record.DesignPath); }
-        else await OpenEditorAsync(record);
+        var monitor = WindowPlacement.Anchor();
+        if (!string.IsNullOrWhiteSpace(record.DesignPath) && File.Exists(record.DesignPath)) { var document = await Task.Run(() => DesignStore.Load(record.DesignPath)); ShowDesign(document, record.DesignPath, monitor); }
+        else await OpenEditorAsync(record, initialMonitor: monitor);
     });
-    public void ShowDesign(DesignDocument? document = null, string? savedPath = null)
+    public void ShowDesign(DesignDocument? document = null, string? savedPath = null, MonitorInfo? initialMonitor = null)
     {
         if (disposed || exitRequested || Exiting) return;
         var existing = document is null ? designWindows.LastOrDefault() : designWindows.FirstOrDefault(w => w.Matches(document, savedPath));
@@ -265,7 +266,7 @@ internal sealed class AppController : IDisposable
         var window = new DesignWindow(dataDirectory, async (png, width, height, path) =>
         {
             var record = await Repository.AddAsync(png, width, height); record.DesignPath = path; await Repository.PersistAsync(); if (!disposed) Dock.Refresh(newCapture: true);
-        }, text => Clipboard.TextAsync(text), document, savedPath, diagnostic: Diagnostic);
+        }, text => Clipboard.TextAsync(text), document, savedPath, diagnostic: Diagnostic, initialMonitor: initialMonitor);
         designWindows.Add(window); window.Closed += (_, _) => designWindows.Remove(window); window.Show();
     }
     internal async Task<bool> OpenDesignInbox()
@@ -273,10 +274,10 @@ internal sealed class AppController : IDisposable
         if (openingDesignInbox) return true;
         if (disposed || exitRequested || Exiting) return false;
         openingDesignInbox = true;
-        try { return await OpenDesignInboxCore(); }
+        try { return await OpenDesignInboxCore(WindowPlacement.Anchor()); }
         finally { openingDesignInbox = false; }
     }
-    private async Task<bool> OpenDesignInboxCore()
+    private async Task<bool> OpenDesignInboxCore(MonitorInfo monitor)
     {
         var inbox = DesignBrowserBridge.Inbox(dataDirectory); if (!Directory.Exists(inbox)) return false; ManagedPath.RejectRedirects(inbox); var opened = false;
         foreach (var file in Directory.EnumerateFiles(inbox, "*.json").Take(10))
@@ -289,14 +290,15 @@ internal sealed class AppController : IDisposable
                 if (!screenshot.StartsWith("data:image/png;base64,", StringComparison.Ordinal)) throw new InvalidDataException("Invalid browser reference image.");
                 var png = Convert.FromBase64String(screenshot[22..]); var document = await ImageWorker.RunAsync(() => DesignBrowser.FromCapture(capture, png), exportLifetime.Token);
                 if (disposed || exitRequested || Exiting) return opened;
-                ShowDesign(document); File.Delete(file); opened = true;
+                ShowDesign(document, initialMonitor: monitor); File.Delete(file); opened = true;
             }
             catch (Exception ex) { Notify("Browser import could not be opened: " + OperationFailure.From(ex).Message); }
         }
         return opened;
     }
-    internal async Task<EditorWindow?> OpenEditorAsync(CaptureRecord record, bool show = true)
+    internal async Task<EditorWindow?> OpenEditorAsync(CaptureRecord record, bool show = true, MonitorInfo? initialMonitor = null)
     {
+        initialMonitor ??= WindowPlacement.Anchor();
         if (exitRequested || Exiting) return null;
         if (editors.TryGetValue(record.Id, out var existing)) { WindowPlacement.Activate(existing); return existing; }
         if (!openingEditors.Add(record.Id)) return null;
@@ -312,7 +314,7 @@ internal sealed class AppController : IDisposable
                 finally { editorLoads.Release(); }
                 if (exitRequested || Exiting || !Repository.Captures.Contains(record)) return null;
                 if (revision != record.FileName) continue;
-                var editor = new EditorWindow(this, record, image); editors[record.Id] = editor;
+                var editor = new EditorWindow(this, record, image, initialMonitor); editors[record.Id] = editor;
                 editor.Closed += (_, _) => { editors.Remove(record.Id); Diagnostics.WindowClosed(); }; if (show) editor.Show(); return editor;
             }
             return null;

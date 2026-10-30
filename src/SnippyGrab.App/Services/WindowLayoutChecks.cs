@@ -37,10 +37,27 @@ internal static class WindowLayoutChecks
                 results.Add(new { monitor.Index, monitor.Bounds, monitor.Work, monitor.Dpi, Normal = normal.Pixels, MaximizedVisible = visible.Pixels, Restored = restored.Pixels });
             }
             finally { window.Close(); owner.Close(); }
+            await CheckDesignMonitor(monitor);
         }
         Require(results.Count > 0, "No monitors available for native layout verification.");
         await CheckWorkspaceReuse();
         await File.WriteAllTextAsync(report, JsonSerializer.Serialize(new { Result = "PASS", Monitors = results, WorkspaceReuse = true, Scope = "Native WPF owner-monitor placement, work-area bounds, maximize visible frame, restore and minimized-window activation on every attached monitor; repeated workspace launch, saved-design identity, empty-workspace reuse, distinct-document preservation and singleton restoration. Synthetic geometry tests cover negative origins and taskbar offsets; unavailable display arrangements and physical gestures remain separate." }, new JsonSerializerOptions { WriteIndented = true }));
+    }
+    private static async Task CheckDesignMonitor(MonitorInfo monitor)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "SnippyGrab-design-monitor-" + Guid.NewGuid().ToString("N"));
+        var window = new DesignWindow(root, (_, _, _, _) => Task.CompletedTask, _ => Task.FromResult(true), diagnostic: true, initialMonitor: monitor) { ShowActivated = false };
+        try
+        {
+            window.Show();
+            var deadline = DateTime.UtcNow.AddSeconds(25);
+            while (!window.Ready) { Require(DateTime.UtcNow < deadline, "Design workspace did not initialize for monitor checks."); await Task.Delay(25); }
+            Require(WindowPlacement.ForWindow(window).Handle == monitor.Handle, "Design workspace lost the launch monitor after asynchronous preparation.");
+            window.WindowState = WindowState.Maximized; await Task.Delay(120);
+            using var layout = JsonDocument.Parse(await window.Editor.CoreWebView2.ExecuteScriptAsync("({top:document.querySelector('header').getBoundingClientRect().top,bottom:document.querySelector('footer').getBoundingClientRect().bottom,height:innerHeight})"));
+            Require(layout.RootElement.GetProperty("top").GetDouble() >= 0 && layout.RootElement.GetProperty("bottom").GetDouble() <= layout.RootElement.GetProperty("height").GetDouble() + 1, "Maximized design workspace clipped its header or footer.");
+        }
+        finally { window.CloseForDiagnostics(); }
     }
     private static async Task CheckWorkspaceReuse()
     {

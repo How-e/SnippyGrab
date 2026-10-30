@@ -28,9 +28,9 @@ internal sealed class DesignWindow : Window
     internal WebView2 Editor => editor;
     internal bool Matches(DesignDocument document, string? savedPath) => session?.Document.Id == document.Id ||
         (path is not null && savedPath is not null && string.Equals(Path.GetFullPath(path), Path.GetFullPath(savedPath), StringComparison.OrdinalIgnoreCase));
-    internal DesignWindow(string dataDirectory, Func<byte[], int, int, string, Task> addToShelf, Func<string, Task<bool>> copyBrief, DesignDocument? initial = null, string? savedPath = null, bool diagnostic = false)
+    internal DesignWindow(string dataDirectory, Func<byte[], int, int, string, Task> addToShelf, Func<string, Task<bool>> copyBrief, DesignDocument? initial = null, string? savedPath = null, bool diagnostic = false, MonitorInfo? initialMonitor = null)
     {
-        Ui.StyleWindow(this); Title = "SnippyGrab · UI Design"; Width = 1320; Height = 900; MinWidth = 800; MinHeight = 550;
+        Ui.StyleWindow(this, initialMonitor: initialMonitor); Title = "SnippyGrab · UI Design"; Width = 1320; Height = 900; MinWidth = 800; MinHeight = 550;
         root = Path.Combine(dataDirectory, "designs"); ManagedPath.RejectRedirects(root); Directory.CreateDirectory(root); shelf = addToShelf; clipboard = copyBrief; this.diagnostic = diagnostic; Content = editor;
         if (initial is not null) { session = new(initial); path = savedPath; if (savedPath is not null) { savedRevision = initial.Revision; fingerprint = initial.LoadedFingerprint ?? DesignStore.Fingerprint(savedPath); } }
         Loaded += async (_, _) =>

@@ -4,7 +4,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'sign-artifact.ps1')
 if ($ExpectedPublisher -and -not $SigningThumbprint) { throw 'ExpectedPublisher requires SigningThumbprint.' }
 Test-SnippyBundle $Bundle
-foreach ($required in @('BUILD-PROVENANCE.json', 'update-helper.ps1', 'install-files.ps1')) {
+foreach ($required in @('BUILD-PROVENANCE.json', 'update-helper.ps1', 'install-files.ps1', 'Design/editor.html', 'Design/editor.js', 'Design/editor.css', 'Design/scene.js', 'Design/capture.js', 'Design/manifest.json', 'Design/extension/background.js', 'licenses/WebView2-LICENSE.txt')) {
     if (-not (Test-Path -LiteralPath (Join-Path $Bundle $required) -PathType Leaf)) { throw "Release bundle is missing $required." }
 }
 . (Join-Path $PSScriptRoot 'webp-policy.ps1')

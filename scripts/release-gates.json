@@ -13,7 +13,7 @@
       "id": "Q2",
       "priority": 0,
       "owner": "Agent",
-      "closed": true,
+      "closed": false,
       "milestone": 5,
       "title": "Make editor close and Exit failure-safe"
     },
@@ -61,7 +61,7 @@
       "id": "Q8",
       "priority": 1,
       "owner": "Shared",
-      "closed": true,
+      "closed": false,
       "milestone": 1,
       "title": "Validate every capture mode and selection edge"
     },
@@ -149,7 +149,7 @@
       "id": "Q19",
       "priority": 1,
       "owner": "Shared",
-      "closed": true,
+      "closed": false,
       "milestone": 3,
       "title": "Complete keyboard/accessibility acceptance"
     },
@@ -423,6 +423,8 @@
       "name": "Capture",
       "tests": [
         "tests/SnippyGrab.Tests/CaptureGeometryTests.cs",
+        "tests/SnippyGrab.Tests/DesignDocumentTests.cs",
+        "tests/SnippyGrab.IntegrationTests/DesignIntegrationTests.cs",
         "tests/SnippyGrab.Tests/HotkeyRegistrationTests.cs",
         "tests/SnippyGrab.IntegrationTests/OverlayLayoutTests.cs"
       ]

@@ -1,8 +1,8 @@
 # ADR 003 — editable UI layers and agent handoff
 
-Date: 2026-10-29. Status: product direction selected; implementation design, not a shipped feature.
+Date: 2026-10-29. Status: implemented for a local unsigned alpha; acceptance remains bounded by [UI-DESIGN.md](UI-DESIGN.md).
 
-The owner selected independent design layers, with their own SnippyGrab interaction design, for editing a project UI and handing the requested changes to an implementation agent. This supersedes the HTML-first recommendation and retires [ADR-001](ADR-001-ASSISTED-SCROLLING.md). Assisted scrolling is removed in this change. The replacement has no production entry point until its import, persistence, editor and export contracts work together.
+The owner selected independent design layers, with their own SnippyGrab interaction design, for editing a project UI and handing the requested changes to an implementation agent. This supersedes the HTML-first recommendation and retires [ADR-001](ADR-001-ASSISTED-SCROLLING.md). Assisted scrolling is removed. The owner subsequently authorized F13–F17 implementation, local commits and a local-only release without pushing to GitHub. Tray → UI Design is the production entry point.
 
 ## Decisions
 
@@ -30,5 +30,5 @@ The [feature design](UI-DESIGN.md) specifies interaction, document/change contra
 ## Reference behavior
 
 - [pen.dev import/export](https://docs.pen.dev/core-concepts/import-and-export): webpage/element import as layers and separate screenshot capture; imported layers omit source JavaScript interactions. Used as capability reference, not a UI to reproduce.
-- [WebView2 WPF](https://learn.microsoft.com/en-us/microsoft-edge/webview2/get-started/wpf) and [host security](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/security): candidate hosting boundary. No dependency is added by this design change.
-- [Chrome native messaging](https://developer.chrome.com/docs/extensions/develop/concepts/native-messaging): candidate extension-to-desktop transport; large assets need bounded chunking or a negotiated transfer mechanism.
+- [WebView2 WPF](https://learn.microsoft.com/en-us/microsoft-edge/webview2/get-started/wpf) and [host security](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/security): implemented hosting boundary; the pinned SDK is admitted under the dependency policy.
+- [Chrome native messaging](https://developer.chrome.com/docs/extensions/develop/concepts/native-messaging): implemented extension-to-desktop transport with an explicit incoming 64 MiB admission limit and registered-origin checks.

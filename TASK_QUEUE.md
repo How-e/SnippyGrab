@@ -6,18 +6,18 @@ New work uses F identifiers to avoid confusing it with Q1–Q51 in `scripts/rele
 
 ## Current cycle — UI Design, 2026-10-29
 
-Owner direction: independent editable design layers for a project UI, with tracked changes and an implementation-agent handoff. Assisted scrolling is removed. The replacement is in design; it has no production app entry point. [Feature design and acceptance](docs/UI-DESIGN.md) · [ADR-003](docs/ADR-003-UI-DESIGN-LAYERS.md).
+Owner direction: independent editable design layers for a project UI, with tracked changes and an implementation-agent handoff. Assisted scrolling is removed. The replacement is implemented for a local unsigned alpha under Tray → UI Design; acceptance limitations remain explicit. [Feature design and acceptance](docs/UI-DESIGN.md) · [ADR-003](docs/ADR-003-UI-DESIGN-LAYERS.md).
 
 | Order | ID | Priority | Task | Size | Dependencies / owner | Status |
 |---|---|---|---|---|---|---|
-| 1 | F12 | P1 | Remove assisted scrolling and design the layer-edit-to-agent workflow | M | Owner direction; Agent | Removal implemented; design/interaction concept prepared; production replacement not implemented |
-| 2 | F13 | P1 | Build versioned layer documents, commands, persistence and net-change tracking | L | F12; Agent | Planned |
-| 3 | F14 | P1 | Prove browser import, layer conversion and renderer fidelity | XL | F13; dependency/runtime admission; Agent | Planned; feasibility and measurements required |
-| 4 | F15 | P1 | Build the native layer workspace and accessible editing controls | XL | F14; Agent + desktop acceptance | Planned |
-| 5 | F16 | P1 | Build reviewed changes and portable agent handoff | L | F15; Agent + independent implementation exercise | Planned; completes the first URL/localhost workflow |
-| 6 | F17 | P2 | Add existing-tab import and implementation recapture comparison | L | F16; browser/native-host admission + desktop acceptance | Planned |
+| 1 | F12 | P1 | Remove assisted scrolling and design the layer-edit-to-agent workflow | M | Owner direction; Agent | Implemented and verified; assisted scrolling retired |
+| 2 | F13 | P1 | Build versioned layer documents, commands, persistence and net-change tracking | L | F12; Agent | Implemented; model/storage/undo/diff regressions pass |
+| 3 | F14 | P1 | Prove browser import, layer conversion and renderer fidelity | XL | F13; dependency/runtime admission; Agent | Implemented; real WebView2 fixture/render and bounded 1k/10k measurements pass; broad fidelity pending |
+| 4 | F15 | P1 | Build the native layer workspace and accessible editing controls | XL | F14; Agent + desktop acceptance | Implemented; production editor bridge/save/copy fixture passes; physical accessibility/gestures pending |
+| 5 | F16 | P1 | Build reviewed changes and portable agent handoff | L | F15; Agent + independent implementation exercise | Implemented; verified review/ZIP/visual inventory; independent external-agent exercise pending |
+| 6 | F17 | P2 | Add existing-tab import and implementation recapture comparison | L | F16; browser/native-host admission + desktop acceptance | Implemented; bounded protocol/comparison fixtures pass; live signed-in extension acceptance pending |
 
-F13–F17 are implementation briefs, not claims of delivered functionality. Begin with one scoped item when implementation is requested. Existing signing and release prerequisites remain applicable to publication.
+F13–F17 implementation was authorized together with local commits and a local-only release. Implemented functionality and automated evidence do not close owner/physical acceptance. Do not push commits/tags or publish these artifacts to GitHub until separately requested. Existing signing and release prerequisites remain applicable to publication.
 
 ## Earlier cycle — historical status
 

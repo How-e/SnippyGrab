@@ -106,7 +106,7 @@ Older acceptance summaries reported 51/51 closure for a particular accepted buil
 
 ## F12–F17 — UI Design replacement
 
-The owner selected independent design layers with tracked changes and agent handoff on 2026-10-29. F12 removes assisted scrolling and prepares the design; F13–F17 are future implementation stages. Use [UI-DESIGN.md](UI-DESIGN.md) for contracts, integration boundaries, dependency order and acceptance criteria, and [ADR-003](ADR-003-UI-DESIGN-LAYERS.md) for the architectural decision. The interaction concept is synthetic and does not establish a production importer/editor. No new browser dependency is admitted by this design pass.
+The owner selected independent design layers with tracked changes and agent handoff on 2026-10-29, then authorized the complete F13–F17 implementation, local commits and local-only packaging. F12 retires assisted scrolling. F13–F17 are implemented with bounded automated evidence and explicit remaining physical/external acceptance. Use [UI-DESIGN.md](UI-DESIGN.md) for contracts, integration boundaries and acceptance, and [ADR-003](ADR-003-UI-DESIGN-LAYERS.md) for the decision. The original synthetic interaction concept is separate from the real WebView2 importer/editor checks. The pinned browser SDK is admitted under [DEPENDENCY-REVIEW.md](DEPENDENCY-REVIEW.md).
 
 ## F08 — Scrolling feasibility and scope decision
 
@@ -124,7 +124,7 @@ The owner selected independent design layers with tracked changes and agent hand
 
 ## F09 — Bounded assisted scrolling capture
 
-**Removed 2026-10-29.** Historical brief below; do not implement or restore this workflow. Its replacement is in design under [UI Design](UI-DESIGN.md).
+**Removed 2026-10-29.** Historical brief below; do not implement or restore this workflow. Its replacement is implemented under [UI Design](UI-DESIGN.md).
 
 **Integration after F08 approval:** a session coordinator in App separate from one-shot `CaptureService`, a pure overlap/layout component in Core, a small preview/control view and existing ImageService/PNG repository commit. F07 supplies layout/budget conventions; scrolling needs its own alignment logic. Keep frames private to the session until confirmed final output; do not auto-copy each frame.
 

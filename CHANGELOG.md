@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.0-alpha.20261029.1 — 2026-10-29 (local only)
+
+- Replaced assisted scrolling with UI Design: independent editable layers imported from a URL, localhost project, local HTML or optional existing-tab browser extension.
+- Added layer selection, drag/resize, inline property/text editing, typography/appearance, primitives, grouping, duplication, reparenting, alignment, visibility/locking, intent and implementation scope. Original/edited comparison and net changes distinguish the final request from edit history.
+- Added versioned portable design files, bounded transactional undo/redo, atomic saves, stale-save protection, owned recovery snapshots and PNG shelf links back to editable designs.
+- Added reviewed agent briefs and verified ZIP handoffs with structured changes, source evidence, matching original/edited images and affected-region crops. Private targets are removed from scene/history/image evidence, including overlapping raster regions. No agent message or cloud upload occurs automatically.
+- Added an optional unpacked Chrome/Edge extension and explicitly registered per-user native messaging bridge, plus implementation recapture/context and pixel-difference reports.
+- Admitted a pinned WebView2 SDK and optional installed Evergreen Runtime. Browser privileges, navigation, resources, native messages and package admission are bounded; missing-runtime guidance preserves ordinary screenshot functionality.
+- This unsigned alpha is built and tagged locally only. New workspace close/capture/accessibility acceptance is reopened; broad browser fidelity, live signed-in extension workflows, clean-profile prerequisites, independent agent implementation and prolonged resource behavior remain separate acceptance work.
+
 ## 0.1.0-alpha.20261028.1 — 2026-10-28
 
 - Isolated capture PNG delivery and clipboard image preparation from long exports and editor effects. Native OCR keeps its separate reusable worker; release verification now checks production OCR isolation, real recognition and engine reuse in the packaged build.

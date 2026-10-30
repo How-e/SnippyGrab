@@ -12,6 +12,17 @@ public partial class App : Application
     {
         base.OnStartup(e);
         Native.SetDefaultDllDirectories(0x1000); // Default safe locations; never the working directory.
+        if (e.Args.Contains("--check-ui-design"))
+        {
+            var report = e.Args.SkipWhile(a => a != "--check-ui-design").Skip(1).FirstOrDefault(); if (report is null) { Shutdown(1); return; }
+            try { await DesignChecks.Run(report); Shutdown(0); } catch (Exception ex) { File.WriteAllText(report, "FAILED: " + ex); Shutdown(1); }
+            return;
+        }
+        if (e.Args.FirstOrDefault()?.StartsWith("chrome-extension://", StringComparison.Ordinal) == true)
+        {
+            try { await DesignBrowserBridge.RunHost(e.Args[0]); Shutdown(0); } catch { Shutdown(1); }
+            return;
+        }
         if (e.Args.Contains("--check-ocr-scheduling"))
         {
             var report = e.Args.SkipWhile(a => a != "--check-ocr-scheduling").Skip(1).FirstOrDefault();
@@ -118,11 +129,12 @@ public partial class App : Application
                     Dispatcher.BeginInvoke(new Action(() =>
                     {
                         if (controller is not { Exiting: false }) return;
-                        controller.Try(() => { controller.Dock.FocusShelf(); if (!controller.Dock.IsVisible) controller.ShowHistory(); });
+                        controller.Run(async () => { if (!await controller.OpenDesignInbox()) { controller.Dock.FocusShelf(); if (!controller.Dock.IsVisible) controller.ShowHistory(); } });
                     }));
                 }
                 catch (InvalidOperationException) when (Dispatcher.HasShutdownStarted) { }
             });
+            if (e.Args.Contains("--design-inbox")) await controller.OpenDesignInbox();
         }
         catch (Exception ex) { MessageBox.Show("SnippyGrab could not start. " + OperationFailure.From(ex).Message, "SnippyGrab"); Shutdown(1); }
     }

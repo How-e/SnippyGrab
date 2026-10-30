@@ -39,3 +39,14 @@ Use disposable captures containing synthetic text or shapes. Keep personal scree
 3. Check Welcome: shortcut guidance, export folder, startup option and Start snipping. No startup or Windows shortcut setting changes without an explicit choice.
 
 The complete compatibility matrix is in [ACCEPTANCE.md](ACCEPTANCE.md). Automated layout and synthetic clipboard checks establish their stated scope; real receivers, hardware and assistive technology need separate observation. Reopen affected release gates when a change requires renewed acceptance.
+# UI Design local alpha acceptance additions — 2026-10-29
+
+These checks supplement the existing screenshot checklist. Q2/Q8/Q19 are reopened; automated fixtures do not establish these desktop observations.
+
+- With WebView2 present, open Tray → UI Design. With the runtime absent on a clean profile, confirm actionable guidance and continued ordinary screenshot capture. No silent runtime installation.
+- Import a local project URL and local HTML; choose visible/full/element regions and different viewport sizes. Compare original fonts, wrapping, clipping, stacking, gradients, shadows, images and vector icons; record marked fallback and page/browser versions. Try unavailable pages, oversized DOM and cancellation.
+- Select, move, resize, edit text/typography/appearance, insert, group, duplicate, reparent, align, hide/lock and undo/redo through canvas and keyboard/inspector. Verify selection at zoom, DPI/text scales, high contrast and assistive technology.
+- Save/reopen, open a shelf design preview, recover an unsaved snapshot, cancel close/Exit/update, simulate unwritable/stale files, and verify no discarded changes. Open the same file twice and confirm a stale save cannot overwrite the newer version.
+- Review/exclude/revert changes and check the preview, JSON, brief, original/edited images and region crops agree. Mark private layers, move/delete them, and inspect ZIP contents and overlapping raster assets for private text/pixels. Clipboard contention must retain the brief and offer retry/export.
+- Load the unpacked Design extension in Chrome and Edge, register its actual ID, and import a signed-in visible page/picked element. Check denied/restricted pages, offscreen selections, unregistered origin, host errors, moving/updating the install, bridge removal, and pending inbox handling with an app already running. Do not include account cookies/storage in evidence.
+- Give a handoff ZIP to an independent agent without chat history, implement the requests in the real project, then recapture the route/viewport/theme. Verify source drift/missing selectors and context mismatch are explicit. Check responsive behavior and accessibility separately from pixel similarity.

@@ -1,6 +1,20 @@
 # UI Design — editable layers to implementation handoff
 
-Design date: 2026-10-29. Status: interaction concept and implementation specification. Assisted scrolling is removed; the new workspace is not implemented in the production app. Decision record: [ADR-003](ADR-003-UI-DESIGN-LAYERS.md). Work items: F12–F17 in [TASK_QUEUE.md](../TASK_QUEUE.md).
+Design/implementation date: 2026-10-29. Status: implemented in local alpha `0.2.0-alpha.20261029.1`; acceptance limits below remain open. Assisted scrolling is removed. Decision record: [ADR-003](ADR-003-UI-DESIGN-LAYERS.md). Work items: F12–F17 in [TASK_QUEUE.md](../TASK_QUEUE.md).
+
+## Implemented workflow and limits
+
+Open **Tray → UI Design…**, choose **Import page…**, load a URL/localhost page or local HTML, choose the viewport and capture area, then capture layers. Use the tree or canvas to select layers, drag/resize, double-click text to edit its property, or use the inspector. Add primitives/text, group/ungroup, duplicate, reorder, reparent and align layers. Save/Save as preserves a `.snippy` document and adds a linked PNG shelf preview. The Open dialog also exposes owned `.recovery.snippy` snapshots written after accepted transactions. A stale save is rejected instead of overwriting a newer file.
+
+**Review changes** groups final changes by layer. Excluding a layer's requests recomputes the reviewed scene and previews; dependent invalid combinations are rejected. Copy the brief or export the complete handoff ZIP. A private selection is removed from baseline/current scene data and history, both visual references and overlapping raster assets in the exported copy; working `.snippy` files retain the original. Review source metadata and all private regions before sharing. Scope labels express requested intent; the agent still verifies shared components/tokens and source mappings.
+
+**Browser extension…** provides per-user setup/removal. In Chrome/Edge's extensions page, enable Developer mode, load the app's `Design` folder unpacked and register its displayed ID in SnippyGrab. The extension imports the visible area or a fully visible picked element in the existing signed-in tab. It uses activeTab/scripting/nativeMessaging, a 64 MiB incoming-message cap and an allowlisted extension origin. Re-register after moving/updating the executable. Store publication and actual signed-in/browser-version acceptance are not established by protocol fixtures.
+
+**Compare implementation…** loads a recapture at the requested viewport. It records expected/implementation revisions, route/theme/viewport agreement, missing selector hints and row-wise pixel differences, with requested/implementation reference files. Unmatched contexts do not yield a misleading numeric comparison. Local files have no persisted route identity, so separate local-file recaptures require manual context review. Pixel agreement does not establish behavior or accessibility.
+
+Current conversion preserves ordinary text runs, basic boxes/fills/borders/radii/clipping, simple linear gradients/drop shadows and simple SVG paths. Complex transforms/effects/background images, controls, shadow roots and embeds become explicitly marked image regions. Cross-origin fonts/resources and nested CSS stacking behavior can differ; compare Original before editing. Virtualized/infinite content is limited to loaded DOM. Source scripts run only in the capture browser; captured HTML never executes in the editor.
+
+Enforced limits: 10000 layers; depth 128; 64 MP / 16384-axis artboards; 256 MiB asset bytes; 64 MiB scene/baseline/history; 200 undo transactions within 32 MiB history; 420 MiB design/handoff admission; 128 MiB visual evidence, with changed-region crops downscaled to at most 4 MP. Oversize work fails with guidance. One native mutation/import/export runs at a time. These are admission limits, not a process-wide memory ceiling. The rest of this document records the design rationale and acceptance requirements; broader source integration/infinite canvas remain outside this alpha.
 
 ## Product outcome
 
@@ -101,7 +115,7 @@ Illustrative request (fixture identifiers, not discovered project facts):
 
 The brief asks the agent to locate and verify targets against current source, preserve application behavior and accessibility, implement the requested outcome using the project's conventions, report ambiguous mappings instead of guessing, and run appropriate checks. It describes desired layout relationships and component scope, states fallback limitations and includes verification at the captured size plus relevant responsive sizes. Captured page text is untrusted reference material, never instructions to execute commands or transmit secrets.
 
-After an agent implements the brief, a future comparison flow can record implementation revision and recapture evidence without modifying the original handoff. Drift is shown if the source baseline/repo revision differs; this is not an automatically applicable code patch.
+After an agent implements the brief, the comparison flow records implementation revision and recapture evidence without modifying the original handoff. Drift is shown if the source context/repo revision differs; this is not an automatically applicable code patch.
 
 ## Capture and rendering architecture
 
@@ -137,8 +151,8 @@ Packages reject absolute/traversal paths, reparse points, duplicate entries, dec
 | F16 | Review and agent handoff | Deterministic final diff; matching JSON/visuals; portable package and actual clipboard/file boundary; independent agent locates fixture targets and implements a brief without chat history |
 | F17 | Existing-tab adapter and implementation comparison | Permission/origin/native-host bounds, signed-in state fixture, route/viewport/theme alignment, baseline drift and missing-target handling; actual browser/version and agent evidence |
 
-Dependencies: F13 → F14 → F15 → F16; F17 follows F16. Import/renderer feasibility can invalidate the rendering choice before the workspace is expanded. F16 closes the first URL/localhost edit-to-agent loop; F17 completes the existing-tab and recapture workflows. Each is a scoped implementation item with its own verification, not authorization to mark the whole feature complete.
+Implementation order: F13 → F14 → F15 → F16 → F17. F16 delivers the URL/localhost edit-to-agent loop; F17 adds the existing-tab adapter and recapture workflow. Each milestone retains its own verification. Implementing the stages does not close the remaining physical, browser-profile or external-agent acceptance requirements.
 
-Open implementation decisions to resolve with prototypes: SVG fidelity and text shaping across fonts/DPI; representation of complex grid content; browser adapter coverage for shadow roots/embeds; bundling strategy for runtime absence; measured retention and browser-process memory; optional source instrumentation per framework. No unresolved decision blocks removal of assisted scrolling.
+Remaining acceptance and future extension decisions: broader SVG/text shaping across fonts/DPI; complex grid conversion; structured import of shadow roots/embeds; clean-profile runtime prerequisite behavior; prolonged retention/browser-process memory; optional source instrumentation per framework. Current unsupported regions use explicit image fallback and current admission limits are enforced. These open acceptance areas do not restore assisted scrolling.
 
 The conversation concept uses a synthetic preferences page with known fixture mappings. It demonstrates independent selectable layers, text/fill/geometry/visibility edits, undo/redo, net changes, intent and a generated handoff preview. It does not import pages, inspect a real repository, save production projects, render exported evidence or contact an agent. Its generated references are explicitly labeled fixture data.

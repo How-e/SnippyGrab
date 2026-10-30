@@ -17,7 +17,7 @@ public sealed class DesignSession
         Document.ValidateLayers(next);
         var changes = Changes(Document.Layers, next);
         if (changes.Count == 0) return;
-        var transaction = new DesignTransaction(name, DateTimeOffset.UtcNow, changes);
+        var transaction = new DesignTransaction(name, DateTimeOffset.UtcNow, changes) { BaseRevision = Document.Revision };
         var history = Document.History.Take(Document.Head).Append(transaction).TakeLast(200).ToList();
         if (JsonSerializer.SerializeToUtf8Bytes(history, DesignDocument.Json).Length > 32 * 1024 * 1024) throw new InvalidDataException("Undo history exceeds 32 MiB; save a new design snapshot before more edits.");
         foreach (var n in next)
@@ -108,7 +108,7 @@ public sealed class DesignSession
             }
             foreach (var property in after.EnumerateObject())
             {
-                if (property.Name is "id" or "source" or "private" or "locked") continue;
+                if (property.Name is "id" or "source" or "private" or "locked" or "name" or "scope") continue;
                 var b = before.GetProperty(property.Name); if (b.GetRawText() == property.Value.GetRawText()) continue;
                 result.Add(new(target.Id + "-" + property.Name, target.Id, target.Name, property.Name == "text" ? "setText" : property.Name == "parent" ? "reparent" : "setProperty", property.Name, b, property.Value, target.Scope, target.Intent, target.Source));
             }

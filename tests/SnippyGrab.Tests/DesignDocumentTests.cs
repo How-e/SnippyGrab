@@ -10,6 +10,23 @@ public sealed class DesignDocumentTests
         var document = new DesignDocument { Layers = [new() { Id = "frame", Width = 400, Height = 300 }, new() { Id = "title", Kind = "text", Parent = "frame", Text = "Before" }, new() { Id = "body", Parent = "frame", Y = 60 }] }; document.SealBaseline(); return document;
     }
     [Fact]
+    public void LayerOrganizationMetadataDoesNotBecomeAnImplementationRequest()
+    {
+        var s = new DesignSession(Fixture()); s.Apply("organize", nodes => { nodes[1].Name = "Heading layer"; nodes[1].Scope = "component"; nodes[1].Locked = true; }); Assert.Empty(s.NetChanges());
+        s.Apply("intent", nodes => nodes[1].Intent = "Support narrow screens."); Assert.Single(s.NetChanges()); Assert.Equal("component", s.NetChanges()[0].Scope);
+    }
+    [Fact]
+    public void ConcurrentDesignSavesRejectStaleAndLateFiles()
+    {
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".snippy");
+        try
+        {
+            var d = Fixture(); DesignStore.Save(path, d); var hash = DesignStore.Fingerprint(path); Assert.Equal(hash, DesignStore.Load(path).LoadedFingerprint); var s = new DesignSession(d); s.Apply("move", n => n[0].X = 12); DesignStore.Save(path, d, hash);
+            Assert.Throws<IOException>(() => DesignStore.Save(path, Fixture(), hash)); Assert.Throws<IOException>(() => DesignStore.Save(path, Fixture(), "")); Assert.Equal(12, DesignStore.Load(path).Layers[0].X);
+        }
+        finally { File.Delete(path); }
+    }
+    [Fact]
     public void ReparentPreservesPositionAndRejectsCycles()
     {
         var d = Fixture(); d.Layers[0].X = 20; d.Layers[1].X = 10; d.SealBaseline(); var s = new DesignSession(d);
@@ -73,6 +90,7 @@ public sealed class DesignDocumentTests
     [Fact]
     public void CorruptBaselineSourcePathsAndUnsupportedVersionsFailClosed()
     {
+        using var oversized = JsonDocument.Parse("{\"LAYERS\":[" + string.Join(',', Enumerable.Repeat("{}", 10001)) + "]}"); Assert.Throws<InvalidDataException>(() => DesignDocument.ValidateEnvelope(oversized.RootElement));
         var d = Fixture(); d.Baseline[0].X = 20; Assert.Throws<InvalidDataException>(d.Validate);
         d = Fixture(); d.Layers[0].Source.File = "../secret"; Assert.Throws<InvalidDataException>(d.Validate);
         d = Fixture(); d.SchemaVersion = 2; Assert.Throws<InvalidDataException>(d.Validate);

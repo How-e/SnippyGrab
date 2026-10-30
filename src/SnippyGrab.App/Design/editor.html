@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width,initial-scale=1" />
+        <meta
+            http-equiv="Content-Security-Policy"
+            content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src data: blob:; font-src data:; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"
+        />
+        <title>SnippyGrab UI Design</title>
+        <link rel="stylesheet" href="editor.css" />
+        <script defer src="scene.js"></script>
+        <script defer src="editor.js"></script>
+    </head>
+    <body>
+        <header>
+            <strong>SnippyGrab <span>/ UI Design</span></strong>
+            <nav>
+                <button data-command="import">Import page…</button
+                ><button data-command="open">Open…</button
+                ><button data-command="save">Save</button
+                ><button data-command="save-as">Save as…</button
+                ><button data-command="undo">Undo</button
+                ><button data-command="redo">Redo</button
+                ><button id="compare">Original</button
+                ><button id="review" class="primary">
+                    Review changes <span id="count">0</span>
+                </button>
+            </nav>
+        </header>
+        <div class="document">
+            <span id="name">Import a project page or open a design</span
+            ><span id="source"></span
+            ><button data-command="recapture">Compare implementation…</button
+            ><button data-command="bridge">Browser extension…</button>
+        </div>
+        <main>
+            <aside class="layers">
+                <div class="panel-title">
+                    Layers <span id="layer-count"></span>
+                </div>
+                <div
+                    id="tree"
+                    role="listbox"
+                    aria-multiselectable="true"
+                    aria-label="Design layers"
+                >
+                    <div id="tree-space"></div>
+                </div>
+                <div class="layer-actions">
+                    <button data-command="group">Group</button
+                    ><button data-command="ungroup">Ungroup</button
+                    ><button data-command="duplicate">Duplicate</button
+                    ><button data-command="delete">Delete</button
+                    ><button data-command="up">Raise</button
+                    ><button data-command="down">Lower</button
+                    ><button data-command="add-text">Add text</button
+                    ><button data-command="add-frame">Add rectangle</button
+                    ><button data-command="add-ellipse">Add ellipse</button
+                    ><button data-command="align-left">Align left</button
+                    ><button data-command="align-top">Align top</button
+                    ><button data-command="align-center">Center</button>
+                </div>
+            </aside>
+            <section class="workspace">
+                <div class="canvas-bar">
+                    <span id="dimensions">No design loaded</span
+                    ><span id="coordinates"></span>
+                    <div>
+                        <button id="zoom-out" aria-label="Zoom out">−</button
+                        ><button id="zoom-fit">Fit</button
+                        ><button id="zoom-in" aria-label="Zoom in">+</button>
+                    </div>
+                </div>
+                <div
+                    id="viewport"
+                    tabindex="0"
+                    aria-label="Design canvas. Use the layer list and properties for keyboard editing."
+                >
+                    <div id="artboard"></div>
+                    <div id="selection"></div>
+                    <div id="resize" aria-hidden="true"></div>
+                </div>
+                <div id="limitations"></div>
+            </section>
+            <aside class="inspector">
+                <div class="tabs">
+                    <button id="properties-tab" aria-pressed="true">
+                        Properties</button
+                    ><button id="changes-tab" aria-pressed="false">
+                        Changes
+                    </button>
+                </div>
+                <section id="properties">
+                    <strong id="selected-name">Select a layer</strong
+                    ><label
+                        >Name<input
+                            data-property="name"
+                            maxlength="500" /></label
+                    ><label>Container<select id="parent"></select></label
+                    ><label id="text-field"
+                        >Text<textarea
+                            data-property="text"
+                            rows="3"
+                            maxlength="100000"
+                        ></textarea>
+                    </label>
+                    <div class="pair">
+                        <label
+                            >X<input
+                                data-property="x"
+                                type="number"
+                                step="1" /></label
+                        ><label
+                            >Y<input data-property="y" type="number" step="1"
+                        /></label>
+                    </div>
+                    <div class="pair">
+                        <label
+                            >Width<input
+                                data-property="width"
+                                type="number"
+                                min="1"
+                                max="16384" /></label
+                        ><label
+                            >Height<input
+                                data-property="height"
+                                type="number"
+                                min="1"
+                                max="16384"
+                        /></label>
+                    </div>
+                    <div class="pair">
+                        <label
+                            >Fill<input
+                                data-property="fill"
+                                pattern="#[a-fA-F0-9]{6}([a-fA-F0-9]{2})?"
+                                maxlength="9" /></label
+                        ><label
+                            >Radius<input
+                                data-property="radius"
+                                type="number"
+                                min="0"
+                                max="1000"
+                        /></label>
+                    </div>
+                    <div class="pair">
+                        <label
+                            >Text size<input
+                                data-property="fontSize"
+                                type="number"
+                                min="1"
+                                max="1000" /></label
+                        ><label
+                            >Opacity<input
+                                data-property="opacity"
+                                type="number"
+                                min="0"
+                                max="1"
+                                step="0.05"
+                        /></label>
+                    </div>
+                    <div class="pair">
+                        <label
+                            >Stroke<input
+                                data-property="stroke"
+                                maxlength="9" /></label
+                        ><label
+                            >Stroke size<input
+                                data-property="strokeWidth"
+                                type="number"
+                                min="0"
+                                max="1000"
+                        /></label>
+                    </div>
+                    <div class="pair">
+                        <label
+                            >Weight<input
+                                data-property="fontWeight"
+                                type="number"
+                                min="1"
+                                max="1000"
+                                step="100" /></label
+                        ><label
+                            >Line height<input
+                                data-property="lineHeight"
+                                type="number"
+                                min="1"
+                                max="2000"
+                        /></label>
+                    </div>
+                    <label
+                        >Rotation<input
+                            data-property="rotation"
+                            type="number"
+                            min="-36000"
+                            max="36000" /></label
+                    ><label
+                        >Font family<input
+                            data-property="fontFamily"
+                            maxlength="300"
+                    /></label>
+                    <div class="pair">
+                        <label
+                            >Layout<select data-property="layout">
+                                <option value="free">Free</option>
+                                <option value="vertical">Vertical stack</option>
+                                <option value="horizontal">
+                                    Horizontal stack
+                                </option>
+                            </select></label
+                        ><label
+                            >Gap<input
+                                data-property="gap"
+                                type="number"
+                                min="0"
+                                max="1000"
+                        /></label>
+                    </div>
+                    <div class="checks">
+                        <label
+                            ><input type="checkbox" data-property="visible" />
+                            Visible</label
+                        ><label
+                            ><input type="checkbox" data-property="locked" />
+                            Locked</label
+                        ><label
+                            ><input type="checkbox" data-property="clip" /> Clip
+                            children</label
+                        ><label
+                            ><input type="checkbox" data-property="private" />
+                            Private in handoff</label
+                        >
+                    </div>
+                    <label
+                        >Intent for the agent<textarea
+                            data-property="intent"
+                            rows="3"
+                            maxlength="4000"
+                        ></textarea></label
+                    ><label
+                        >Apply to<select data-property="scope">
+                            <option value="instance">This instance</option>
+                            <option value="matching">
+                                Matching instances (agent verifies)
+                            </option>
+                            <option value="component">
+                                Component (agent verifies)
+                            </option>
+                            <option value="token">
+                                Shared token (agent verifies)
+                            </option>
+                        </select></label
+                    >
+                    <div id="evidence"></div>
+                    <button data-command="replace-image">Replace image…</button
+                    ><button data-command="revert">Revert layer</button>
+                </section>
+                <section id="changes" hidden></section>
+            </aside>
+        </main>
+        <footer>
+            <span id="status" role="status" aria-live="polite">Ready</span
+            ><span id="revision"></span>
+        </footer>
+        <section id="handoff" hidden>
+            <div class="review-header">
+                <button id="back">← Back to layers</button
+                ><strong>Review agent handoff</strong>
+                <div>
+                    <button data-command="copy">Copy brief</button
+                    ><button data-command="export" class="primary">
+                        Export handoff…
+                    </button>
+                </div>
+            </div>
+            <div class="review-body">
+                <aside>
+                    <p>Include changes</p>
+                    <div id="review-changes"></div>
+                    <p class="muted">
+                        Private content is removed from both reference images
+                        and exported scene data.
+                    </p>
+                </aside>
+                <section>
+                    <div class="review-mode">
+                        <button id="review-original">Original</button
+                        ><button id="review-edited">Edited</button
+                        ><button id="review-brief">Brief</button>
+                    </div>
+                    <div id="review-visual"></div>
+                    <textarea
+                        id="brief"
+                        readonly
+                        aria-label="Agent implementation brief"
+                    ></textarea>
+                </section>
+            </div>
+        </section>
+    </body>
+</html>

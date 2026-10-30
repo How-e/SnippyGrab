@@ -1,6 +1,6 @@
 # Capabilities and evidence
 
-**Current source update, 2026-10-29:** assisted scrolling has been removed. Manual composition and previously created PNGs remain supported. [UI Design](UI-DESIGN.md), a replacement based on editable design layers and tracked agent handoff, is in design and unavailable in the app. The release/build observations below are historical and do not establish acceptance of this change.
+**Local alpha update, 2026-10-29:** assisted scrolling has been removed. [UI Design](UI-DESIGN.md) implements editable layers, page import, tracked net changes, saved/reopened projects, reviewed agent handoff, optional existing-tab import and implementation comparison. The pinned WebView2 SDK is admitted; UI Design requires the installed Evergreen Runtime. Q2/Q8/Q19 are reopened for new close/capture/accessibility acceptance, leaving **38 closed / 13 open** gates. Earlier release observations below do not establish current acceptance. This alpha is local only; no GitHub publication is authorized.
 
 Current source adds History-window/session-name leak fixes, bounded superseded copies, one STA image worker, asynchronous durable capture/revision commits and previews. OCR now rejects inputs above 16 MP before full decoding; generated image output is limited to 100 MiB before commit. See [processing boundaries](PERFORMANCE-BOUNDARIES.md). Earlier owner attestations below describe their stated builds; they do not establish physical acceptance or all-day behavior for these changes.
 

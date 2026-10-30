@@ -46,6 +46,7 @@ internal sealed class AppController : IDisposable
     private SettingsWindow? settingsWindow;
     private HistoryWindow? historyWindow;
     private WelcomeWindow? welcomeWindow;
+    private readonly HashSet<DesignWindow> designWindows = [];
     private readonly string dataDirectory;
     private bool dockWasVisible;
     private bool disposed;
@@ -248,7 +249,36 @@ internal sealed class AppController : IDisposable
         var path = Repository.PathFor(record);
         Notify(await OcrPng(token => Task.Run(() => { ManagedPath.RejectRedirects(path); return ImageService.ReadEncoded(path); }, token), exportLifetime.Token));
     }
-    public void Edit(CaptureRecord record) => Run(async () => { await OpenEditorAsync(record); });
+    public void Edit(CaptureRecord record) => Run(async () =>
+    {
+        if (!string.IsNullOrWhiteSpace(record.DesignPath) && File.Exists(record.DesignPath)) { var document = await Task.Run(() => DesignStore.Load(record.DesignPath)); ShowDesign(document, record.DesignPath); }
+        else await OpenEditorAsync(record);
+    });
+    public void ShowDesign(DesignDocument? document = null, string? savedPath = null)
+    {
+        var window = new DesignWindow(dataDirectory, async (png, width, height, path) =>
+        {
+            var record = await Repository.AddAsync(png, width, height); record.DesignPath = path; await Repository.PersistAsync(); if (!disposed) Dock.Refresh(newCapture: true);
+        }, text => Clipboard.TextAsync(text), document, savedPath);
+        designWindows.Add(window); window.Closed += (_, _) => designWindows.Remove(window); window.Show();
+    }
+    internal async Task<bool> OpenDesignInbox()
+    {
+        var inbox = DesignBrowserBridge.Inbox(dataDirectory); if (!Directory.Exists(inbox)) return false; ManagedPath.RejectRedirects(inbox); var opened = false;
+        foreach (var file in Directory.EnumerateFiles(inbox, "*.json").Take(10))
+        {
+            if (!System.Text.RegularExpressions.Regex.IsMatch(Path.GetFileName(file), "^[a-f0-9]{32}\\.json$")) continue;
+            ManagedPath.RejectRedirects(file); if (new FileInfo(file).Length > 64 * 1024 * 1024) continue;
+            try
+            {
+                using var json = System.Text.Json.JsonDocument.Parse(await File.ReadAllBytesAsync(file)); var capture = json.RootElement.GetProperty("capture").GetRawText(); var screenshot = json.RootElement.GetProperty("screenshot").GetString()!;
+                if (!screenshot.StartsWith("data:image/png;base64,", StringComparison.Ordinal)) throw new InvalidDataException("Invalid browser reference image.");
+                var png = Convert.FromBase64String(screenshot[22..]); var document = await ImageWorker.RunAsync(() => DesignBrowser.FromCapture(capture, png), exportLifetime.Token); ShowDesign(document); File.Delete(file); opened = true;
+            }
+            catch (Exception ex) { Notify("Browser import could not be opened: " + OperationFailure.From(ex).Message); }
+        }
+        return opened;
+    }
     internal async Task<EditorWindow?> OpenEditorAsync(CaptureRecord record, bool show = true)
     {
         if (exitRequested || Exiting) return null;
@@ -485,6 +515,7 @@ internal sealed class AppController : IDisposable
             }
         };
         menu.Items.Add(monitorMenu);
+        Item("UI Design…", "edit", () => ShowDesign());
         menu.Items.Add(new Forms.ToolStripSeparator());
         Item("Show screenshot shelf", "image", Dock.Reveal); Item("Focus screenshot shelf", "capture", Dock.FocusShelf); Item("Recent captures", "history", ShowHistory); Item("Settings", "settings", ShowSettings);
         menu.Items.Add(new Forms.ToolStripSeparator());
@@ -563,6 +594,7 @@ internal sealed class AppController : IDisposable
         ConfigureHotkeys(true);
         try
         {
+            foreach (var design in designWindows.ToArray()) if (!await design.RequestCloseAsync()) return;
             foreach (var editor in editors.Values.ToArray())
                 if (!await editor.RequestCloseAsync()) return;
             foreach (var pin in pins.Values.ToArray()) pin.Close();

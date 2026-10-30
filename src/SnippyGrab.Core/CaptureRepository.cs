@@ -21,6 +21,7 @@ public sealed class CaptureRecord
     public bool Edited { get; set; }
     public bool Saved { get; set; }
     public string ExportPath { get; set; } = "";
+    public string DesignPath { get; set; } = "";
     public bool Dismissed { get; set; }
     public PinLayout? PinLayout { get; set; }
 }
@@ -54,10 +55,10 @@ public sealed partial class CaptureRepository
     private long persistenceVersion;
     private long writtenVersion;
     private readonly record struct CaptureStamp(Guid Id, string File, DateTimeOffset Created, DateTimeOffset? Restored, int Width, int Height,
-        bool DimensionsPending, string Monitor, bool Pinned, bool Edited, bool Saved, string ExportPath, bool Dismissed, PinLayout? PinLayout)
+        bool DimensionsPending, string Monitor, bool Pinned, bool Edited, bool Saved, string ExportPath, bool Dismissed, PinLayout? PinLayout, string DesignPath)
     {
         internal static CaptureStamp From(CaptureRecord c) => new(c.Id, c.FileName, c.CreatedUtc, c.RestoredUtc, c.Width, c.Height,
-            c.DimensionsPending, c.Monitor, c.Pinned, c.Edited, c.Saved, c.ExportPath, c.Dismissed, c.PinLayout);
+            c.DimensionsPending, c.Monitor, c.Pinned, c.Edited, c.Saved, c.ExportPath, c.Dismissed, c.PinLayout, c.DesignPath);
     }
     private sealed record CachedPage(string Name, CaptureStamp[] Stamps);
     public IReadOnlyList<CaptureRecord> Captures => state.Captures;

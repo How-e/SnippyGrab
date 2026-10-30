@@ -93,12 +93,13 @@ public sealed class DesignDocument
     public List<DesignTransaction> History { get; set; } = [];
     public int Head { get; set; }
     public List<string> PrivateIds { get; set; } = [];
+    [JsonIgnore] public string? LoadedFingerprint { get; set; }
     public static JsonSerializerOptions Json { get; } = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, PropertyNameCaseInsensitive = true, MaxDepth = 160, WriteIndented = false, NumberHandling = JsonNumberHandling.Strict };
     public static T Copy<T>(T value) => JsonSerializer.Deserialize<T>(JsonSerializer.SerializeToUtf8Bytes(value, Json), Json)!;
     public static string Hash(byte[] bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
     public string AddAsset(byte[] bytes, string mediaType = "image/png", string family = "")
     {
-        var id = Hash(bytes); Assets.TryAdd(id, new() { Data = Convert.ToBase64String(bytes), MediaType = mediaType, Family = family }); return id;
+        var id = Hash(bytes); if (Assets.Count >= 20000 && !Assets.ContainsKey(id)) throw new InvalidDataException("Design asset inventory exceeds 20000 entries."); Assets.TryAdd(id, new() { Data = Convert.ToBase64String(bytes), MediaType = mediaType, Family = family }); return id;
     }
     public void SealBaseline()
     {
@@ -118,6 +119,7 @@ public sealed class DesignDocument
     {
         if (SchemaVersion != 1 || Id == Guid.Empty || !Finite(Width, 1, 16384) || !Finite(Height, 1, 16384) || Width * Height > 64_000_000 || !Finite(DevicePixelRatio, .1, 8)) throw new InvalidDataException("Unsupported design version or artboard size (64 MP / 16384 per axis).");
         if (Source is null || Source.Url != SafeUrl(Source.Url) || Source.Title.Length > 500 || Source.Project.Length > 2000 || Source.Revision.Length > 200 || Limitations.Count > 1000 || Limitations.Any(s => s.Length > 2000)) throw new InvalidDataException("Invalid design source metadata.");
+        if (Assets.Count > 20000) throw new InvalidDataException("Too many design assets.");
         long total = 0;
         foreach (var (key, asset) in Assets)
         {
@@ -161,6 +163,20 @@ public sealed class DesignDocument
         }
     }
     public static bool Color(string color) => Regex.IsMatch(color, "^#[a-fA-F0-9]{6}([a-fA-F0-9]{2})?$");
+    public static void ValidateEnvelope(JsonElement root)
+    {
+        if (root.ValueKind != JsonValueKind.Object) throw new InvalidDataException("Expected a design object.");
+        long historyChanges = 0;
+        foreach (var property in root.EnumerateObject())
+        {
+            var name = property.Name.ToLowerInvariant(); var value = property.Value;
+            var limit = name switch { "layers" or "baseline" or "privateids" => 10000, "history" => 200, "limitations" => 1000, _ => 0 };
+            if (limit > 0 && (value.ValueKind != JsonValueKind.Array || value.GetArrayLength() > limit)) throw new InvalidDataException("Design collection exceeds its admission limit.");
+            if (name == "assets" && (value.ValueKind != JsonValueKind.Object || value.EnumerateObject().Take(20001).Count() > 20000)) throw new InvalidDataException("Design asset inventory exceeds its admission limit.");
+            if (name == "history") foreach (var transaction in value.EnumerateArray()) foreach (var item in transaction.EnumerateObject())
+                if (item.Name.Equals("changes", StringComparison.OrdinalIgnoreCase) && (item.Value.ValueKind != JsonValueKind.Array || (historyChanges += item.Value.GetArrayLength()) > 50000)) throw new InvalidDataException("Design history exceeds its admission limit.");
+        }
+    }
     public static bool Finite(double value, double min, double max) => double.IsFinite(value) && value >= min && value <= max;
     private static bool ValidAsset(byte[] b, string type) => type switch
     {
@@ -172,4 +188,8 @@ public sealed class DesignDocument
 }
 
 public sealed record DesignLayerChange(string Id, DesignLayer? Before, DesignLayer? After, int BeforeIndex, int AfterIndex);
-public sealed record DesignTransaction(string Name, DateTimeOffset Time, List<DesignLayerChange> Changes);
+public sealed record DesignTransaction(string Name, DateTimeOffset Time, List<DesignLayerChange> Changes)
+{
+    public Guid Id { get; init; } = Guid.NewGuid();
+    public long BaseRevision { get; init; }
+}

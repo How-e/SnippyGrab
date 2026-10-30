@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
@@ -12,15 +13,30 @@ public static class DesignStore
         ManagedPath.RejectRedirects(path);
         using var stream = File.OpenRead(path);
         if (stream.Length > MaxFileBytes) throw new InvalidDataException("Design file exceeds the storage limit.");
-        var document = JsonSerializer.Deserialize<DesignDocument>(stream, DesignDocument.Json) ?? throw new InvalidDataException("Design file is empty.");
-        document.Validate(); return document;
+        using var envelope = JsonDocument.Parse(stream, new JsonDocumentOptions { MaxDepth = 160 }); DesignDocument.ValidateEnvelope(envelope.RootElement);
+        var document = envelope.RootElement.Deserialize<DesignDocument>(DesignDocument.Json) ?? throw new InvalidDataException("Design file is empty.");
+        document.Validate(); stream.Position = 0; document.LoadedFingerprint = Convert.ToHexStringLower(SHA256.HashData(stream)); return document;
     }
-    public static void Save(string path, DesignDocument document)
+    public static string Fingerprint(string path)
+    {
+        ManagedPath.RejectRedirects(path); using var stream = File.OpenRead(path); return Convert.ToHexStringLower(SHA256.HashData(stream));
+    }
+    public static void Save(string path, DesignDocument document, string? expectedFingerprint = null)
     {
         document.Validate(); ManagedPath.RejectRedirects(path);
         var bytes = JsonSerializer.SerializeToUtf8Bytes(document, DesignDocument.Json);
         if (bytes.Length > MaxFileBytes) throw new InvalidDataException("Design file exceeds the storage limit.");
-        AtomicFile.Write(path, bytes);
+        using var mutex = new Mutex(false, "SnippyGrab-design-" + DesignDocument.Hash(Encoding.UTF8.GetBytes(Path.GetFullPath(path).ToUpperInvariant())));
+        var owned = false;
+        try
+        {
+            try { owned = mutex.WaitOne(TimeSpan.FromSeconds(5)); } catch (AbandonedMutexException) { owned = true; }
+            if (!owned) throw new IOException("Another editor is saving this design. Retry shortly.");
+            ManagedPath.RejectRedirects(path);
+            if (expectedFingerprint is not null && (File.Exists(path) ? Fingerprint(path) != expectedFingerprint : expectedFingerprint.Length > 0)) throw new IOException("This design changed or was removed in another editor. Use Save as to preserve this version.");
+            AtomicFile.Write(path, bytes);
+        }
+        finally { if (owned) mutex.ReleaseMutex(); }
     }
     public static DesignDocument Review(DesignDocument document, IEnumerable<string> excluded)
     {
@@ -45,8 +61,10 @@ public static class DesignStore
     }
     public static byte[] ChangeJson(DesignDocument document, IReadOnlyDictionary<string, byte[]> files)
     {
-        var assets = files.OrderBy(x => x.Key, StringComparer.Ordinal).Select(x => new { path = x.Key, byteLength = x.Value.LongLength, sha256 = DesignDocument.Hash(x.Value) });
-        return JsonSerializer.SerializeToUtf8Bytes(new { schemaVersion = 1, documentId = document.Id, baselineHash = document.BaselineHash, reviewedRevision = document.Revision, source = document.Source, viewport = new { document.Width, document.Height, document.DevicePixelRatio }, changes = new DesignSession(document).NetChanges(), limitations = document.Limitations, assets }, DesignDocument.Json);
+        var assets = files.OrderBy(x => x.Key, StringComparer.Ordinal).Select(x => new { path = x.Key, byteLength = x.Value.LongLength, sha256 = DesignDocument.Hash(x.Value), mediaType = Path.GetExtension(x.Key) switch { ".png" => "image/png", ".woff2" => "font/woff2", ".woff" => "font/woff", ".json" => "application/json", ".md" => "text/markdown", _ => "application/octet-stream" } });
+        var changes = new DesignSession(document).NetChanges();
+        var handoffId = DesignDocument.Hash(JsonSerializer.SerializeToUtf8Bytes(new { document.Id, document.BaselineHash, document.Revision, changes }, DesignDocument.Json));
+        return JsonSerializer.SerializeToUtf8Bytes(new { schemaVersion = 1, handoffId, documentId = document.Id, baselineHash = document.BaselineHash, reviewedRevision = document.Revision, source = document.Source, viewport = new { document.Width, document.Height, document.DevicePixelRatio }, changes, limitations = document.Limitations, assets }, DesignDocument.Json);
     }
     public static void Export(string path, DesignDocument document, IReadOnlyDictionary<string, byte[]> visuals)
     {
@@ -94,9 +112,12 @@ public static class DesignStore
             if (!declared.Add(name) || !files.TryGetValue(name, out var bytes) || bytes.LongLength != asset.GetProperty("byteLength").GetInt64() || DesignDocument.Hash(bytes) != asset.GetProperty("sha256").GetString()) throw new InvalidDataException("Handoff inventory/hash mismatch.");
         }
         if (declared.Count != files.Count - 1 || !declared.Contains("design.snippy.json") || !declared.Contains("visuals/original.png") || !declared.Contains("visuals/edited.png")) throw new InvalidDataException("Handoff contains unlisted or missing files.");
-        var document = JsonSerializer.Deserialize<DesignDocument>(scene, DesignDocument.Json) ?? throw new InvalidDataException("Empty handoff scene."); document.Validate();
+        using var sceneEnvelope = JsonDocument.Parse(scene, new JsonDocumentOptions { MaxDepth = 160 }); DesignDocument.ValidateEnvelope(sceneEnvelope.RootElement);
+        var document = sceneEnvelope.RootElement.Deserialize<DesignDocument>(DesignDocument.Json) ?? throw new InvalidDataException("Empty handoff scene."); document.Validate();
         if (document.BaselineHash != json.RootElement.GetProperty("baselineHash").GetString() || document.Revision != json.RootElement.GetProperty("reviewedRevision").GetInt64()) throw new InvalidDataException("Handoff revision mismatch.");
         if (!JsonElement.DeepEquals(json.RootElement.GetProperty("changes"), JsonSerializer.SerializeToElement(new DesignSession(document).NetChanges(), DesignDocument.Json)) || !JsonElement.DeepEquals(json.RootElement.GetProperty("source"), JsonSerializer.SerializeToElement(document.Source, DesignDocument.Json))) throw new InvalidDataException("Handoff requests do not match the reviewed scene.");
+        var expectedHandoff = DesignDocument.Hash(JsonSerializer.SerializeToUtf8Bytes(new { document.Id, document.BaselineHash, document.Revision, changes = new DesignSession(document).NetChanges() }, DesignDocument.Json));
+        if (json.RootElement.GetProperty("documentId").GetGuid() != document.Id || json.RootElement.GetProperty("handoffId").GetString() != expectedHandoff || !JsonElement.DeepEquals(json.RootElement.GetProperty("viewport"), JsonSerializer.SerializeToElement(new { document.Width, document.Height, document.DevicePixelRatio }, DesignDocument.Json))) throw new InvalidDataException("Handoff identity or viewport mismatch.");
         return document;
     }
 }

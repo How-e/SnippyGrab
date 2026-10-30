@@ -22,6 +22,8 @@ internal static class DesignCaptureChecks
         Require(inline.Width > 50 && inline.NoWrap, "Inline text still uses a zero-width client box or wraps again.");
         Require(full.Layers.Any(n => n.Kind == "text" && n.Text == "Bottom of the loaded page"), "Bottom-page text was omitted.");
         Require(full.Layers.Any(n => n.Kind == "text" && n.Text == "Display contents child"), "display:contents children were dropped.");
+        Require(full.Layers.Any(n => n.Kind == "text" && n.Text.Trim() == "Boxless direct text"), "Direct display:contents text was dropped.");
+        Require(full.Layers.Any(n => n.Kind == "text" && n.Text == "Boxless child"), "Nested display:contents child was dropped.");
         Require(full.Layers.Any(n => n.Kind == "text" && n.Text == "Overflow child"), "Zero-size positioned ancestor lost its visible child.");
         Require(full.Layers.Any(n => n.Name == "Left border" && n.Fill == "#a0b0c0"), "Asymmetric border was lost.");
         Require(full.Layers.Any(n => n.Kind == "image" && n.Source.Selector == "#pseudo"), "Empty generated icon was omitted.");
@@ -207,6 +209,7 @@ internal static class DesignCaptureChecks
         <div class="separator">Asymmetric separator</div><div id="pseudo">Generated icon</div>
         <svg id="outline-icon" viewBox="0 0 24 24" fill="none" stroke="#eee" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3 L21 3 L12 21 Z"/></svg>
         <p id="styled">Styled text</p><div style="display:contents"><p>Display contents child</p></div>
+        <div style="display:contents">Boxless direct text <b>Boxless child</b></div>
         <details><summary id="disclosure">Capture log storage</summary><p>Hidden details</p></details><div id="modern-color" style="width:40px;height:20px;background:oklch(60% .15 230)"></div>
         <div style="width:0;height:0;position:relative"><div style="position:absolute;left:260px;top:-50px;width:200px;height:30px">Overflow child</div></div>
         <div id="scroll-panel"><div>Nested scroller top</div><p>Nested scroller bottom</p></div>

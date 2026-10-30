@@ -72,7 +72,12 @@ globalThis.snippyExtract = async function (options = {}) {
         }
     }
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    const rootBox = root.getBoundingClientRect();
+    const renderedBox = (element, style = getComputedStyle(element)) => {
+        if (style.display !== "contents") return element.getBoundingClientRect();
+        const range = document.createRange(); range.selectNodeContents(element);
+        return range.getBoundingClientRect();
+    };
+    const rootBox = renderedBox(root);
     const region =
         mode === "element"
             ? {
@@ -184,8 +189,8 @@ globalThis.snippyExtract = async function (options = {}) {
             component,
         };
     };
-    const bounds = (e) => {
-        const b = e.getBoundingClientRect();
+    const bounds = (e, style) => {
+        const b = renderedBox(e, style);
         return {
             x: b.left + scrollX - region.x,
             y: b.top + scrollY - region.y,
@@ -220,13 +225,14 @@ globalThis.snippyExtract = async function (options = {}) {
         )
             return;
         const c = getComputedStyle(e),
-            b = bounds(e);
+            boxless = c.display === "contents",
+            b = bounds(e, c);
         if (
             c.display === "none" ||
-            Number(c.opacity) === 0
+            (!boxless && Number(c.opacity) === 0)
         )
             return;
-        if (c.display === "contents" || c.visibility === "hidden" || b.width < 0.1 || b.height < 0.1) {
+        if (c.visibility === "hidden" || b.width < 0.1 || b.height < 0.1) {
             for (const child of e.children) await walk(child, parent, origin, depth + 1);
             return;
         }
@@ -402,7 +408,7 @@ globalThis.snippyExtract = async function (options = {}) {
         }
         const node = add({
             parent,
-            kind: fallback ? "image" : "frame",
+            kind: fallback ? "image" : boxless ? "group" : "frame",
             name: (
                 e.getAttribute("aria-label") ||
                 e.dataset.testid ||
@@ -412,12 +418,12 @@ globalThis.snippyExtract = async function (options = {}) {
             y: b.y - origin.y,
             width: b.width,
             height: b.height,
-            fill: color(c.backgroundColor),
+            fill: boxless ? "#00000000" : color(c.backgroundColor),
             stroke: "#00000000",
             strokeWidth: 0,
-            radius: parseFloat(c.borderTopLeftRadius) || 0,
-            opacity: fallback ? 1 : Number(c.opacity),
-            clip: e !== document.documentElement && e !== document.body && c.overflowX !== "visible" && c.overflowY !== "visible",
+            radius: boxless ? 0 : parseFloat(c.borderTopLeftRadius) || 0,
+            opacity: fallback || boxless ? 1 : Number(c.opacity),
+            clip: !boxless && e !== document.documentElement && e !== document.body && c.overflowX !== "visible" && c.overflowY !== "visible",
             layout:
                 c.display === "flex" && c.flexDirection === "column"
                     ? "vertical"
@@ -425,11 +431,11 @@ globalThis.snippyExtract = async function (options = {}) {
                       ? "horizontal"
                       : "free",
             gap: parseFloat(c.gap) || 0,
-            shadowColor,
+            shadowColor: boxless ? "#00000000" : shadowColor,
             shadowX,
             shadowY,
             shadowBlur,
-            gradientStops,
+            gradientStops: boxless ? [] : gradientStops,
             gradientAngle,
             fallback,
             source: source(e),
@@ -448,10 +454,10 @@ globalThis.snippyExtract = async function (options = {}) {
             ["Bottom", 0, b.height - parseFloat(c.borderBottomWidth), b.width, parseFloat(c.borderBottomWidth)],
             ["Left", 0, 0, parseFloat(c.borderLeftWidth), b.height],
         ];
-        if (borders.every(([side]) => c["border" + side + "Width"] === c.borderTopWidth && c["border" + side + "Color"] === c.borderTopColor && c["border" + side + "Style"] === "solid") && parseFloat(c.borderTopWidth) > 0) {
+        if (!boxless && borders.every(([side]) => c["border" + side + "Width"] === c.borderTopWidth && c["border" + side + "Color"] === c.borderTopColor && c["border" + side + "Style"] === "solid") && parseFloat(c.borderTopWidth) > 0) {
             node.stroke = color(c.borderTopColor); node.strokeWidth = parseFloat(c.borderTopWidth);
         } else for (const [side, x, y, width, height] of borders) {
-            if (width > 0 && height > 0 && !["none", "hidden"].includes(c["border" + side + "Style"]))
+            if (!boxless && width > 0 && height > 0 && !["none", "hidden"].includes(c["border" + side + "Style"]))
                 add({ parent: node.id, kind: "frame", name: side + " border", x, y, width, height, fill: color(c["border" + side + "Color"]), source: { ...source(e), key: source(e).key + "-border-" + side } });
         }
         let textIndex = 0;

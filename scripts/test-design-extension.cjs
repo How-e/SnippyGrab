@@ -21,6 +21,7 @@ header{position:fixed;top:0;left:0;width:100%;height:24px;background:#304050}h1{
 #deferred{position:absolute;top:1700px;width:240px;height:120px;content-visibility:auto}
 </style><header>Fixed header</header><main><h1>Signed-in fixture</h1><span id="stat">1 / 5</span> capture slots
 <p id="pseudo">Generated icon</p><div id="panel"><div>Panel top</div><p>Panel bottom</p></div>
+<div id="boxless" style="display:contents">Boxless direct text <b>Boxless child</b></div>
 <div id="deferred"><p>Deferred source content</p></div><img id="lazy-picture" loading="lazy" src="/lazy-image.svg" width="80" height="40" style="position:absolute;top:6520px;left:20px">
 <div id="bottom">Bottom of full signed-in page</div></main></html>`;
 const server = http.createServer(async (request, response) => {
@@ -93,6 +94,8 @@ async function main() {
         assert(full.capture.layers.some(n => n.kind === "text" && n.text === "Bottom of full signed-in page"));
         assert(full.capture.layers.some(n => n.kind === "text" && n.text === "1 / 5" && n.width > 50 && n.noWrap));
         assert(full.capture.layers.some(n => n.kind === "text" && n.text === "Panel bottom"));
+        assert(full.capture.layers.some(n => n.kind === "text" && n.text.trim() === "Boxless direct text"));
+        assert(full.capture.layers.some(n => n.kind === "text" && n.text === "Boxless child"));
         assert(full.capture.layers.some(n => n.kind === "text" && n.text === "Deferred source content"));
         assert(await page.locator("#lazy-picture").evaluate(image => image.complete && image.naturalWidth === 80));
         assert.equal(await page.locator("#lazy-picture").getAttribute("loading"), "lazy");

@@ -9,6 +9,32 @@ namespace SnippyGrab.IntegrationTests;
 
 public sealed class DesignIntegrationTests
 {
+    [Fact]
+    public void CapturedFontsRejectUnsupportedTypesSignaturesAndStyleInjection()
+    {
+        ImageIntegrationTests.Sta(() =>
+        {
+            var png = ImageService.Png(EditorDocumentTests.Fixture());
+            string Capture(string media, string data, string weight = "normal") => JsonSerializer.Serialize(new { width = 160, height = 100, layers = Array.Empty<object>(), fontAssets = new[] { new { mediaType = media, data, family = "Fixture", weight, style = "normal" } } });
+            Assert.Throws<InvalidDataException>(() => DesignBrowser.FromCapture(Capture("text/html", Convert.ToBase64String(png)), png));
+            Assert.Throws<InvalidDataException>(() => DesignBrowser.FromCapture(Capture("font/woff", Convert.ToBase64String(png)), png));
+            var header = new byte[48]; "wOFF"u8.CopyTo(header);
+            Assert.Throws<InvalidDataException>(() => DesignBrowser.FromCapture(Capture("font/woff", Convert.ToBase64String(header), "normal;src:url(secret)"), png));
+            var admitted = DesignBrowser.FromCapture(Capture("font/woff", Convert.ToBase64String(header), "100 900"), png);
+            Assert.Contains(admitted.Assets.Values, asset => asset.MediaType == "font/woff" && asset.Weight == "100 900"); return true;
+        });
+    }
+    [Fact]
+    public void PartiallyClippedRasterLayersUseOnlyTheirIntersectionWithTheReference()
+    {
+        ImageIntegrationTests.Sta(() =>
+        {
+            var png = ImageService.Png(EditorDocumentTests.Fixture());
+            var d = DesignBrowser.FromCapture("""{"width":160,"height":100,"layers":[{"id":"partial","kind":"image","x":-20,"y":-10,"width":80,"height":40},{"id":"outside","kind":"image","x":-100,"y":0,"width":40,"height":20}]}""", png);
+            Assert.Equal(0, d.Layers[0].X); Assert.Equal(0, d.Layers[0].Y); Assert.Equal(60, d.Layers[0].Width); Assert.Equal(30, d.Layers[0].Height); Assert.False(d.Layers[1].Visible);
+            var crop = DesignBrowser.Decode(d.Assets[d.Layers[0].Asset].Bytes()); Assert.Equal(60, crop.PixelWidth); Assert.Equal(30, crop.PixelHeight); return true;
+        });
+    }
     internal static DesignDocument Fixture()
     {
         var png = ImageService.Png(EditorDocumentTests.Fixture());

@@ -49,25 +49,6 @@ internal static class DesignBrowser
             using var captured = JsonDocument.Parse(screenshot); var png = Convert.FromBase64String(captured.RootElement.GetProperty("data").GetString()!);
             cancellation.ThrowIfCancellationRequested();
             var document = await ImageWorker.RunAsync(() => FromCapture(data.GetRawText(), png), cancellation);
-            if (data.TryGetProperty("fonts", out var fonts))
-            {
-                using var tree = JsonDocument.Parse(await core.CallDevToolsProtocolMethodAsync("Page.getResourceTree", "{}"));
-                var frameId = tree.RootElement.GetProperty("frameTree").GetProperty("frame").GetProperty("id").GetString();
-                foreach (var font in fonts.EnumerateArray().Take(40))
-                {
-                    try
-                    {
-                        using var content = JsonDocument.Parse(await core.CallDevToolsProtocolMethodAsync("Page.getResourceContent", JsonSerializer.Serialize(new { frameId, url = font.GetProperty("url").GetString() })));
-                        if (!content.RootElement.GetProperty("base64Encoded").GetBoolean()) continue;
-                        var bytes = Convert.FromBase64String(content.RootElement.GetProperty("content").GetString()!);
-                        if (bytes.Length > 8 * 1024 * 1024) continue;
-                        var media = bytes.AsSpan().StartsWith("wOF2"u8) ? "font/woff2" : bytes.AsSpan().StartsWith("wOFF"u8) ? "font/woff" : "";
-                        if (media.Length > 0) document.AddAsset(bytes, media, font.GetProperty("family").GetString() ?? "");
-                    }
-                    catch (Exception ex) when (ex is System.Runtime.InteropServices.COMException or FormatException or KeyNotFoundException) { document.Limitations.Add("A custom font could not be bundled; check text wrapping against the original reference."); }
-                    cancellation.ThrowIfCancellationRequested();
-                }
-            }
             document.Validate(); return document;
         }
         finally { try { await core.ExecuteScriptAsync("globalThis.snippyFreezeCleanup?.()"); } catch (Exception ex) when (ex is System.Runtime.InteropServices.COMException or ObjectDisposedException or InvalidOperationException) { } }
@@ -92,11 +73,26 @@ internal static class DesignBrowser
             var p = n.Parent is { } parent && positions.TryGetValue(parent, out var origin) ? origin : new Point();
             p = new Point(p.X + n.X, p.Y + n.Y); positions[n.Id] = p;
             if (n.Kind != "image") continue;
-            var area = new PixelRect(Math.Max(0, (int)Math.Floor(p.X * scaleX)), Math.Max(0, (int)Math.Floor(p.Y * scaleY)), Math.Max(1, (int)Math.Ceiling(n.Width * scaleX)), Math.Max(1, (int)Math.Ceiling(n.Height * scaleY))).Intersect(new(0, 0, original.PixelWidth, original.PixelHeight));
+            var left = (int)Math.Floor(p.X * scaleX); var top = (int)Math.Floor(p.Y * scaleY);
+            var area = new PixelRect(left, top, Math.Max(1, (int)Math.Ceiling((p.X + n.Width) * scaleX) - left), Math.Max(1, (int)Math.Ceiling((p.Y + n.Height) * scaleY) - top)).Intersect(new(0, 0, original.PixelWidth, original.PixelHeight));
             if (area.IsEmpty) { n.Visible = false; continue; }
             n.Asset = document.AddAsset(ImageService.Png(ImageService.Crop(original, area))); n.Fill = "#00000000";
             // A clipped capture represents the visible portion of an image region.
             n.X += area.X / scaleX - p.X; n.Y += area.Y / scaleY - p.Y; n.Width = area.Width / scaleX; n.Height = area.Height / scaleY;
+        }
+        if (envelope.RootElement.TryGetProperty("fontAssets", out var fonts))
+        {
+            if (fonts.ValueKind != JsonValueKind.Array || fonts.GetArrayLength() > 40) throw new InvalidDataException("Too many captured fonts.");
+            long total = 0;
+            foreach (var font in fonts.EnumerateArray())
+            {
+                var data = font.GetProperty("data").GetString() ?? "";
+                if (data.Length > 12 * 1024 * 1024 || (total += data.Length) > 24 * 1024 * 1024) throw new InvalidDataException("Captured fonts exceed their admission limit.");
+                var bytes = Convert.FromBase64String(data); var media = font.GetProperty("mediaType").GetString() ?? "";
+                if (media is not ("font/woff" or "font/woff2")) throw new InvalidDataException("Unsupported captured font.");
+                if (bytes.Length > 8 * 1024 * 1024 || (media == "font/woff" ? bytes.Length <= 44 || !bytes.AsSpan().StartsWith("wOFF"u8) : bytes.Length <= 48 || !bytes.AsSpan().StartsWith("wOF2"u8))) throw new InvalidDataException("Invalid captured font signature or size.");
+                document.AddAsset(bytes, media, font.GetProperty("family").GetString() ?? "", font.TryGetProperty("weight", out var weight) ? weight.GetString() ?? "normal" : "normal", font.TryGetProperty("style", out var style) ? style.GetString() ?? "normal" : "normal");
+            }
         }
         document.SealBaseline(); return document;
     }

@@ -8,6 +8,8 @@ namespace SnippyGrab.App.Views;
 internal sealed class DesignSourceWindow : Window
 {
     private readonly WebView2 browser = new();
+    private readonly Button load;
+    private readonly Button capture;
     private readonly TextBox address = new() { Text = "http://localhost:5173", MinWidth = 220 };
     private readonly TextBox width = new() { Text = "1280", Width = 65 }, height = new() { Text = "800", Width = 65 };
     private readonly TextBox project = new() { Width = 170 }, revision = new() { Width = 140 };
@@ -17,33 +19,42 @@ internal sealed class DesignSourceWindow : Window
     private bool ready, pageReady, busy;
     private ulong navigation;
     internal DesignDocument? Result { get; private set; }
+    internal bool Ready => ready;
+    internal bool PageReady => pageReady;
+    internal bool Busy => busy;
+    internal WebView2 Browser => browser;
+    internal TextBox Address => address;
+    internal Button LoadButton => load;
+    internal Button CaptureButton => capture;
     internal DesignSourceWindow(string profile, DesignDocument? previous = null)
     {
-        Ui.StyleWindow(this); Title = "SnippyGrab · Select source page"; Width = 1150; Height = 850; MinWidth = 700; MinHeight = 500;
+        Ui.StyleWindow(this); Title = "SnippyGrab · Select source page"; Width = 1150; Height = 850; MinWidth = 700; MinHeight = 500; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         var root = new DockPanel(); Content = root; var top = new WrapPanel { Margin = new Thickness(12) };
-        top.Children.Add(address); top.Children.Add(Ui.Button("Load", "Load source page", () => Run(Load))); top.Children.Add(Ui.Button("Open HTML…", "Open a local HTML source file", () =>
+        load = Ui.Button("Load", "Load source page", () => Run(Load)); load.IsEnabled = false;
+        address.KeyDown += (_, e) => { if (e.Key == System.Windows.Input.Key.Enter && load.IsEnabled) { e.Handled = true; Run(Load); } };
+        top.Children.Add(address); top.Children.Add(load); top.Children.Add(Ui.Button("Open HTML…", "Open a local HTML source file", () =>
         {
             var dialog = new OpenFileDialog { Filter = "HTML files|*.html;*.htm", CheckFileExists = true }; if (dialog.ShowDialog(this) == true) { address.Text = new Uri(dialog.FileName).AbsoluteUri; Run(Load); }
         }));
         top.Children.Add(Ui.Text("Viewport", 12)); top.Children.Add(width); top.Children.Add(Ui.Text("×", 12)); top.Children.Add(height);
         top.Children.Add(Ui.Text("Project", 12)); top.Children.Add(project); top.Children.Add(Ui.Text("Revision", 12)); top.Children.Add(revision);
         DockPanel.SetDock(top, Dock.Top); root.Children.Add(top);
-        status = Ui.Text("Load a project page and sign in here if needed. This browser keeps its own sign-in session; use the extension for a tab already signed in.", 12, true);
+        status = Ui.Text("Starting source browser…", 12, true);
         var bottom = new StackPanel { Margin = new Thickness(12) }; var actions = new WrapPanel(); actions.Children.Add(mode);
         actions.Children.Add(Ui.Button("Pick element", "Click an element in the source page to capture", () => Run(async () => { RequireReady(); await browser.CoreWebView2.ExecuteScriptAsync(await File.ReadAllTextAsync(Path.Combine(DesignBrowser.AssetsRoot, "capture.js"))); await browser.CoreWebView2.ExecuteScriptAsync("snippyPick()"); mode.SelectedIndex = 2; status.Text = "Move over the source page and click the element. Then choose Capture layers. Escape cancels the picker."; })));
-        actions.Children.Add(Ui.Button("Capture layers", "Capture editable layers from this source", () => Run(Capture)));
+        capture = Ui.Button("Capture layers", "Capture editable layers from this source", () => Run(Capture)); capture.IsEnabled = false; actions.Children.Add(capture);
         actions.Children.Add(Ui.Button("Cancel", "Cancel source import", Close)); bottom.Children.Add(actions); bottom.Children.Add(status); DockPanel.SetDock(bottom, Dock.Bottom); root.Children.Add(bottom); root.Children.Add(browser);
         foreach (var (control, label) in new (Control, string)[] { (address, "Source URL"), (width, "Viewport width"), (height, "Viewport height"), (project, "Project context"), (revision, "Source revision"), (mode, "Capture area") }) System.Windows.Automation.AutomationProperties.SetName(control, label);
         if (previous is not null) { address.Text = previous.Source.Url; width.Text = Math.Round(previous.Source.ViewportWidth > 0 ? previous.Source.ViewportWidth : previous.Width).ToString(System.Globalization.CultureInfo.InvariantCulture); height.Text = Math.Round(previous.Source.ViewportHeight > 0 ? previous.Source.ViewportHeight : previous.Height).ToString(System.Globalization.CultureInfo.InvariantCulture); project.Text = previous.Source.Project; revision.Text = previous.Source.Revision; mode.SelectedIndex = previous.Source.CaptureMode == "visible" ? 0 : previous.Source.CaptureMode == "element" ? 2 : 1; }
         Loaded += (_, _) => Run(async () =>
         {
             await DesignBrowser.Initialize(browser, profile, false, Authenticate); ready = true;
-            browser.CoreWebView2.NavigationStarting += (_, e) => { navigation = e.NavigationId; pageReady = false; };
+            browser.CoreWebView2.NavigationStarting += (_, e) => { navigation = e.NavigationId; pageReady = false; capture.IsEnabled = false; status.Text = "Loading source page…"; };
             browser.CoreWebView2.NavigationCompleted += async (_, e) =>
             {
                 if (lifetime.IsCancellationRequested || e.NavigationId != navigation) return;
                 if (!e.IsSuccess) { status.Text = e.WebErrorStatus == Microsoft.Web.WebView2.Core.CoreWebView2WebErrorStatus.ValidAuthenticationCredentialsRequired ? "This page requires sign-in. Enter credentials when prompted, or reload to try again." : "Page loading failed: " + e.WebErrorStatus + ". Check the address and retry."; return; }
-                try { await Viewport(); if (lifetime.IsCancellationRequested || e.NavigationId != navigation) return; pageReady = true; status.Text = "Page loaded. Sign in if needed, then capture the full loaded page or pick an element."; }
+                try { await Viewport(); if (lifetime.IsCancellationRequested || e.NavigationId != navigation) return; pageReady = true; capture.IsEnabled = !busy; status.Text = "Page loaded. Sign in if needed, then capture the full loaded page or pick an element."; }
                 catch (Exception ex) { if (!lifetime.IsCancellationRequested) status.Text = OperationFailure.From(ex).Message; }
             };
             await Load();
@@ -88,9 +99,9 @@ internal sealed class DesignSourceWindow : Window
     }
     private async void Run(Func<Task> action)
     {
-        if (busy) return; busy = true;
+        if (busy) return; busy = true; load.IsEnabled = false; capture.IsEnabled = false;
         try { await action(); }
         catch (Exception ex) { if (!lifetime.IsCancellationRequested) status.Text = OperationFailure.From(ex).Message; }
-        finally { busy = false; }
+        finally { busy = false; if (!lifetime.IsCancellationRequested) { load.IsEnabled = ready; capture.IsEnabled = ready && pageReady; } }
     }
 }

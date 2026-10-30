@@ -20,9 +20,10 @@ internal sealed class DesignWindow : Window
     private string? path;
     private string? fingerprint;
     private bool busy, ready, allowClose;
+    private int queuedMessages;
     private readonly bool diagnostic;
     internal bool Ready => ready;
-    internal bool Busy => busy;
+    internal bool Busy => busy || queuedMessages > 0;
     internal DesignSession? Session => session;
     internal WebView2 Editor => editor;
     internal DesignWindow(string dataDirectory, Func<byte[], int, int, string, Task> addToShelf, Func<string, Task<bool>> copyBrief, DesignDocument? initial = null, string? savedPath = null, bool diagnostic = false)
@@ -66,10 +67,17 @@ internal sealed class DesignWindow : Window
     private async void Message(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
     {
         if (e.Source != DesignBrowser.EditorUrl || lifetime.IsCancellationRequested) return;
-        if (e.WebMessageAsJson.Length > 2_000_000) { Status("The edit request is too large. Choose fewer layers.", true); Idle(); return; }
+        var message = e.WebMessageAsJson;
+        if (message.Length > 2_000_000) { Status("The edit request is too large. Choose fewer layers.", true); Idle(); return; }
+        // Modal source/file dialogs must open after the WebView2 callback returns.
+        // A nested message loop inside that callback stalls child WebView2 initialization.
+        queuedMessages++;
+        await System.Windows.Threading.Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.Background);
+        queuedMessages--;
+        if (lifetime.IsCancellationRequested) return;
         try
         {
-            using var json = JsonDocument.Parse(e.WebMessageAsJson); var data = json.RootElement; var command = data.GetProperty("command").GetString();
+            using var json = JsonDocument.Parse(message); var data = json.RootElement; var command = data.GetProperty("command").GetString();
             if (command == "ready") { ready = true; Publish(true); return; }
             if (busy) { Status("An operation is running. Please retry when it finishes."); Idle(); return; }
             if (session is not null && data.GetProperty("revision").GetInt64() != session.Document.Revision) { Publish(false, "The design changed. Review the current state and retry."); Idle(); return; }
@@ -214,7 +222,7 @@ internal sealed class DesignWindow : Window
     }
     private async void ClosingWindow(object? sender, CancelEventArgs e)
     {
-        if (allowClose) return; e.Cancel = true; if (busy) { Status("Wait for the current operation to finish before closing."); return; }
+        if (allowClose) return; e.Cancel = true; if (Busy) { Status("Wait for the current operation to finish before closing."); return; }
         busy = true;
         try { if (await ConfirmReplace()) { allowClose = true; Close(); } }
         catch (Exception ex) { Status(OperationFailure.From(ex).Message, true); }
@@ -222,7 +230,7 @@ internal sealed class DesignWindow : Window
     }
     internal async Task<bool> RequestCloseAsync()
     {
-        if (busy) { Status("Wait for the current operation to finish before exiting."); return false; }
+        if (Busy) { Status("Wait for the current operation to finish before exiting."); return false; }
         busy = true; try { if (!await ConfirmReplace()) return false; allowClose = true; Close(); return true; } finally { busy = false; }
     }
     internal void CloseForDiagnostics() { if (!diagnostic) throw new InvalidOperationException("Diagnostic isolation is required."); allowClose = true; Close(); }

@@ -102,6 +102,38 @@ internal static class DesignCaptureChecks
         }
         finally { authView.Dispose(); host.Close(); }
     }
+    internal static async Task<object> SourceWindowWorkflow(string root)
+    {
+        using var server = new FixtureServer();
+        var workspace = new Views.DesignWindow(Path.Combine(root, "source-window-workflow"), (_, _, _, _) => Task.CompletedTask, _ => Task.FromResult(true), diagnostic: true)
+        { ShowActivated = false, Left = -30000, Top = -30000, WindowStartupLocation = WindowStartupLocation.Manual };
+        workspace.Show(); Views.DesignSourceWindow? source = null;
+        try
+        {
+            await Wait(() => Task.FromResult(workspace.Ready));
+            var command = workspace.Editor.CoreWebView2.ExecuteScriptAsync("document.querySelector('[data-command=import]').click()");
+            await Wait(() =>
+            {
+                source = Application.Current.Windows.OfType<Views.DesignSourceWindow>().SingleOrDefault(w => w.Owner == workspace);
+                return Task.FromResult(source is { Ready: true, Busy: false });
+            });
+            await command.WaitAsync(TimeSpan.FromSeconds(10));
+            Require(source!.LoadButton.IsEnabled, "Load stayed disabled after source initialization.");
+            source.Address.Text = "javascript:invalid"; source.LoadButton.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
+            await Wait(() => Task.FromResult(!source.Busy));
+            Require(source.LoadButton.IsEnabled, "Invalid-address failure prevented retry.");
+            source.Address.Text = new Uri(server.Url).Authority + "/public";
+            source.LoadButton.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
+            await Wait(() => Task.FromResult(source.PageReady && !source.Busy));
+            Require((await source.Browser.CoreWebView2.ExecuteScriptAsync("document.body.innerText")).Contains("Public source fixture", StringComparison.Ordinal), "Load did not navigate from a scheme-free local address.");
+            Require(source.CaptureButton.IsEnabled, "Capture did not become available after Load.");
+            source.CaptureButton.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
+            await Wait(() => Task.FromResult(workspace.Session is not null && !workspace.Busy));
+            Require(workspace.Session!.Document.Layers.Any(n => n.Kind == "text" && n.Text == "Public source fixture"), "Source capture did not return editable layers to its owner workspace.");
+            return new { Entry = "Production editor Import page message", SourceInitialized = true, InvalidAddressRetry = true, SchemeFreeLocalLoad = true, CaptureReturnedToWorkspace = true };
+        }
+        finally { if (source is { IsVisible: true }) source.Close(); workspace.CloseForDiagnostics(); }
+    }
     private static async Task Navigate(WebView2 browser, string url)
     {
         var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -153,6 +185,7 @@ internal static class DesignCaptureChecks
                     }
                     else if (path == "/signin") { extra = "Set-Cookie: fixture-session=yes; HttpOnly; SameSite=Lax; Path=/\r\n"; body = "<!doctype html><p>Cookie-authenticated page</p>"; }
                     else if (path == "/form") body = cookie ? "<!doctype html><p>Cookie-authenticated page</p>" : "<!doctype html><form action='/signin'><input name='user'><input type='password' name='password'><button>Sign in</button></form>";
+                    else if (path == "/public") body = "<!doctype html><html><title>Local source fixture</title><p>Public source fixture</p></html>";
                     var bytes = Encoding.UTF8.GetBytes(body); var response = Encoding.ASCII.GetBytes("HTTP/1.1 " + status + "\r\nContent-Type: text/html; charset=utf-8\r\nConnection: close\r\n" + extra + "Content-Length: " + bytes.Length + "\r\n\r\n");
                     await stream.WriteAsync(response, cancellation); await stream.WriteAsync(bytes, cancellation);
                 }

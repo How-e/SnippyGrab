@@ -2,6 +2,8 @@
 
 ## Unreleased — UI Design import fixes
 
+- Fixed the blank source window opened from UI Design: native dialogs now open after the editor's WebView2 message callback returns. Source controls show initialization/loading state, support Enter to load, and enable capture only after navigation succeeds. Regression coverage follows the real Import page → Load → capture route.
+
 - Accept scheme-free LAN/localhost addresses and prompt for HTTP Basic authentication. Form sign-in uses the source browser's retained session.
 - Default URL import to the full loaded page and add full-page existing-tab import, including offscreen selected elements, bounded loaded scroll panels, high-DPI references and cleanup after errors. Reload the unpacked extension and accept its page-capture permission after updating.
 - Preserve inline text geometry/spacing, computed typography, side borders, page background and display-contents/positioned children. Use explicit raster fallback for generated icons and complex SVG strokes. Bundle available WOFF/WOFF2 resources and font-face metadata in both adapters.

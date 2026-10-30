@@ -2,7 +2,24 @@
 
 Researched 2026-10-09 against `df652d6`. Implementation of the remaining backlog authorized 2026-10-09; local commits only. Implementation status does not close acceptance gates. Details, source links, integration points and acceptance criteria are in [IMPLEMENTATION-BRIEFS.md](docs/IMPLEMENTATION-BRIEFS.md).
 
-The former task queue is absent from this checkout. New work uses F identifiers to avoid confusing it with Q1–Q51 in `scripts/release-gates.json`. That file remains the packaging authority. Existing release gates are not superseded by this backlog. Priority reflects user benefit, adoption risk, implementation cost and dependencies; size is relative complexity, not a time estimate.
+New work uses F identifiers to avoid confusing it with Q1–Q51 in `scripts/release-gates.json`. That file remains the packaging authority. Existing release gates are not superseded by this backlog. Priority reflects user benefit, adoption risk, implementation cost and dependencies; size is relative complexity, not a time estimate.
+
+## Current cycle — UI Design, 2026-10-29
+
+Owner direction: independent editable design layers for a project UI, with tracked changes and an implementation-agent handoff. Assisted scrolling is removed. The replacement is in design; it has no production app entry point. [Feature design and acceptance](docs/UI-DESIGN.md) · [ADR-003](docs/ADR-003-UI-DESIGN-LAYERS.md).
+
+| Order | ID | Priority | Task | Size | Dependencies / owner | Status |
+|---|---|---|---|---|---|---|
+| 1 | F12 | P1 | Remove assisted scrolling and design the layer-edit-to-agent workflow | M | Owner direction; Agent | Removal implemented; design/interaction concept prepared; production replacement not implemented |
+| 2 | F13 | P1 | Build versioned layer documents, commands, persistence and net-change tracking | L | F12; Agent | Planned |
+| 3 | F14 | P1 | Prove browser import, layer conversion and renderer fidelity | XL | F13; dependency/runtime admission; Agent | Planned; feasibility and measurements required |
+| 4 | F15 | P1 | Build the native layer workspace and accessible editing controls | XL | F14; Agent + desktop acceptance | Planned |
+| 5 | F16 | P1 | Build reviewed changes and portable agent handoff | L | F15; Agent + independent implementation exercise | Planned; completes the first URL/localhost workflow |
+| 6 | F17 | P2 | Add existing-tab import and implementation recapture comparison | L | F16; browser/native-host admission + desktop acceptance | Planned |
+
+F13–F17 are implementation briefs, not claims of delivered functionality. Begin with one scoped item when implementation is requested. Existing signing and release prerequisites remain applicable to publication.
+
+## Earlier cycle — historical status
 
 | Order | ID | Priority | Task | Size | Dependencies / owner | Status |
 |---|---|---|---|---|---|---|
@@ -13,14 +30,14 @@ The former task queue is absent from this checkout. New work uses F identifiers 
 | 5 | F05 | P1 | Add JPEG export with shared safe export boundary | M | Agent | Implemented; agent PNG dialog and owner export batch PASS on acceptance .2 |
 | 6 | F06 | P1 | Add ordered batch export from shelf and history | M | F05; Agent + receiver/file workflow acceptance | Implemented; owner-reported desktop workflow PASS on acceptance .2 |
 | 7 | F07 | P1 | Combine selected captures into strip/grid | M | Agent + editor/shelf acceptance | Implemented; owner-reported native gesture PASS on acceptance .2 |
-| 8 | F08 | P1 | Specify scrolling capture feasibility and supported first-release targets | M | Agent research; F07 informs composition | Complete; GO for bounded assisted static viewport scope |
-| 9 | F09 | P1 | Implement bounded, assisted scrolling capture after feasibility decision | L | F08 go decision; F07 composition conventions; Shared | Implemented within ADR-001; owner-reported listed desktop checks PASS on acceptance .2 |
+| 8 | F08 | P1 | Specify scrolling capture feasibility and supported first-release targets | M | Agent research; F07 informs composition | Retired 2026-10-29; superseded by ADR-003 |
+| 9 | F09 | P1 | Implement bounded, assisted scrolling capture after feasibility decision | L | F08 go decision; F07 composition conventions; Shared | Removed 2026-10-29 under F12 |
 | 10 | F10 | P2 | Add WebP export after explicit codec admission | M | F05; dependency/security review | Implemented; pinned encoder admitted; owner-reported Windows 11 clean-profile PASS on acceptance .2 |
 | 11 | F11 | P3 | Evaluate video/GIF as a separately approved product scope | XL | Owner scope decision; Agent research | Evaluation complete; ADR-002 NO-GO for current product; recording deferred |
 
-P1 means the next improvement cycle, not an emergency defect. P2 is useful follow-on work. P3 is outside the current still-image scope. Scrolling is the largest still-image gap; its two-stage sequence follows the simpler export and composition improvements because those deliver value sooner and establish bounded image processing. WebP follows scrolling because JPEG already addresses a broad file-size workflow without a new codec. Documented evidence and installation confidence take precedence over feature expansion.
+P1 means the next improvement cycle, not an emergency defect. P2 is useful follow-on work. P3 is outside the current still-image scope. The earlier cycle established bounded capture/export/composition behavior; the current cycle adds a separately stored design document and agent handoff. Documented evidence and installation confidence remain release prerequisites.
 
-F03 may wait for publisher credentials; that wait should not prevent F04 onward once separately authorized. F09 must not start unless F08 establishes an acceptable first-release scope. F11 evaluation is complete in [ADR-002](docs/ADR-002-RECORDING-SCOPE.md); recording remains deferred until the owner explicitly changes the exclusion.
+F03 may wait for publisher credentials. F08/F09 are retired and must not be restored from their historical briefs. F11 evaluation is complete in [ADR-002](docs/ADR-002-RECORDING-SCOPE.md); recording remains deferred until the owner explicitly changes the exclusion.
 
 ## Execution and completion rules
 

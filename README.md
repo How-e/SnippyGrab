@@ -16,11 +16,13 @@ Release requirements and regression ownership are maintained in `scripts/release
 
 Improvements are ordered in the [task queue](TASK_QUEUE.md), with [research and implementation briefs](docs/IMPLEMENTATION-BRIEFS.md). The queue records implemented work and remaining acceptance separately.
 
+**In design: UI Design** imports a project page as editable layers, records visual changes and prepares an implementation handoff for an agent. See the [feature design](docs/UI-DESIGN.md). It is not available in the app yet. Assisted scrolling has been removed from current source; existing combined PNG captures remain ordinary images.
+
 ## Preview
 
 The interface uses consistent line icons, neutral surfaces and a restrained blue accent. System, Light and Dark themes share the same controls. Settings are grouped into seven categories; the editor keeps all sixteen tools in a scrollable rail with contextual properties, and Recent captures pairs a virtualized list with a large preview. Narrow windows use compact navigation and wrapping actions.
 
-Synthetic content rendered by the WPF interface; no private captures. These previews show the published design prerelease. Current source adds revised composition/scrolling guidance, translucent dock actions and a direct Delete button; updated release previews are pending.
+Synthetic content rendered by the WPF interface; no private captures. These previews show the published design prerelease. Current source includes composition guidance, translucent dock actions and a direct Delete button; updated release previews are pending.
 
 ![Compact shelf with twenty captures, showing three visible cards](docs/images/dock.png)
 
@@ -52,7 +54,6 @@ The app lives in the tray. Closing a window keeps it running; **Exit** stops it.
 - Drag a thumbnail to attach its temporary PNG file.
 - **Export selected…** on the shelf menu or in Recent captures saves up to 200 selected captures in shelf order. Choose format, folder and keep-both/skip/replace policy once. Progress can be cancelled; completed files stay in place and the result reports failures and history warnings.
 - **Combine selected…** combines 2–20 captures into a native-pixel vertical strip, horizontal strip or grid. Reorder inputs, choose spacing/alignment/background and review the bounded preview. Confirmation creates a new PNG and opens the editor; originals and clipboard stay intact. Oversize layouts are rejected before rendering.
-- Tray → **Assisted scrolling…** selects a fixed viewport inside one application. Trim sticky headers/footers, scroll the application yourself, capture another frame and preview/accept its seam. Adjust overlap or reject/undo a join; uncertain joins need confirmation. Finish creates one PNG and opens the editor. Cancel discards staged frames. Static vertical content only, up to 30 frames / 10 minutes, with stricter image and staging budgets; window/DPI/display changes cancel the session. Chrome/Edge/Notepad physical acceptance remains pending; see [the supported scope](docs/ADR-001-ASSISTED-SCROLLING.md).
 - **Ctrl-click** several captures, then drag one selected image to export all of them. Multi-image Ctrl+C copies file-drop data; no universal multi-image bitmap paste format exists.
 - File-copy and drag use **ascending shelf-number order**, regardless of selection-click order. Alt-reordering changes that order. Cards grow outward from number 1 at the anchored corner, so physical left-to-right/top-to-bottom order can be reversed. History file transfers also use underlying shelf order, even if the history list is sorted by capture time. Receivers may present attachments in a different order.
 - For dock keyboard use, click a numbered badge or choose **Focus screenshot shelf (keyboard)** in the tray. Arrows move focus in the displayed direction; Home/End reach the first/last capture; Space toggles selection. Copy/Delete act on selected captures, or the focused capture if none are selected. Enter, Ctrl+S and Ctrl+P edit/export/pin the focused capture. Ctrl+H opens history; Ctrl+, opens settings. Tab reaches card controls; Escape clears selection and collapses. Hover and a new capture do not acquire keyboard focus.

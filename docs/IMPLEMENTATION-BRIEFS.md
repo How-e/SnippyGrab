@@ -104,7 +104,13 @@ Older acceptance summaries reported 51/51 closure for a particular accepted buil
 
 **Verification:** heterogeneous sizes, alpha/padding, odd grid rows, no unrequested scaling, shelf/history ordering, cross-view revisions, cancel/clear/exit, checked overflow and oversize rejection. Decoded composite pixels establish seam/layout accuracy. Confirm OCR, redaction/editor, pin, copy, drag and export work on the new capture. Inputs retain byte-identical PNG files.
 
+## F12–F17 — UI Design replacement
+
+The owner selected independent design layers with tracked changes and agent handoff on 2026-10-29. F12 removes assisted scrolling and prepares the design; F13–F17 are future implementation stages. Use [UI-DESIGN.md](UI-DESIGN.md) for contracts, integration boundaries, dependency order and acceptance criteria, and [ADR-003](ADR-003-UI-DESIGN-LAYERS.md) for the architectural decision. The interaction concept is synthetic and does not establish a production importer/editor. No new browser dependency is admitted by this design pass.
+
 ## F08 — Scrolling feasibility and scope decision
+
+**Retired 2026-10-29.** Historical brief below; superseded by F12–F17 and [ADR-003](ADR-003-UI-DESIGN-LAYERS.md).
 
 **Product goal:** one readable long still image. A generic screenshot tool cannot assume browsers, terminal logs, virtualized chats and spreadsheets expose the same scrolling or hidden content. Spreadsheets add frozen headers and horizontal scrolling; chats/logs may update continuously.
 
@@ -117,6 +123,8 @@ Older acceptance summaries reported 51/51 closure for a particular accepted buil
 **Go/no-go:** proceed with F09 only if the design supports bounded resource use, honest rejection of ambiguous joins, reversible seam correction and a defensible first target matrix. Otherwise ship manual combination and keep scrolling deferred. A later implementation agent may prototype only when specifically authorized; this research pass includes no prototype or runtime experiment.
 
 ## F09 — Bounded assisted scrolling capture
+
+**Removed 2026-10-29.** Historical brief below; do not implement or restore this workflow. Its replacement is in design under [UI Design](UI-DESIGN.md).
 
 **Integration after F08 approval:** a session coordinator in App separate from one-shot `CaptureService`, a pure overlap/layout component in Core, a small preview/control view and existing ImageService/PNG repository commit. F07 supplies layout/budget conventions; scrolling needs its own alignment logic. Keep frames private to the session until confirmed final output; do not auto-copy each frame.
 

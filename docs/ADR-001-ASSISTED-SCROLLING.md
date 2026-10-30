@@ -1,5 +1,7 @@
 # ADR 001 — bounded assisted vertical capture (F08)
 
+**Retired 2026-10-29.** The owner requested removal of assisted scrolling and design of a layer-based UI editing and agent handoff workflow. Its entry point, coordinator, window, staging, overlap algorithm and dedicated tests have been removed. This document preserves the historical decision only; it does not authorize restoring that workflow. [ADR-003](ADR-003-UI-DESIGN-LAYERS.md) supersedes this direction. Previously created PNGs remain supported. Old private staging directories are left untouched; removal does not delete user data.
+
 Decision: **GO for F09's narrow, user-assisted static viewport workflow**, authorized by the 2026-10-09 request to complete the remaining queue. No automatic scrolling, DOM access, browser extension, recording or universal application claim. This is a technical implementation decision; physical/application acceptance remains separate.
 
 The user selects a physical viewport inside one visible application window, explicitly trims a sticky header/footer if needed, captures the first frame, scrolls themselves and explicitly captures the next. The app hides its controls/shelf/pins, restores the selected target, checks its HWND/window bounds/DPI and display topology, then captures the fixed physical rectangle without cursor. A changed/disappeared/minimized target or failed foreground restore cancels the session. Internal application viewport changes cannot be inferred from HWND bounds; the user must cancel/reselect after sidebar/layout changes.

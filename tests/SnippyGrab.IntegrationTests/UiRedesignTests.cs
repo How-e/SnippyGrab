@@ -265,41 +265,6 @@ public sealed class UiRedesignTests
                     layout.SelectedIndex = 2; Assert.Equal(328, combine.Layout!.Width);
                 }
                 finally { combine.Close(); }
-                using (var session = new ScrollSession(Path.Combine(root, "guided-scroll")))
-                {
-                    var first = EditorDocumentTests.Fixture(); session.Stage(first);
-                    var scroll = new ScrollCaptureWindow(session, first, () => throw new InvalidOperationException("Capture is disabled in test."), (_, _) => throw new InvalidOperationException("Commit is disabled in test."));
-                    try
-                    {
-                        LayoutWindow(scroll);
-                        RenderReview(scroll, "scroll-Dark");
-                        var buttons = Children<Button>(scroll).Where(b => b.Content is string).ToDictionary(b => (string)b.Content);
-                        Assert.True(buttons["Capture next frame"].IsEnabled);
-                        Assert.False(buttons["Keep this frame"].IsEnabled);
-                        Assert.False(buttons["Discard this frame"].IsEnabled);
-                        Assert.False(buttons["Undo last frame"].IsEnabled);
-                        Assert.True(buttons["Create screenshot"].IsEnabled);
-                    }
-                    finally { scroll.Close(); }
-                }
-                using (var session = new ScrollSession(Path.Combine(root, "guided-scroll-pending")))
-                {
-                    var first = EditorDocumentTests.Fixture(); session.Stage(first); session.Stage(first);
-                    var scroll = new ScrollCaptureWindow(session, first, () => throw new InvalidOperationException("Capture is disabled in test."), (_, _) => throw new InvalidOperationException("Commit is disabled in test."));
-                    try
-                    {
-                        LayoutWindow(scroll);
-                        RenderReview(scroll, "scroll-Dark");
-                        var buttons = Children<Button>(scroll).Where(b => b.Content is string).ToDictionary(b => (string)b.Content);
-                        Assert.False(buttons["Capture next frame"].IsEnabled); Assert.False(buttons["Create screenshot"].IsEnabled);
-                        Assert.True(buttons["Keep this frame"].IsEnabled); Assert.True(buttons["Discard this frame"].IsEnabled);
-                        buttons["Discard this frame"].RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-                        RunUiTask(async () => { await scroll.PendingWork(); return true; });
-                        Assert.Null(session.Pending); Assert.Single(session.Frames);
-                        Assert.True(buttons["Capture next frame"].IsEnabled); Assert.True(buttons["Create screenshot"].IsEnabled);
-                    }
-                    finally { scroll.Close(); }
-                }
                 var history = new HistoryWindow(controller);
                 try
                 {

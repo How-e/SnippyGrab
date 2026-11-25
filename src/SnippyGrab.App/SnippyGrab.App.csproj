@@ -16,7 +16,7 @@
   <ItemGroup>
     <Content Include="Design\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
     <Content Include="..\..\scripts\update-helper.ps1" Link="update-helper.ps1" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
-    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4370.26" />
     <ProjectReference Include="..\SnippyGrab.Core\SnippyGrab.Core.csproj" />
     <PackageReference Include="Tesseract" Version="5.2.0" GeneratePathProperty="true" />
     <Content Include="tessdata\*.traineddata"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory><CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory></Content>
